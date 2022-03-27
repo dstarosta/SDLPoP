@@ -1082,10 +1082,33 @@ void __pascal far start_fall() {
 	} else if (frame >= 150 && frame < 180) {
 		// frame 150..179: with sword + fall + dead
 		if (Char.charid == charid_2_guard) {
+#ifdef KEEP_FALLEN_GUARD
+            // guards can also fallout into an adjacent room
+            if (Char.curr_row == 3) {
+    	        int fallout_room;
+    	        if (Char.curr_col >= 10 &&
+                        (fallout_room = level.roomlinks[Char.room - 1].right) &&
+                        (level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
+                	goto_other_room(1); // right
+                	Char.y = 211; // trigger fallout
+            		draw_guard_hp(0, guardhp_curr);
+    	        } else if (Char.curr_col <= -1 &&
+                            (fallout_room = level.roomlinks[Char.room - 1].left) &&
+                            (level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
+                	goto_other_room(0); // left
+                	Char.y = 211; // trigger fallout
+            		draw_guard_hp(0, guardhp_curr);
+                } else if (Char.curr_col <= -1 || Char.curr_col >= 10) {
+    				clear_char();
+    				return;
+                }
+            }
+#else
 			if (Char.curr_row == 3 && Char.curr_col == 10) {
 				clear_char();
 				return;
 			}
+#endif
 			if (Char.fall_x < 0) {
 				seq_id = seq_82_guard_pushed_off_ledge; // Guard is pushed off the ledge
 				if (Char.direction < dir_0_right && distance_to_edge_weight() <= 7) {
@@ -1394,6 +1417,16 @@ void __pascal far play_guard() {
 		if (Char.alive < 0) {
 			if (guardhp_curr == 0) {
 				Char.alive = 0;
+#ifdef KEEP_FALLEN_GUARD
+                // do not play the victory sound when a falling guard has no hitpoints
+				if (Char.curr_row > 2 && level.roomlinks[Char.room - 1].down) {
+				    return;
+				}
+				// Ensure victory sound is played. This is important for the Jaffar level.
+				if (Char.room != drawn_room) {
+					stop_sounds();
+				}
+#endif
 				on_guard_killed();
 			} else {
 				goto loc_7A65;

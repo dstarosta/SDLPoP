@@ -214,6 +214,13 @@ void __pascal far land() {
 	seqtbl_offset_char(seq_id);
 	play_seq();
 	Char.fall_y = 0;
+
+#ifdef KEEP_FALLEN_GUARD
+    // this method does not seem to handle skeletons probably due to the hardcoded event on level 3
+    if (Char.charid == charid_2_guard && Char.room != drawn_room) {
+        leave_guard();
+    }
+#endif
 }
 
 // seg005:01B7

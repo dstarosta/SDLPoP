@@ -241,6 +241,7 @@ loc_left_guard_tile:
 
 // seg002:0269
 void __pascal far check_guard_fallout() {
+    int fallout_room;
 	if (Guard.direction == dir_56_none || Guard.y < 211) {
 		return;
 	}
@@ -259,16 +260,18 @@ void __pascal far check_guard_fallout() {
 		Guard.direction = /*dir_0_right*/ custom->skeleton_reappear_dir;
 		Guard.alive = -1;
 		leave_guard();
-	}
 #ifdef KEEP_FALLEN_GUARD
-	else if (level.roomlinks[Guard.room - 1].down != 0) {
-		// Move one room below:
-		Guard.room = level.roomlinks[Guard.room - 1].down;
-		// Adjust coordinates to the room below:
+	} else if ((fallout_room = level.roomlinks[Guard.room - 1].down) &&
+            // prevents a live guard from disappearing if another guard falls into his room
+            (level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
+        if (Guard.room == drawn_room) {
+            level.guards_tile[drawn_room - 1] = -1;
+        }
+	    Guard.room = fallout_room;
 		Guard.y -= 189;
-		Guard.curr_row -= 3;
-		// Remove from current room:
-		level.guards_tile[drawn_room - 1] = -1;
+		Guard.curr_row = y_to_row_mod4(Guard.y);
+		draw_guard_hp(0, guardhp_curr);
+		droppedout = 0;
 	}
 #endif
 	else {
@@ -316,7 +319,12 @@ void __pascal far leave_guard() {
 	}
 	Guard.direction = dir_56_none;
 	draw_guard_hp(0, guardhp_curr);
-	guardhp_curr = 0;
+
+#ifdef KEEP_FALLEN_GUARD
+    // do not kill fallen guards that are still alive
+	if (Guard.room == drawn_room)
+#endif
+        guardhp_curr = 0;
 }
 
 // seg002:039E
@@ -388,6 +396,24 @@ void __pascal far exit_room() {
 	} else {
 		leave = 1;
 	}
+#ifdef KEEP_FALLEN_GUARD
+	if (Guard.alive < 0 && // guard alive
+            (Guard.action == actions_3_in_midair || // starting to fall
+             Guard.action == actions_4_in_freefall || // falling
+             // standing on a non-floor or a loose tile
+             !tile_is_floor(get_tile(Guard.room, Guard.curr_col, Guard.curr_row)) ||
+             (curr_tile2 == tiles_11_loose && (curr_room_tiles[curr_tilepos] & 0x20) == 0))) {
+        loadshad();
+        // When prince leaves room "autocontrol" can make guard sheathe sword causing him to stand in the air
+        // due to dx_weight() difference. Similar logic exists in the "start_fall()" function.
+        if (Char.sword == sword_2_drawn && distance_to_edge_weight() < 7) {
+            Char.x = char_dx_forward(-5);
+            saveshad();
+        }
+        // do not leave room or follow kid
+        return;
+    }
+#endif
 	if (leave) {
 		leave_guard();
 	} else {

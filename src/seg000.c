@@ -1226,7 +1226,9 @@ void __pascal far play_guard_frame() {
 		load_fram_det_col();
 		check_killed_shadow();
 		play_guard();
-#ifndef KEEP_FALLEN_GUARD
+#ifdef KEEP_FALLEN_GUARD
+        if (Char.room != 0)
+#else
 		if (Char.room == drawn_room)
 #endif
 		{
@@ -1444,6 +1446,12 @@ void __pascal far draw_hp() {
 			draw_kid_hp(0, 1);
 		}
 	}
+#ifdef KEEP_FALLEN_GUARD
+	// do not draw hitpoints of a guard in a different room
+	if (Guard.room != drawn_room) {
+	    return;
+    }
+#endif
 	if (guardhp_delta) {
 		draw_guard_hp(guardhp_curr, guardhp_max);
 	}
