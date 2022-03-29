@@ -417,12 +417,16 @@ void restore_room_after_quick_load() {
 	//redraw_screen(1); // for room_L
 
 	hitp_delta = guardhp_delta = 1; // force HP redraw
+
+#ifndef KEEP_FALLEN_GUARD
 	// Don't draw guard HP if a previously viewed room (with the H,J,U,N keys) had a guard but the current room doesn't have one.
+	// This logic is handled in the draw_hp() method when KEEP_FALLEN_GUARD is enabled
 	if (Guard.room != drawn_room) {
 		// Like in clear_char().
 		Guard.direction = dir_56_none;
 		guardhp_curr = 0;
 	}
+#endif
 
 	draw_hp();
 	loadkid_and_opp();
@@ -1233,7 +1237,9 @@ void __pascal far play_guard_frame() {
 #endif
 		{
 			play_seq();
+#ifndef KEEP_FALLEN_GUARD
 			if (Char.x >= 44 && Char.x < 211) {
+#endif
 				fall_accel();
 				fall_speed();
 				load_frame_to_obj();
@@ -1245,7 +1251,9 @@ void __pascal far play_guard_frame() {
 				check_spike_below();
 				check_spiked();
 				check_chomped_guard();
+#ifndef KEEP_FALLEN_GUARD
 			}
+#endif
 		}
 		saveshad();
 	}

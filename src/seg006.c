@@ -1083,26 +1083,29 @@ void __pascal far start_fall() {
 		// frame 150..179: with sword + fall + dead
 		if (Char.charid == charid_2_guard) {
 #ifdef KEEP_FALLEN_GUARD
-            // guards can also fallout into an adjacent room
-            if (Char.curr_row == 3) {
-    	        int fallout_room;
-    	        if (Char.curr_col >= 10 &&
-                        (fallout_room = level.roomlinks[Char.room - 1].right) &&
-                        (level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
-                	goto_other_room(1); // right
-                	Char.y = 211; // trigger fallout
-            		draw_guard_hp(0, guardhp_curr);
-    	        } else if (Char.curr_col <= -1 &&
-                            (fallout_room = level.roomlinks[Char.room - 1].left) &&
-                            (level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
-                	goto_other_room(0); // left
-                	Char.y = 211; // trigger fallout
-            		draw_guard_hp(0, guardhp_curr);
-                } else if (Char.curr_col <= -1 || Char.curr_col >= 10) {
-    				clear_char();
-    				return;
-                }
-            }
+			// correct coordinates for guards falling in an adjacent room from row 3
+			if (Char.curr_row == 3) {
+				int fallout_room;
+				if (Char.curr_col >= 10 &&
+						(fallout_room = level.roomlinks[Char.room - 1].right) &&
+						(level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
+					level.guards_tile[Char.room - 1] = -1;
+					goto_other_room(1); // right
+					draw_guard_hp(0, guardhp_curr);
+				} else if (Char.curr_col < -1 && // column -1 is still visible
+							(fallout_room = level.roomlinks[Char.room - 1].left) &&
+							(level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
+					level.guards_tile[Char.room - 1] = -1;
+					goto_other_room(0); // left
+					draw_guard_hp(0, guardhp_curr);
+				} else if (Char.curr_col < -1 || Char.curr_col >= 10) {
+					clear_char();
+					return;
+				} else if (Char.room == level.roomlinks[drawn_room - 1].up) {
+					// align guard dropping from the room above
+					Char.x = x_bump[Char.curr_col + 5] + 7;
+				}
+			}
 #else
 			if (Char.curr_row == 3 && Char.curr_col == 10) {
 				clear_char();
@@ -1416,17 +1419,18 @@ void __pascal far play_guard() {
 	} else {
 		if (Char.alive < 0) {
 			if (guardhp_curr == 0) {
-				Char.alive = 0;
 #ifdef KEEP_FALLEN_GUARD
-                // do not play the victory sound when a falling guard has no hitpoints
-				if (Char.curr_row > 2 && level.roomlinks[Char.room - 1].down) {
+                // Do not play the victory sound while a guard is falling.
+				if (Char.action == actions_3_in_midair || Char.action == actions_4_in_freefall) {
 				    return;
 				}
 				// Ensure victory sound is played. This is important for the Jaffar level.
-				if (Char.room != drawn_room) {
-					stop_sounds();
+				if (check_sound_playing() &&
+						(current_sound == sound_0_fell_to_death || current_sound == sound_46_chomped || current_sound == sound_48_spiked)) {
+					return;
 				}
 #endif
+				Char.alive = 0;
 				on_guard_killed();
 			} else {
 				goto loc_7A65;

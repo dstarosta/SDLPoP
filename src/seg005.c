@@ -36,9 +36,37 @@ void __pascal far seqtbl_offset_opp(int seq_index) {
 // seg005:0030
 void __pascal far do_fall() {
 	if (is_screaming == 0 && Char.fall_y >= 31) {
+		#ifdef KEEP_FALLEN_GUARD
+		// skeleton and shadow should not scream
+		if (Char.charid == charid_0_kid || Char.charid == charid_2_guard) {
+		#endif
 		play_sound(sound_1_falling); // falling
 		is_screaming = 1;
+		#ifdef KEEP_FALLEN_GUARD
+		}
+		#endif
 	}
+
+	#ifdef KEEP_FALLEN_GUARD
+	// correct coordinates for guards falling in an adjacent room
+	if (Char.charid == charid_2_guard) {
+		int fallout_room;
+		if (Char.curr_col >= 10 &&
+				(fallout_room = level.roomlinks[Char.room - 1].right) &&
+				(level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
+			level.guards_tile[Char.room - 1] = -1;
+			goto_other_room(1); // right
+			draw_guard_hp(0, guardhp_curr);
+		} else if (Char.curr_col < -1 &&
+				    (fallout_room = level.roomlinks[Char.room - 1].left) &&
+				    (level.guards_tile[fallout_room - 1] >= 30 || level.guards_seq_hi[fallout_room - 1] != 0)) {
+			level.guards_tile[Char.room - 1] = -1;
+			goto_other_room(0); // left
+			draw_guard_hp(0, guardhp_curr);
+		}
+	}
+	#endif
+
 	if ((word)y_land[Char.curr_row + 1] > (word)Char.y) {
 		check_grab();
 
@@ -160,12 +188,18 @@ void __pascal far land() {
 			loc_5EE6:
 			if (is_spike_harmful()) {
 				spiked();
+				#ifdef KEEP_FALLEN_GUARD
+				goto loc_dead_fallen_guard;
+				#endif
 				return;
 			}
 			#ifdef FIX_SAFE_LANDING_ON_SPIKES
 			else if (fixes->fix_safe_landing_on_spikes && curr_room_modif[curr_tilepos] == 0) {
 				// spikes ARE dangerous, just not out yet.
 				spiked();
+				#ifdef KEEP_FALLEN_GUARD
+				goto loc_dead_fallen_guard;
+				#endif
 				return;
 			}
 			#endif // FIX_SAFE_LANDING_ON_SPIKES
@@ -184,6 +218,17 @@ void __pascal far land() {
 					play_sound(sound_17_soft_land); // soft land (crouch)
 					is_guard_notice = 1;
 				}
+				#ifdef KEEP_FALLEN_GUARD
+				// guard falls 1 row, possibly into another room
+				if (Char.charid == charid_2_guard) {
+					// gets rid of a weird land then die animation when a guard without any hit points falls 1 row
+					if (guardhp_curr == 0) {
+						goto loc_5F75;
+					}
+					// play soft land sound
+					play_sound(sound_17_soft_land);
+				}
+				#endif
 			} else if (Char.fall_y < 33) {
 				// fell 2 rows
 				if (Char.charid == charid_1_shadow) goto loc_5EFD;
@@ -216,8 +261,13 @@ void __pascal far land() {
 	Char.fall_y = 0;
 
 #ifdef KEEP_FALLEN_GUARD
+loc_dead_fallen_guard:
     // this method does not seem to handle skeletons probably due to the hardcoded event on level 3
     if (Char.charid == charid_2_guard && Char.room != drawn_room) {
+		if (guardhp_curr == 0 || guardhp_delta == -guardhp_curr) {
+			Char.alive = 0x80; // a special value of -128 that saves guard as dead but calls on_guard_killed()
+			saveshad();
+		}
         leave_guard();
     }
 #endif

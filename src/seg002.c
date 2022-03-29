@@ -270,7 +270,13 @@ void __pascal far check_guard_fallout() {
 	    Guard.room = fallout_room;
 		Guard.y -= 189;
 		Guard.curr_row = y_to_row_mod4(Guard.y);
-		draw_guard_hp(0, guardhp_curr);
+		// Hit points should be displayed when guard follows prince from above.
+		if (Guard.room == drawn_room && Guard.alive < 0) {
+			draw_guard_hp(guardhp_curr, guardhp_max);
+		} else {
+			draw_guard_hp(0, guardhp_curr);
+		}
+		// Guards in another room should not think that prince dropped out.
 		droppedout = 0;
 	}
 #endif
@@ -311,7 +317,14 @@ void __pascal far leave_guard() {
 	level.guards_x[room_minus_1] = Guard.x;
 	level.guards_dir[room_minus_1] = Guard.direction;
 	level.guards_skill[room_minus_1] = guard_skill;
+#ifdef KEEP_FALLEN_GUARD
+	if (Guard.alive == (sbyte) 0x80) {
+		level.guards_seq_lo[room_minus_1] = Guard.curr_seq;
+		level.guards_seq_hi[room_minus_1] = Guard.curr_seq >> 8;
+    } else if (Guard.alive < 0) {
+#else
 	if (Guard.alive < 0) {
+#endif
 		level.guards_seq_hi[room_minus_1] = 0;
 	} else {
 		level.guards_seq_lo[room_minus_1] = Guard.curr_seq;
@@ -321,10 +334,10 @@ void __pascal far leave_guard() {
 	draw_guard_hp(0, guardhp_curr);
 
 #ifdef KEEP_FALLEN_GUARD
-    // do not kill fallen guards that are still alive
+	// do not kill fallen guards that are still alive
 	if (Guard.room == drawn_room)
 #endif
-        guardhp_curr = 0;
+	guardhp_curr = 0;
 }
 
 // seg002:039E
@@ -388,6 +401,19 @@ void __pascal far exit_room() {
 				if (Guard.curr_row >= 0) leave = 1;
 			} else {
 				// down
+#ifdef KEEP_FALLEN_GUARD
+				// Kid dropped out into a room below without a guard.
+				// guard_follows_kid_down() now can still control the guard in another room.
+				if (droppedout &&
+						Kid.room != 0 && Kid.room == level.roomlinks[Guard.room - 1].down &&
+						(level.guards_tile[Guard.room - 1] >= 30 || level.guards_seq_hi[Guard.room - 1] != 0) &&
+						Kid.curr_row == 0 && Guard.curr_row == 2) {
+					return;
+				} else {
+					// Otherwise, guards in another room should not think that prince dropped out.
+					droppedout = 0;
+				}
+#endif
 				if (Guard.curr_row < 3) leave = 1;
 			}
 		} else {
@@ -859,8 +885,14 @@ void __pascal far guard_follows_kid_down() {
 			wall_type(curr_tile2) != 0 ||
 			// ... or into a chasm
 			! tile_is_floor(curr_tile2)) ||
+#ifdef KEEP_FALLEN_GUARD
+			// ... or Kid is below or at the top row of the room below
+			((Char.curr_row + 1 != Opp.curr_row) &&
+				(Char.curr_row != 2 || Opp.curr_row != 0 || Opp.room != level.roomlinks[Char.room - 1].down))
+#else
 			// ... or Kid is not below
 			Char.curr_row + 1 != Opp.curr_row
+#endif
 		))
 	) {
 		// don't follow
