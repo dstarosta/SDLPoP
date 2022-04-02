@@ -406,7 +406,7 @@ void __pascal far exit_room() {
 				// guard_follows_kid_down() now can still control the guard in another room.
 				if (droppedout &&
 						Kid.room != 0 && Kid.room == level.roomlinks[Guard.room - 1].down &&
-						(level.guards_tile[Guard.room - 1] >= 30 || level.guards_seq_hi[Guard.room - 1] != 0) &&
+						(level.guards_tile[Kid.room - 1] >= 30 || level.guards_seq_hi[Kid.room - 1] != 0) &&
 						Kid.curr_row == 0 && Guard.curr_row == 2) {
 					return;
 				} else {
