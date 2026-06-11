@@ -3,8 +3,8 @@
 CC = gcc
 RM = rm -f
 
-HFILES = common.h config.h data.h proto.h types.h
-OBJ = main.o data.o seg000.o seg001.o seg002.o seg003.o seg004.o seg005.o seg006.o seg007.o seg008.o seg009.o seqtbl.o replay.o options.o lighting.o screenshot.o menu.o midi.o opl3.o stb_vorbis.o
+HFILES = common.h config.h data.h proto.h types.h mt32synth.h
+OBJ = main.o data.o seg000.o seg001.o seg002.o seg003.o seg004.o seg005.o seg006.o seg007.o seg008.o seg009.o seqtbl.o replay.o options.o lighting.o screenshot.o menu.o midi.o opl3.o mt32synth.o stb_vorbis.o
 BIN = ../prince
 
 OS      := $(shell uname)
@@ -17,6 +17,16 @@ CFLAGS += $(shell pkg-config --cflags sdl2 SDL2_image)
 
 ifeq ($(OS),Darwin)
 CPPFLAGS += -D_THREAD_SAFE -DOSX
+endif
+
+# mt32synth loads libmt32emu dynamically at run time (dlopen), so link the dynamic loader.
+# Windows uses LoadLibrary from kernel32 (linked by default); only *nix needs -ldl.
+ifneq ($(OS),Darwin)
+ifneq (,$(findstring MINGW,$(OS)))
+# MinGW/Windows: no -ldl needed.
+else
+LIBS += -ldl
+endif
 endif
 
 all: $(BIN)

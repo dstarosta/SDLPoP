@@ -1,7 +1,7 @@
 [Project]
 FileName=port_release.dev
 Name=SDLPoP
-UnitCount=27
+UnitCount=29
 Type=0
 Ver=2
 ObjFiles=
@@ -319,4 +319,24 @@ Link=1
 Priority=1000
 OverrideBuildCmd=0
 BuildCmd=$(CC) -c stb_vorbis.c -o stb_vorbis.o $(CFLAGS)
+
+[Unit28]
+FileName=mt32synth.h
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit29]
+FileName=mt32synth.c
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
 

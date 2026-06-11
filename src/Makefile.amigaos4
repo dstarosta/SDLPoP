@@ -6,10 +6,10 @@ CC = ppc-amigaos-gcc
 STRIP = ppc-amigaos-strip
 RM = rm -f
 
-HFILES = common.h config.h data.h proto.h types.h
+HFILES = common.h config.h data.h proto.h types.h mt32synth.h
 OBJ = main.o data.o seg000.o seg001.o seg002.o seg003.o seg004.o seg005.o seg006.o \
 seg007.o seg008.o seg009.o seqtbl.o replay.o options.o lighting.o screenshot.o menu.o \
-midi.o opl3.o stb_vorbis.o
+midi.o opl3.o mt32synth.o stb_vorbis.o
 
 OS := $(shell uname)
 
@@ -19,8 +19,10 @@ else
 	AMIGADATE = $(shell date +"%-d.%-m.%Y")
 endif
 
-LIBS = -lSDL2_image -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL2 -lpthread
-#LIBS = -lSDL2_image -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL2 -lpthread -athread=native -use-dynld
+# -ldl: mt32synth uses dlopen() to load libmt32emu at run time (graceful OPL fallback if the
+# library/ROMs are absent, which is the normal case on AmigaOS4).
+LIBS = -lSDL2_image -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL2 -lpthread -ldl
+#LIBS = -lSDL2_image -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL2 -lpthread -athread=native -use-dynld -ldl
 INCS = -gstabs -ISDK:Local/newlib/include/SDL2 -D__AMIGADATE__=\"$(AMIGADATE)\" -D__USE_INLINE__
 CFLAGS += $(INCS) -Wall -std=gnu99
 

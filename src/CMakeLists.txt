@@ -73,7 +73,7 @@ set(SOURCE_FILES
         seg009.c
         seqtbl.c
         options.c
-        midi.c opl3.c opl3.h
+        midi.c opl3.c opl3.h mt32synth.c mt32synth.h
         replay.c
         lighting.c
         screenshot.c
@@ -115,10 +115,12 @@ else()
             ${CMAKE_SOURCE_DIR}/../SDLPoP.ini ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/prince.app/Contents/MacOS/SDLPoP.ini)
 endif()
 
+# mt32synth loads libmt32emu dynamically (dlopen/LoadLibrary). ${CMAKE_DL_LIBS} is the
+# portable dynamic-loader library: empty on Windows, "dl" on Linux/*BSD.
 if(WIN32)
-    target_link_libraries(prince mingw32 SDL2main SDL2 SDL2_image)
+    target_link_libraries(prince mingw32 SDL2main SDL2 SDL2_image ${CMAKE_DL_LIBS})
 elseif(APPLE)
-    target_link_libraries(prince SDL2main SDL2 SDL2_image m)
+    target_link_libraries(prince SDL2main SDL2 SDL2_image m ${CMAKE_DL_LIBS})
 elseif(PSP) # Linux, *BSD, etc.
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 	include(FindPkgConfig)
@@ -136,5 +138,5 @@ elseif(PSP) # Linux, *BSD, etc.
 		TITLE prince
 	)
 else()
-    	target_link_libraries(prince SDL2 SDL2_image m)
+    	target_link_libraries(prince SDL2 SDL2_image m ${CMAKE_DL_LIBS})
 endif()

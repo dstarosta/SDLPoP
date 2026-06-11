@@ -12,6 +12,9 @@ QUICKSAVE.SAV
 # PoP custom levelsets
 mods/*/
 
+# MT32 ROMs
+/roms
+
 # Object files
 *.o
 *.ko
@@ -33,6 +36,8 @@ mods/*/
 
 # Shared objects (inc. Windows DLLs)
 *.dll
+!libmt32emu.dll
+!libmt32emu-x64.dll
 *.so
 *.so.*
 *.dylib
