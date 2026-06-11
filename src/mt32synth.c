@@ -79,8 +79,8 @@ typedef void* dynlib_t;
 #define DYNLIB_SYM(lib, sym)     dlsym((lib), (sym))
 #define DYNLIB_CLOSE(lib)        dlclose(lib)
 static const char* k_dll_names[] = {
-    "libmt32emu.so.2", "libmt32emu.so", "libmt32emu.so.2.7.1",   // Linux / *BSD
-    "libmt32emu.2.dylib", "libmt32emu.dylib",                    // macOS
+    "libmt32emu.so.2", "libmt32emu.so",       // Linux / *BSD
+    "libmt32emu.2.dylib", "libmt32emu.dylib", // macOS
 };
 #endif
 
