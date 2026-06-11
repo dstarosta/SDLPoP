@@ -1,14 +1,22 @@
 /*
-mt32synth.c: real MT-32 / CM-32L music for SDLPoP via libmt32emu. See mt32synth.h.
+mt32synth.c: Roland MT-32 / CM-32L music for SDLPoP, via libmt32emu.
 
-This is a thin wrapper around Munt's libmt32emu C API. SDLPoP feeds it the game's raw MIDI
-messages (including PoP's custom-timbre SysEx) and pulls rendered audio; the emulator does
-the actual Roland LA synthesis. It is always compiled in; whether it is actually used is
-decided at run time by whether mt32synth_init() finds the DLL and ROMs (see mt32synth.h).
+Copyright (C) 2026  Dmitry Starosta
 
-We declare the small slice of libmt32emu's stable C API we use right here, rather than
-vendoring the upstream headers, to keep this to a single .c/.h pair. The function names and
-signatures match github.com/munt/munt (libmt32emu 2.x, mt32emu/src/c_interface/c_interface.h).
+Munt mt32emu library is licensed under GPL v2.1.
+
+The code in this file is licensed under GPL v3+.
+
+SDLPoP's MIDI music can be played through a real MT-32 emulator (Munt's libmt32emu, the
+same core DOSBox uses) instead of the OPL/Adlib emulator. The game's MIDI bytes — note
+on/off, program changes and Prince of Persia's custom-timbre SysEx upload — are fed
+straight to the emulator, so it sounds exactly like the original Roland hardware with PoP's
+instruments. No sample bank, no pitch-shifting.
+
+The MT-32/CM-32L ROMs are NOT shipped (they are copyrighted). The user drops their own
+licensed ROM files into SDLPoP's "data/roms" folder (see MT32_ROM_DIR in config.h),
+DOSBox-style. Both a CM-32L pair and an MT-32 pair are accepted; the emulator identifies
+
 */
 
 #include "mt32synth.h"

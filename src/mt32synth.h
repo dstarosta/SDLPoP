@@ -1,7 +1,11 @@
 /*
-mt32synth.h: real Roland MT-32 / CM-32L music for SDLPoP, via libmt32emu.
+mt32synth.h: Roland MT-32 / CM-32L music for SDLPoP, via libmt32emu.
 
 Copyright (C) 2026  Dmitry Starosta
+
+Munt mt32emu library is licensed under GPL v2.1.
+
+The code in this file is licensed under GPL v3+.
 
 SDLPoP's MIDI music can be played through a real MT-32 emulator (Munt's libmt32emu, the
 same core DOSBox uses) instead of the OPL/Adlib emulator. The game's MIDI bytes — note
