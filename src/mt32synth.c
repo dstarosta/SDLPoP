@@ -111,11 +111,15 @@ static dynlib_t open_libmt32emu_in(const char* dir) {
         const char* name = k_dll_names[i];
         if (dir != NULL) {
             snprintf(path, sizeof(path), "%s/%s", dir, name);
-            dynlib_t h = DYNLIB_OPEN(path);
-            if (h) return h;
+            dynlib_t handle = DYNLIB_OPEN(path);
+            if (handle) {
+                return handle;
+            }
         } else {
-            dynlib_t h = DYNLIB_OPEN(name); // bare name -> system library search path
-            if (h) return h;
+            dynlib_t handle = DYNLIB_OPEN(name); // bare name -> system library search path
+            if (handle) {
+                return handle;
+            }
         }
     }
     return NULL;
@@ -210,12 +214,17 @@ static int load_roms(mt32emu_context c, const char* rom_dir) {
         int got_control = 0, got_pcm = 0;
         for (int k = 0; k < 2; ++k) {
             snprintf(path, sizeof(path), "%s/%s", rom_dir, groups[g][k]);
-            FILE* f = fopen(path, "rb");
-            if (!f) continue;
-            fclose(f);
+            FILE* file = fopen(path, "rb");
+            if (!file) {
+                continue;
+            }
+            fclose(file);
             int rc = mt32emu_add_rom_file(c, path);
-            if (rc == MT32EMU_RC_ADDED_CONTROL_ROM) got_control = 1;
-            else if (rc == MT32EMU_RC_ADDED_PCM_ROM) got_pcm = 1;
+            if (rc == MT32EMU_RC_ADDED_CONTROL_ROM) {
+                got_control = 1;
+            } else if (rc == MT32EMU_RC_ADDED_PCM_ROM) {
+                got_pcm = 1;
+            }
         }
         if (got_control && got_pcm) {
             return 1;
@@ -247,7 +256,7 @@ int mt32synth_init(int out_freq, const char* rom_dir) {
         mt32synth_free();
         return 0;
     }
-    mt32emu_set_analog_output_mode(ctx, MT32_ANALOG_OUTPUT_MODE);
+    mt32emu_set_analog_output_mode(ctx, mt_32_quality);
 
     if (mt32emu_open_synth(ctx) != MT32EMU_RC_OK) {
         fprintf(stderr, "mt32synth: mt32emu_open_synth failed\n");
@@ -256,7 +265,9 @@ int mt32synth_init(int out_freq, const char* rom_dir) {
     }
 
     synth_rate = (int)mt32emu_get_actual_stereo_output_samplerate(ctx);
-    if (synth_rate <= 0) synth_rate = 32000;
+    if (synth_rate <= 0) {
+        synth_rate = 32000;
+    }
 
     render_have = 0;
     resample_pos = 0.0;
@@ -348,7 +359,9 @@ int mt32synth_capture_state(void) {
 }
 
 void mt32synth_send_message(int status, int data1, int data2) {
-    if (!ctx) return;
+    if (!ctx) {
+        return;
+    }
 
     unsigned int msg = (unsigned int)(status & 0xFF)
                        | ((unsigned int)(data1 & 0xFF) << 8)

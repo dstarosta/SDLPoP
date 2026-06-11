@@ -197,6 +197,7 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_boolean("use_correct_aspect_ratio", &use_correct_aspect_ratio);
 		process_boolean("use_integer_scaling", &use_integer_scaling);
 		process_byte("scaling_type", &scaling_type, &scaling_type_names_list);
+        process_int("mt_32_quality", &mt_32_quality, NULL);
 		process_boolean("enable_controller_rumble", &enable_controller_rumble);
 		process_boolean("joystick_only_horizontal", &joystick_only_horizontal);
 		process_int("joystick_threshold", &joystick_threshold, NULL);
@@ -483,6 +484,7 @@ void set_options_to_default() {
 	use_correct_aspect_ratio = 0;
 	use_integer_scaling = 0;
 	scaling_type = 0;
+    mt_32_quality = 2;
 	enable_controller_rumble = 1;
 	joystick_only_horizontal = 1;
 	joystick_threshold = 8000;

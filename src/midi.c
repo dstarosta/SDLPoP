@@ -863,7 +863,7 @@ int mt32_available(void) {
             mt32_ok = 0;
         }
         if (mt32_ok) {
-            printf("MT-32: Using Roland emulation for MIDI music.\n");
+            printf("MT-32: Using Roland emulation for MIDI music (quality: %d).\n", mt_32_quality);
         }
     }
     return mt32_ok;

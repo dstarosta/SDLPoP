@@ -395,12 +395,4 @@ The authors of this program may be contacted at https://forum.princed.org
 // Real Roland MT-32 / CM-32L ROM files relative path.
 #define MT32_ROM_DIR "roms"
 
-// MT-32 analog output emulation. This shapes the tone (bass/warmth) of the synthesized music:
-//   0 = DIGITAL_ONLY  cleanest/brightest, least bass; keeps native 32 kHz output
-//   1 = COARSE        emulates the low-pass filter (adds bass) at the native rate
-//   2 = ACCURATE      full analog stage — what DOSBox uses by default (warmest, most bass)
-//   3 = OVERSAMPLED   like ACCURATE but 2x oversampled (96 kHz); highest CPU
-// Default ACCURATE to match DOSBox.
-#define MT32_ANALOG_OUTPUT_MODE 2
-
 #endif
