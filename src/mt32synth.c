@@ -286,6 +286,9 @@ static int load_roms(mt32emu_context c, const char* rom_dir) {
 }
 
 const char* get_dac_name(int value) {
+    if (value < 0) {
+        return "OPL";
+    }
     switch (value) {
         case 1:
             return "PURE";

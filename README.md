@@ -134,6 +134,7 @@ See their contents for license information.
 * `draw` -- Draw directly to the screen, skipping the offscreen buffer.
 * `demo` -- Run in demo mode: only the first two levels will be playable, and quotes from magazine reviews will be displayed.
 * `stdsnd` -- Use PC speaker sounds.
+* `sblaster` -- Use digital sounds and Adlib/Sound Blaster MIDI sounds (Disables MT-32 MIDI emulation).
 
 **The following don't exist in the original game:**
 

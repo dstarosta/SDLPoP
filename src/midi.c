@@ -872,6 +872,12 @@ int mt32_available(void) {
     static int mt32_init_tried = 0;
     if (!mt32_init_tried) {
         mt32_init_tried = 1;
+        // MT32 DAC option set to a negative value means do not use MT-32.
+        // The "sblaster" command line parameter should force the digi/OPL path like PoP 1.3+.
+        if (mt32_dac < 0 || check_param("sblaster")) {
+            mt32_ok = 0;
+            return 0;
+        }
         init_digi();
         init_midi();
         if (!digi_unavailable && mt32synth_init(digi_audiospec->freq, MT32_ROM_DIR)) {
@@ -889,7 +895,7 @@ int mt32_available(void) {
             mt32_ok = 0;
         }
         if (mt32_ok) {
-            printf("MT-32: Using Roland emulation for MIDI music.\nDAC: %s, Quality: %d, Sampling Quality: %d, Reverb: %s.\n",
+            printf("MT-32: Using Roland emulation for MIDI music.\nDAC: %s, Emulation Quality: %d, Sampling Quality: %d, Reverb: %s.\n",
                    get_dac_name(mt32_dac), mt32_quality, mt32_sampling_quality, mt32_reverb ? "on" : "off");
         }
     }
