@@ -109,9 +109,10 @@ You can use either set:
 * **CM-32L** (recommended): `cm32l_control.rom` + `cm32l_pcm.rom`
 * **MT-32**: `mt32_control.rom` + `mt32_pcm.rom`
 
-CM-32L is preferred because Prince of Persia's Roland music was authored for it. The emulator
-recognises the ROMs by their contents, so the exact file names only need to match one of the pairs
-above (upper- or lower-case both work).
+CM-32L is preferred in the most cases because Prince of Persia's Roland music was authored for it.
+The only exception is the GENERATION1 DAC `mt32_dac` option which prefers the MT-32 ROM. The emulator
+recognises the ROMs by their contents, so the exact file names only need to match one of the pairs above
+(upper- or lower-case both work, but both files must use the same convention).
 
 ---
 
@@ -132,13 +133,26 @@ are not available or it could not find the MT-32 resource -1.
 
 ## Adjusting the sound (optional)
 
-A couple of compile-time options in `src/config.h` control the MT-32 feature:
+A few runtime options in `SDLPoP.ini` file control the MT-32 feature:
 
-* `MT32_ROM_DIR` — the relative ROM folder name (default `"roms"`).
-* `MT32_ANALOG_OUTPUT_MODE` — how much of the Roland's warm analog character to emulate
-  - `0` - digital, clean but more synthetic
-  - `1` - coarse
-  - `2` - accurate (default in most applications)
-  - `3` - oversampled (similar to accurate, higher quality, requires more CPU)
+* `mt32_dac` — shapes the tone/character of the output, emulating hardware DAC differences.
+  - `0` — NICE: produces the cleanest samples, no DAC tricks.
+  - `1` — PURE: clips samples within range, no DAC tricks; volume is normalized by SDL only.
+  - `2` — GENERATION1: emulates the old MT-32 DAC — warmer/softer top end. Prefers the MT-32 ROM over the CM-32L ROM.
+  - `3` — GENERATION2: emulates the newer MT-32 / CM-32L DAC (default).
 
-These are optional; the defaults are fine for normal use. The output matches DOSBox Staging.
+* `mt32_quality` — how much of the Roland's analog character to emulate, shaping the tone (bass/warmth) of the music.
+  - `0` — digital: only the digital path is emulated, the fastest mode; clean but more synthetic.
+  - `1` — coarse: coarse low-pass filter emulation, boosts higher frequencies, fixed sample rate.
+  - `2` — accurate: accurate low-pass filter, close to real hardware — warmer, more bass (default).
+  - `3` — oversampled: same as accurate but 2× over-sampled; the slowest mode, not recommended because of SDL re-sampling.
+
+* `mt32_sampling_quality` — quality of the libmt32emu emulator's internal resampler.
+  - `0` — fastest
+  - `1` — fast
+  - `2` — good (default)
+  - `3` — best
+
+* `mt32_reverb` — adds reverb to the MT-32 emulator's output signal (default: `true`).
+
+These are optional; the defaults are fine for normal use.

@@ -24,7 +24,8 @@ DOSBox-style. Both a CM-32L pair and an MT-32 pair are accepted; the emulator id
 
 #include "common.h"
 
-// --- SDLPoP-facing API (mirrors the role of the OPL routines in midi.c) -------------
+// Returns the DAC name by its value.
+const char* get_dac_name(int value);
 
 // Initializes the emulator and loads the ROMs from rom_dir (e.g. "data/roms").
 // Returns 1 on success, 0 if ROMs/DLL are unavailable to fall back on OPL.

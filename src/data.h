@@ -748,7 +748,10 @@ extern byte use_hardware_acceleration INIT(= 2);
 extern byte use_correct_aspect_ratio INIT(= 0);
 extern byte use_integer_scaling INIT(= 0);
 extern byte scaling_type INIT(= 0);
-extern int mt_32_quality INIT(= 2);
+extern int mt32_dac INIT(= 3);
+extern int mt32_quality INIT(= 2);
+extern int mt32_sampling_quality INIT(= 2);
+extern byte mt32_reverb INIT(= 1);
 #ifdef USE_LIGHTING
 extern byte enable_lighting INIT(= 0);
 extern image_type* lighting_mask;

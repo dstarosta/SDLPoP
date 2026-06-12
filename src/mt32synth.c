@@ -45,6 +45,11 @@ typedef mt32emu_context (*fn_create_context)(mt32emu_report_handler_i report_han
 typedef void            (*fn_free_context)(mt32emu_context context);
 typedef int             (*fn_add_rom_file)(mt32emu_context context, const char* filename);
 typedef void            (*fn_set_analog_output_mode)(mt32emu_context context, int mode);
+typedef void            (*fn_set_dac_input_mode)(mt32emu_const_context context, int mode);
+typedef void            (*fn_set_stereo_output_samplerate)(mt32emu_context context, double samplerate);
+typedef void            (*fn_set_samplerate_conversion_quality)(mt32emu_context context, int quality);
+typedef void            (*fn_set_reverb_overridden)(mt32emu_const_context context, int overridden);
+typedef void            (*fn_set_reverb_enabled)(mt32emu_const_context context, int enabled);
 typedef int             (*fn_open_synth)(mt32emu_const_context context);
 typedef void            (*fn_close_synth)(mt32emu_const_context context);
 typedef unsigned int    (*fn_get_actual_stereo_output_samplerate)(mt32emu_const_context context);
@@ -59,6 +64,11 @@ static fn_create_context                       mt32emu_create_context;
 static fn_free_context                         mt32emu_free_context;
 static fn_add_rom_file                         mt32emu_add_rom_file;
 static fn_set_analog_output_mode               mt32emu_set_analog_output_mode;
+static fn_set_dac_input_mode                   mt32emu_set_dac_input_mode;
+static fn_set_stereo_output_samplerate         mt32emu_set_stereo_output_samplerate;
+static fn_set_samplerate_conversion_quality    mt32emu_set_samplerate_conversion_quality;
+static fn_set_reverb_overridden                mt32emu_set_reverb_overridden;
+static fn_set_reverb_enabled                   mt32emu_set_reverb_enabled;
 static fn_open_synth                           mt32emu_open_synth;
 static fn_close_synth                          mt32emu_close_synth;
 static fn_get_actual_stereo_output_samplerate  mt32emu_get_actual_stereo_output_samplerate;
@@ -165,6 +175,11 @@ static int load_dll(const char* rom_dir) {
     mt32emu_free_context                        = (fn_free_context)                        resolve("mt32emu_free_context", &ok);
     mt32emu_add_rom_file                        = (fn_add_rom_file)                        resolve("mt32emu_add_rom_file", &ok);
     mt32emu_set_analog_output_mode              = (fn_set_analog_output_mode)              resolve("mt32emu_set_analog_output_mode", &ok);
+    mt32emu_set_dac_input_mode                  = (fn_set_dac_input_mode)                  resolve("mt32emu_set_dac_input_mode", &ok);
+    mt32emu_set_stereo_output_samplerate        = (fn_set_stereo_output_samplerate)        resolve("mt32emu_set_stereo_output_samplerate", &ok);
+    mt32emu_set_samplerate_conversion_quality   = (fn_set_samplerate_conversion_quality)   resolve("mt32emu_set_samplerate_conversion_quality", &ok);
+    mt32emu_set_reverb_overridden               = (fn_set_reverb_overridden)               resolve("mt32emu_set_reverb_overridden", &ok);
+    mt32emu_set_reverb_enabled                  = (fn_set_reverb_enabled)                  resolve("mt32emu_set_reverb_enabled", &ok);
     mt32emu_open_synth                          = (fn_open_synth)                          resolve("mt32emu_open_synth", &ok);
     mt32emu_close_synth                         = (fn_close_synth)                         resolve("mt32emu_close_synth", &ok);
     mt32emu_get_actual_stereo_output_samplerate = (fn_get_actual_stereo_output_samplerate) resolve("mt32emu_get_actual_stereo_output_samplerate", &ok);
@@ -200,38 +215,97 @@ static short last_frame[2] = {0, 0};      // final frame of the previous chunk (
 static int   have_last = 0;               // whether last_frame is valid
 static double resample_pos = 0.0;         // fractional frame index into the current chunk
 
+static int try_load_pair(mt32emu_context c, const char* rom_dir,
+                         const char* ctrl, const char* pcm) {
+    char path_ctrl[1024];
+    char path_pcm[1024];
+
+    if (snprintf(path_ctrl, sizeof(path_ctrl), "%s/%s", rom_dir, ctrl) >= (int)sizeof(path_ctrl)) {
+        return 0;
+    }
+    if (snprintf(path_pcm,  sizeof(path_pcm),  "%s/%s", rom_dir, pcm)  >= (int)sizeof(path_pcm)) {
+        return 0;
+    }
+    if (!file_exists(path_ctrl) || !file_exists(path_pcm)) {
+        return 0;
+    }
+    if (mt32emu_add_rom_file(c, path_ctrl) != MT32EMU_RC_ADDED_CONTROL_ROM) {
+        return 0;
+    }
+    if (mt32emu_add_rom_file(c, path_pcm) != MT32EMU_RC_ADDED_PCM_ROM) {
+        return 0;
+    }
+    return 1;
+}
+
+
 static int load_roms(mt32emu_context c, const char* rom_dir) {
-    static const char* groups[][2] = {
-        { "CM32L_CONTROL.ROM", "CM32L_PCM.ROM" }, // CM-32L (preferred)
-        { "cm32l_control.rom", "cm32l_pcm.rom" },
-        { "MT32_CONTROL.ROM",  "MT32_PCM.ROM"  }, // MT-32
-        { "mt32_control.rom",  "mt32_pcm.rom"  },
-        { "CONTROL.ROM",       "PCM.ROM"       }, // generic
-        { "control.rom",       "pcm.rom"       },
+    static const char* const variants[][2] = {
+        {"MT32_CONTROL.ROM",  "MT32_PCM.ROM"},  // [0,1] MT-32
+        {"mt32_control.rom",  "mt32_pcm.rom"},
+        {"CM32L_CONTROL.ROM", "CM32L_PCM.ROM"}, // [2,3] CM-32L
+        {"cm32l_control.rom", "cm32l_pcm.rom"},
+        {"CONTROL.ROM",       "PCM.ROM"},       // [4,5] generic
+        {"control.rom",       "pcm.rom"},
     };
-    char path[1024];
-    for (size_t g = 0; g < sizeof(groups) / sizeof(groups[0]); ++g) {
-        int got_control = 0, got_pcm = 0;
-        for (int k = 0; k < 2; ++k) {
-            snprintf(path, sizeof(path), "%s/%s", rom_dir, groups[g][k]);
-            FILE* file = fopen(path, "rb");
-            if (!file) {
-                continue;
+
+    enum { MT32_START = 0, MT32_COUNT = 2,
+           CM32L_START = 2, CM32L_COUNT = 2,
+           GENERIC_START = 4, GENERIC_COUNT = 2
+         };
+
+    int order[3][2];
+    const int mt32_first = mt32_dac == 2;
+
+    if (mt32_first) {
+        order[0][0] = MT32_START;
+        order[0][1] = MT32_COUNT;
+        order[1][0] = CM32L_START;
+        order[1][1] = CM32L_COUNT;
+    } else {
+        order[0][0] = CM32L_START;
+        order[0][1] = CM32L_COUNT;
+        order[1][0] = MT32_START;
+        order[1][1] = MT32_COUNT;
+    }
+    order[2][0] = GENERIC_START;
+    order[2][1] = GENERIC_COUNT;
+
+    for (int group = 0; group < 3; ++group) {
+        int start = order[group][0];
+        int count = order[group][1];
+        for (int i = start; i < start + count; ++i) {
+            if (try_load_pair(c, rom_dir, variants[i][0], variants[i][1])) {
+                printf("ROM: %s, %s.\n", variants[i][0], variants[i][1]);
+                return 1;
             }
-            fclose(file);
-            int rc = mt32emu_add_rom_file(c, path);
-            if (rc == MT32EMU_RC_ADDED_CONTROL_ROM) {
-                got_control = 1;
-            } else if (rc == MT32EMU_RC_ADDED_PCM_ROM) {
-                got_pcm = 1;
-            }
-        }
-        if (got_control && got_pcm) {
-            return 1;
         }
     }
+
     return 0;
 }
+
+const char* get_dac_name(int value) {
+    switch (value) {
+        case 1:
+            return "PURE";
+        case 2:
+            return "GENERATION1";
+        case 3:
+            return "GENERATION2";
+        default:
+            return "NICE";
+    }
+}
+
+static void mt32synth_apply_reverb_pref(void) {
+    if (!ctx || mt32_reverb) {
+        return;
+    }
+    mt32emu_set_reverb_overridden(ctx, 1); // ignore PoP's reverb SysEx
+    mt32emu_set_reverb_enabled(ctx, 0);    // keep reverb off
+}
+
 
 int mt32synth_init(int out_freq, const char* rom_dir) {
     mt32synth_free();
@@ -256,13 +330,20 @@ int mt32synth_init(int out_freq, const char* rom_dir) {
         mt32synth_free();
         return 0;
     }
-    mt32emu_set_analog_output_mode(ctx, mt_32_quality);
+
+    mt32emu_set_analog_output_mode(ctx, mt32_quality);
+    mt32emu_set_samplerate_conversion_quality(ctx, mt32_sampling_quality);
+    mt32emu_set_stereo_output_samplerate(ctx, (double)output_rate);
 
     if (mt32emu_open_synth(ctx) != MT32EMU_RC_OK) {
         fprintf(stderr, "mt32synth: mt32emu_open_synth failed\n");
         mt32synth_free();
         return 0;
     }
+
+    mt32emu_set_dac_input_mode(ctx, mt32_dac);
+
+    mt32synth_apply_reverb_pref();
 
     synth_rate = (int)mt32emu_get_actual_stereo_output_samplerate(ctx);
     if (synth_rate <= 0) {
@@ -272,6 +353,7 @@ int mt32synth_init(int out_freq, const char* rom_dir) {
     render_have = 0;
     resample_pos = 0.0;
     have_last = 0;
+
     return 1;
 }
 
@@ -288,6 +370,11 @@ void mt32synth_free(void) {
         mt32emu_free_context = NULL;
         mt32emu_add_rom_file = NULL;
         mt32emu_set_analog_output_mode = NULL;
+        mt32emu_set_dac_input_mode = NULL;
+        mt32emu_set_stereo_output_samplerate = NULL;
+        mt32emu_set_samplerate_conversion_quality = NULL;
+        mt32emu_set_reverb_overridden = NULL;
+        mt32emu_set_reverb_enabled = NULL;
         mt32emu_open_synth = NULL;
         mt32emu_close_synth = NULL;
         mt32emu_get_actual_stereo_output_samplerate = NULL;
@@ -309,13 +396,16 @@ void mt32synth_free(void) {
 }
 
 void mt32synth_all_notes_off(void) {
-    if (!ctx) return;
+    if (!ctx) {
+        return;
+    }
+
 
     // Close/open is the only thing that reliably clears the previous song's *live* state: still-
     // ringing partials AND the reverb delay lines (everything lighter leaves them alive). It also
     // flushes the internal MIDI queue for free. The catch: it is NOT thread-safe against rendering
     // and it discards the uploaded custom timbres -- so it must run ONLY on the main thread (callers
-    // hold the audio lock or have midi_playing==0), and the timbres are restored afterwards.
+    // hold the audio lock or have midi_playing == 0), and the timbres are restored afterwards.
 
     mt32emu_close_synth(ctx);
 
@@ -327,6 +417,8 @@ void mt32synth_all_notes_off(void) {
     if (state_bank != NULL) {
         mt32emu_apply_sysex_bank(ctx, state_bank, state_bank_len); // restore timbres (no re-init)
     }
+
+    mt32synth_apply_reverb_pref();
 
     render_have = 0;
     resample_pos = 0.0;

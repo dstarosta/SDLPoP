@@ -66,6 +66,7 @@ static int mixing_freq;
 static sbyte midi_semitones_higher;
 static float current_midi_tempo_modifier;
 
+static bool mt32_channel_has_program[MAX_MIDI_CHANNELS];
 static int mt32_ok = 0; // 1 = MT-32 emulator; 0 - fall back to OPL
 static int mt32_reset_pending = 0; // an MT-32 song ended
 
@@ -382,12 +383,26 @@ static void opl_write_instrument(instrument_type* instrument, byte voice) {
     }
 }
 
+// A channel that has NOT sent a program change plays on a default, concert-pitch timbre, so
+// PoP's play an octave too high unless played on a custom timbre.
+// A similar but unrelated issue is happening in OPL as well.
+static int normalize_mt32_note(byte channel, byte note) {
+    if (channel < MAX_MIDI_CHANNELS && mt32_channel_has_program[channel]) {
+        return note;
+    }
+    int n = (int)note - 12;
+    if (n < 0) {
+        n = 0;
+    }
+    return n;
+}
+
 static void midi_note_off(midi_event_type* event) {
     byte note = event->channel.param1;
     byte channel = event->channel.channel;
 
     if (mt32_ok) {
-        mt32synth_send_message(0x80 | channel, note, 0);
+        mt32synth_send_message(0x80 | channel, normalize_mt32_note(channel, note), 0);
         return;
     }
 
@@ -414,7 +429,7 @@ static void midi_note_on(midi_event_type* event) {
     byte channel = event->channel.channel;
 
     if (mt32_ok) {
-        mt32synth_send_message((velocity == 0 ? 0x80 : 0x90) | channel, note, velocity);
+        mt32synth_send_message((velocity == 0 ? 0x80 : 0x90) | channel, normalize_mt32_note(channel, note), velocity);
         return;
     }
 
@@ -492,6 +507,9 @@ static void process_midi_event(midi_event_type* event) {
             channel_instrument[event->channel.channel] = event->channel.param1;
 
             if (mt32_ok) {
+                if (event->channel.channel < MAX_MIDI_CHANNELS) {
+                    mt32_channel_has_program[event->channel.channel] = true;
+                }
                 mt32synth_send_message(0xC0 | event->channel.channel, event->channel.param1, 0);
             }
 
@@ -568,7 +586,15 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
             }
             if (is_sound_on && enable_music) {
                 for (int sample = 0; sample < advance_frames * 2; ++sample) {
-                    ((short*)stream)[sample] += temp_buffer[sample];
+                    // The line below causes overflows
+                    // ((short*)stream)[sample] += temp_buffer[sample];
+                    int mixed = (int)((short*)stream)[sample] + (int)temp_buffer[sample];
+                    if (mixed > 32767) {
+                        mixed = 32767;
+                    } else if (mixed < -32768) {
+                        mixed = -32768;
+                    }
+                    ((short*)stream)[sample] = (short)mixed;
                 }
             }
             free(temp_buffer);
@@ -863,7 +889,8 @@ int mt32_available(void) {
             mt32_ok = 0;
         }
         if (mt32_ok) {
-            printf("MT-32: Using Roland emulation for MIDI music (quality: %d).\n", mt_32_quality);
+            printf("MT-32: Using Roland emulation for MIDI music.\nDAC: %s, Quality: %d, Sampling Quality: %d, Reverb: %s.\n",
+                   get_dac_name(mt32_dac), mt32_quality, mt32_sampling_quality, mt32_reverb ? "on" : "off");
         }
     }
     return mt32_ok;
@@ -909,6 +936,10 @@ void play_midi_sound(sound_buffer_type* buffer) {
     midi_tracks = parsed_midi.tracks;
     num_midi_tracks = parsed_midi.num_tracks;
     midi_semitones_higher = 0;
+    // reset MT-32 program channels
+    for (int channel = 0; channel < MAX_MIDI_CHANNELS; channel++) {
+        mt32_channel_has_program[channel] = false;
+    }
     us_per_beat = 500000; // default tempo (500000 us/beat == 120 bpm)
     current_midi_tempo_modifier = midi_tempo_modifiers[current_sound];
     ticks_per_beat = parsed_midi.ticks_per_beat;
