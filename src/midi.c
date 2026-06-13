@@ -103,7 +103,7 @@ void free_parsed_midi(parsed_midi_type* parsed_midi) {
         free(parsed_midi->tracks[i].events);
     }
     free(parsed_midi->tracks);
-    memset(&parsed_midi, 0, sizeof(parsed_midi));
+    memset(parsed_midi, 0, sizeof(*parsed_midi));
 }
 
 bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
@@ -134,6 +134,11 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
     parsed_midi->ticks_per_beat = division;
 
     parsed_midi->tracks = calloc(1, num_tracks * sizeof(midi_track_type));
+    if (parsed_midi->tracks == NULL) {
+        printf("Warning: could not allocate memory for midi tracks.\n");
+        parsed_midi->num_tracks = 0;
+        return 0;
+    }
     parsed_midi->num_tracks = num_tracks;
     midi_raw_chunk_type* next_track_chunk = (midi_raw_chunk_type*) midi->header.tracks; // The first track chunk starts after the header chunk.
     byte last_event_type = 0;
@@ -141,8 +146,7 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
         midi_raw_chunk_type* track_chunk = next_track_chunk;
         if (memcmp(track_chunk->chunk_type, "MTrk", 4) != 0) {
             printf("Warning: midi track without 'MTrk' chunk header.\n");
-            free(parsed_midi->tracks);
-            memset(&parsed_midi, 0, sizeof(parsed_midi));
+            free_parsed_midi(parsed_midi);
             return 0;
         }
         next_track_chunk = (midi_raw_chunk_type*) (track_chunk->data + (dword) SDL_SwapBE32(track_chunk->chunk_length));
