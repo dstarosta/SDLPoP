@@ -407,7 +407,7 @@ void mt32synth_all_notes_off(void) {
     // Close/open is the only thing that reliably clears the previous song's *live* state: still-
     // ringing partials AND the reverb delay lines (everything lighter leaves them alive). It also
     // flushes the internal MIDI queue for free. The catch: it is NOT thread-safe against rendering
-    // and it discards the uploaded custom timbres -- so it must run ONLY on the main thread (callers
+    // and it discards the uploaded custom timbres - so it must run ONLY on the main thread (callers
     // hold the audio lock or have midi_playing == 0), and the timbres are restored afterwards.
 
     mt32emu_close_synth(ctx);

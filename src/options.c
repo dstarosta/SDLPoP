@@ -487,7 +487,7 @@ void set_options_to_default() {
 	use_correct_aspect_ratio = 0;
 	use_integer_scaling = 0;
 	scaling_type = 0;
-    mt32_dac = 3;
+    mt32_dac = 2;
     mt32_quality = 2;
     mt32_sampling_quality = 2;
     mt32_reverb = 1;
