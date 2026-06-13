@@ -68,7 +68,7 @@ static float current_midi_tempo_modifier;
 
 static bool mt32_channel_has_program[MAX_MIDI_CHANNELS];
 static int mt32_ok = 0; // 1 = MT-32 emulator; 0 - fall back to OPL
-static int mt32_reset_pending = 0; // an MT-32 song ended
+static int mt32_reset_pending = 1; // an MT-32 song ended or have not played yet
 
 // Tempo adjustments for specific songs:
 // * PV scene, with 'Story 3 Jaffar enters':
@@ -532,12 +532,11 @@ static void process_midi_event(midi_event_type* event) {
             }
             if (mt32_ok && !is_pop_transpose) {
                 int slen = (int)event->sysex.length;
-                byte* sx = malloc((size_t)slen + 1);
-                if (sx != NULL) {
+                static byte sx[4096];
+                if (slen + 1 <= (int)sizeof(sx)) {
                     sx[0] = 0xF0;
                     memcpy(sx + 1, event->sysex.data, (size_t)slen);
                     mt32synth_send_sysex(sx, slen + 1);
-                    free(sx);
                 }
             }
             break;
@@ -573,6 +572,7 @@ static void process_midi_event(midi_event_type* event) {
 void midi_callback(void* userdata, Uint8* stream, int len) {
     if (!midi_playing || len <= 0) return;
     int frames_needed = len / 4;
+    static short temp_buffer[4096];
     while (frames_needed > 0) {
         if (ticks_to_next_pause > 0) {
             // Fill the audio buffer (we have already processed the MIDI events up till this point)
@@ -582,7 +582,6 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
             int available_frames = (int)(((advance_us * mixing_freq) + ONE_SECOND_IN_US - 1) / ONE_SECOND_IN_US); // round up.
             int advance_frames = MIN(available_frames, frames_needed);
             advance_us = advance_frames * ONE_SECOND_IN_US / mixing_freq; // recalculate, in case the rounding up increased this.
-            short* temp_buffer = malloc(advance_frames * 4);
             if (mt32_ok) {
                 mt32synth_generate_stream(temp_buffer, advance_frames);
             } else {
@@ -601,7 +600,6 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
                     ((short*)stream)[sample] = (short)mixed;
                 }
             }
-            free(temp_buffer);
 
             frames_needed -= advance_frames;
             stream += advance_frames * 4;
@@ -648,13 +646,11 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
                 // All tracks have finished. Fill the remaining samples with silence and stop playback.
                 SDL_memset(stream, 0, frames_needed * 4);
 //				printf("midi_callback(): sound ended\n");
-                SDL_LockAudio();
                 midi_playing = 0;
                 if (mt32_ok) {
                     mt32_reset_pending = 1;
                 }
                 free_parsed_midi(&parsed_midi);
-                SDL_UnlockAudio();
                 return;
             } else {
                 // Need to delay (let the OPL chip do its work) until one of the tracks needs to process a MIDI event again.
@@ -872,7 +868,7 @@ static void mt32_send_init(void) {
 
 // Returns 1 if the real MT-32 emulator is up (MUNT mt32emu DLL + ROMs both present), 0 if we
 // must use the OPL/Adlib path. The emulator is brought up once, on first call.
-int mt32_available(void) {
+void init_mt32(void) {
     static int mt32_init_tried = 0;
     if (!mt32_init_tried) {
         mt32_init_tried = 1;
@@ -880,7 +876,7 @@ int mt32_available(void) {
         // The "sblaster" command line parameter should force the digi/OPL path like PoP 1.3+.
         if (mt32_dac < 0 || check_param("sblaster")) {
             mt32_ok = 0;
-            return 0;
+            return;
         }
         init_digi();
         init_midi();
@@ -888,7 +884,9 @@ int mt32_available(void) {
             mt32_ok = 1;
             if (mt32_init_parsed_ok) {
                 mt32_send_init();
-                if (!mt32synth_capture_state()) mt32_ok = 0;
+                if (!mt32synth_capture_state()) {
+                    mt32_ok = 0;
+                }
             } else {
                 mt32_ok = 0;
             }
@@ -903,7 +901,6 @@ int mt32_available(void) {
                    get_dac_name(mt32_dac), mt32_quality, mt32_sampling_quality, mt32_reverb ? "on" : "off");
         }
     }
-    return mt32_ok;
 }
 
 void play_midi_sound(sound_buffer_type* buffer) {
@@ -918,7 +915,7 @@ void play_midi_sound(sound_buffer_type* buffer) {
         return;
     }
 
-    if (mt32_available()) {
+    if (mt32_ok) {
         // No need to initialize MT-32 except for clearing reverb on song changes.
         if (mt32_reset_pending) {
             SDL_LockAudio();

@@ -729,4 +729,4 @@ void stop_midi(void);
 void init_midi(void);
 void midi_callback(void *userdata, Uint8 *stream, int len);
 void play_midi_sound(sound_buffer_type* buffer);
-int mt32_available(void);
+void init_mt32(void);

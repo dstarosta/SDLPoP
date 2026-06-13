@@ -419,6 +419,12 @@ void mt32synth_all_notes_off(void) {
 
     if (state_bank != NULL) {
         mt32emu_apply_sysex_bank(ctx, state_bank, state_bank_len); // restore timbres (no re-init)
+        // Flush the queued SysEx.
+        int drain_iters = 32 * (synth_rate / output_rate + 1);
+        short drain_buf[MT32_RENDER_CHUNK * 2];
+        for (int i = 0; i < drain_iters; ++i) {
+            mt32emu_render_bit16s(ctx, drain_buf, MT32_RENDER_CHUNK);
+        }
     }
 
     mt32synth_apply_reverb_pref();
