@@ -8,19 +8,19 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=implicit-function-declaration")
 # have CMake output binaries to the directory that contains the source files
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SDLPoP_SOURCE_DIR}/..")
 
-# SDLPoP requires the SDL2 and SDL2_image development libraries.
-# You can pass the SDL2 location to CMake like so: -DSDL2="C:/work/libraries/SDL2-2.0.8"
-# Or alternatively, specify the SDL2 location below:
+# SDLPoP requires the SDL3 and SDL3_image development libraries.
+# You can pass the SDL3 location to CMake like so: -DSDL3="C:/work/libraries/SDL3-3.0.0"
+# Or alternatively, specify the SDL3 location below:
 
-#set(SDL2 "C:/work/libraries/SDL2-2.0.8")
+#set(SDL3 "C:/work/libraries/SDL3-3.0.0")
 
-# On macOS, if you used Homebrew to install SDL2, the location may be something like this:
+# On macOS, if you used Homebrew to install SDL3, the location may be something like this:
 
-#set(SDL2 "/usr/local/Cellar/sdl2/2.0.5")
+#set(SDL3 "/usr/local/Cellar/sdl3/3.0.0")
 
-if (NOT(WIN32) AND (DEFINED SDL2))
-    include_directories(${SDL2}/include/SDL2)
-    link_directories(${SDL2}/lib)
+if (NOT(WIN32) AND (DEFINED SDL3))
+    include_directories(${SDL3}/include/SDL3)
+    link_directories(${SDL3}/lib)
 endif()
 
 if (WIN32)
@@ -36,21 +36,21 @@ if (WIN32)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mwindows")
     endif (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
 
-    # If the location of SDL2 is not specified, we will try to guess it.
-    if (NOT(DEFINED SDL2))
+    # If the location of SDL3 is not specified, we will try to guess it.
+    if (NOT(DEFINED SDL3))
         cmake_policy(SET CMP0015 NEW) # suppress warning about relative paths
-        set(SDL2 "../../SDL2-2.0.8")
+        set(SDL3 "../../SDL3-3.0.0")
     endif()
 
-    # Automatically detect whether we need the x86 or x64 version of the SDL2 library.
+    # Automatically detect whether we need the x86 or x64 version of the SDL3 library.
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(SDL2_ARCH "x86_64-w64-mingw32")
+        set(SDL3_ARCH "x86_64-w64-mingw32")
     else()
-        set(SDL2_ARCH "i686-w64-mingw32")
+        set(SDL3_ARCH "i686-w64-mingw32")
     endif()
 
-    include_directories(${SDL2}/${SDL2_ARCH}/include)
-    link_directories(${SDL2}/${SDL2_ARCH}/lib)
+    include_directories(${SDL3}/${SDL3_ARCH}/include)
+    link_directories(${SDL3}/${SDL3_ARCH}/lib)
 endif()
 
 set(SOURCE_FILES
@@ -90,8 +90,8 @@ else()
     # By default, a normal binary executable will be created.
     # If you want an Application Bundle instead, pass CREATE_BUNDLE to CMake like so: -DCREATE_BUNDLE=1
 
-    # NOTE: Currently, the SDL2 and SDL2_image frameworks are not being correctly included/linked in the bundle!
-    #       As long as this isn't fixed, these bundles will only work if SDL2 and SDL2_image are installed.
+    # NOTE: Currently, the SDL3 and SDL3_image frameworks are not being correctly included/linked in the bundle!
+    #       As long as this isn't fixed, these bundles will only work if SDL3 and SDL3_image are installed.
 
     set (SDLPoP_VERSION "1.24 RC")
     set (MACOSX_BUNDLE_INFO_STRING          ${PROJECT_NAME})
@@ -118,10 +118,10 @@ endif()
 # mt32synth loads libmt32emu dynamically (dlopen/LoadLibrary). ${CMAKE_DL_LIBS} is the
 # portable dynamic-loader library: empty on Windows, "dl" on Linux/*BSD.
 if(WIN32)
-    target_link_libraries(prince mingw32 SDL2main SDL2 SDL2_image ${CMAKE_DL_LIBS})
+    target_link_libraries(prince mingw32 SDL3 SDL3_image ${CMAKE_DL_LIBS})
 elseif(APPLE)
-    target_link_libraries(prince SDL2main SDL2 SDL2_image m ${CMAKE_DL_LIBS})
-elseif(PSP) # Linux, *BSD, etc.
+    target_link_libraries(prince SDL3 SDL3_image m ${CMAKE_DL_LIBS})
+elseif(PSP) # PSP port — SDL3 PSP support not verified; kept at SDL2 until tested
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 	include(FindPkgConfig)
 	pkg_search_module(SDL2 REQUIRED sdl2)
@@ -138,5 +138,5 @@ elseif(PSP) # Linux, *BSD, etc.
 		TITLE prince
 	)
 else()
-    	target_link_libraries(prince SDL2 SDL2_image m ${CMAKE_DL_LIBS})
+    	target_link_libraries(prince SDL3 SDL3_image m ${CMAKE_DL_LIBS})
 endif()

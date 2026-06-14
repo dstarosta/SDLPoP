@@ -17,20 +17,20 @@ if ERRORLEVEL 1 (
   exit /b
 )
 
-:: To override the directory for SDL2 library files, simply set the SDL environment variable in the command shell.
+:: To override the directory for SDL3 library files, simply set the SDL3 environment variable in the command shell.
 :: (You could do that from the command-line, or from a wrapper script that calls this one.)
 
-if [%SDL2%]==[] (
-  set SDL2=..\..\SDL2-2.0.6
+if [%SDL3%]==[] (
+  set SDL3=..\..\SDL3-3.0.0
 )
 
-if not exist %SDL2% (
-  echo Problem^: Could not find SDL2 directory.
-  echo Tried to look here^: %SDL2%
+if not exist %SDL3% (
+  echo Problem^: Could not find SDL3 directory.
+  echo Tried to look here^: %SDL3%
   echo,
-  echo To specify the SDL2 directory, set the SDL2 environment variable.
+  echo To specify the SDL3 directory, set the SDL3 environment variable.
   echo Example command:
-  echo set "SDL2=C:\work\libraries\SDL2-2.0.6"
+  echo set "SDL3=C:\work\libraries\SDL3-3.0.0"
   exit /b
 )
 
@@ -53,8 +53,8 @@ set PreprocessorDefinitions=
 
 :compile
 set SourceFiles= main.c data.c seg000.c seg001.c seg002.c seg003.c seg004.c seg005.c seg006.c seg007.c seg008.c seg009.c seqtbl.c replay.c options.c lighting.c screenshot.c menu.c midi.c opl3.c mt32synth.c stb_vorbis.c
-set CommonCompilerFlags= /nologo /MP /fp:fast /GR- /wd4048 %PreprocessorDefinitions% /I"%SDL2%\include"
-set CommonLinkerFlags= /subsystem:windows,5.01 /libpath:"%SDL2%\lib\%VSCMD_ARG_TGT_ARCH%" SDL2main.lib SDL2.lib SDL2_image.lib Shell32.lib icon.res /out:..\prince.exe
+set CommonCompilerFlags= /nologo /MP /fp:fast /GR- /wd4048 %PreprocessorDefinitions% /I"%SDL3%\include"
+set CommonLinkerFlags= /subsystem:windows,5.01 /libpath:"%SDL3%\lib\%VSCMD_ARG_TGT_ARCH%" SDL3.lib SDL3_image.lib Shell32.lib icon.res /out:..\prince.exe
 
 rc /nologo /fo icon.res icon.rc
 cl %BuildTypeCompilerFlags% %CommonCompilerFlags% %SourceFiles% /link %CommonLinkerFlags%
