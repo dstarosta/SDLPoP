@@ -71,6 +71,11 @@ static bool mt32_sound_has_programs_cache[59]; // true if sound has Program Chan
 static int mt32_ok = 0; // 1 = MT-32 emulator; 0 - fall back to OPL
 static int mt32_reset_pending = 1; // an MT-32 song ended or have not played yet
 
+// Sound IDs whose notes must be shifted down one octave because they sound more like the OPL version.
+static const int mt32_octave_down_sounds[] = {
+    sound_37_victory,
+};
+
 // Tempo adjustments for specific songs:
 // * PV scene, with 'Story 3 Jaffar enters':
 //   Speed must be exactly right, otherwise it will not line up with the flashing animation in the cutscene.
@@ -389,12 +394,22 @@ static void opl_write_instrument(instrument_type* instrument, byte voice) {
 }
 
 
+static byte mt32_adjust_note(byte note) {
+    for (size_t i = 0; i < sizeof(mt32_octave_down_sounds) / sizeof(mt32_octave_down_sounds[0]); ++i) {
+        if (current_sound == mt32_octave_down_sounds[i]) {
+            int shifted = (int)note - 12;
+            return (byte)(shifted < 0 ? 0 : shifted);
+        }
+    }
+    return note;
+}
+
 static void midi_note_off(midi_event_type* event) {
     byte note = event->channel.param1;
     byte channel = event->channel.channel;
 
     if (mt32_ok) {
-        mt32synth_send_message(0x80 | channel, note, 0);
+        mt32synth_send_message(0x80 | channel, mt32_adjust_note(note), 0);
         return;
     }
 
@@ -421,7 +436,7 @@ static void midi_note_on(midi_event_type* event) {
     byte channel = event->channel.channel;
 
     if (mt32_ok) {
-        mt32synth_send_message((velocity == 0 ? 0x80 : 0x90) | channel, note, velocity);
+        mt32synth_send_message((velocity == 0 ? 0x80 : 0x90) | channel, mt32_adjust_note(note), velocity);
         return;
     }
 
@@ -897,7 +912,9 @@ static bool midi_sound_has_program_changes(void) {
     bool found = false;
     for (int t = 0; t < parsed_midi.num_tracks && !found; ++t) {
         for (int i = 0; i < parsed_midi.tracks[t].num_events && !found; ++i) {
-            if (parsed_midi.tracks[t].events[i].event_type == 0xC0) found = true;
+            if (parsed_midi.tracks[t].events[i].event_type == 0xC0) {
+                found = true;
+            }
         }
     }
     if (id >= 0 && id < cache_size) {
