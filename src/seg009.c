@@ -1913,7 +1913,8 @@ void stop_digi(void) {
 stb_vorbis* ogg_decoder;
 
 void stop_ogg(void) {
-	SDL_PauseAudio(1);
+	// The stray pause causes gaps in audio playback.
+	// SDL_PauseAudio(1);
 	if (!ogg_playing) return;
 	ogg_playing = 0;
 	SDL_LockAudio();
@@ -2364,7 +2365,8 @@ sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
 	float freq_ratio = (float)waveinfo.sample_rate /  (float)digi_audiospec->freq;
 
 	int source_length = waveinfo.sample_count;
-	int expanded_frames = source_length * digi_audiospec->freq / waveinfo.sample_rate;
+	// Using a 64-bit int - source_length (up to 65535) * freq (44100) overflows int32.
+	int expanded_frames = (int)((int64_t)source_length * digi_audiospec->freq / waveinfo.sample_rate);
 	int expanded_length = expanded_frames * 2 * sizeof(short);
 	sound_buffer_type* converted_buffer = malloc(sizeof(sound_buffer_type) + expanded_length);
 
