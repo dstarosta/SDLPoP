@@ -1,4 +1,4 @@
-/*
+﻿/*
 SDLPoP, a port/conversion of the DOS game Prince of Persia.
 Copyright (C) 2013-2025  Dávid Nagy
 
@@ -466,10 +466,10 @@ dat_type* open_dat(const char* filename, int optional) {
 	if (fp != NULL) {
 		if (fread(&dat_header, 6, 1, fp) != 1)
 			goto failed;
-		dat_table = (dat_table_type*) malloc(SDL_SwapLE16(dat_header.table_size));
+		dat_table = (dat_table_type*) malloc(SDL_Swap16LE(dat_header.table_size));
 		if (dat_table == NULL ||
-		    fseek(fp, SDL_SwapLE32(dat_header.table_offset), SEEK_SET) ||
-		    fread(dat_table, SDL_SwapLE16(dat_header.table_size), 1, fp) != 1)
+		    fseek(fp, SDL_Swap32LE(dat_header.table_offset), SEEK_SET) ||
+		    fread(dat_table, SDL_Swap16LE(dat_header.table_size), 1, fp) != 1)
 			goto failed;
 		pointer->handle = fp;
 		pointer->dat_table = dat_table;
@@ -575,8 +575,8 @@ chtab_type* load_sprites_from_file(int resource,int palette_bits, int quit_on_er
 			}
 */
 			/*
-			if (SDL_SetColorKey(image, SDL_SRCCOLORKEY, 0) != 0) {
-				sdlperror("load_sprites_from_file: SDL_SetColorKey");
+			if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+				sdlperror("load_sprites_from_file: SDL_SetSurfaceColorKey");
 				quit(1);
 			}
 			*/
@@ -598,7 +598,7 @@ void free_chtab(chtab_type *chtab_ptr) {
 	for (word id = 0; id < n_images; ++id) {
 		curr_image = chtab_ptr->images[id];
 		if (curr_image) {
-			SDL_FreeSurface(curr_image);
+			SDL_DestroySurface(curr_image);
 		}
 	}
 	free(chtab_ptr);
@@ -798,20 +798,20 @@ void decompr_img(byte* dest,const image_data_type* source,int decomp_size,int cm
 			decompress_rle_lr(dest, source->data, decomp_size);
 		break;
 		case 2: // RLE up-to-down
-			decompress_rle_ud(dest, source->data, decomp_size, stride, SDL_SwapLE16(source->height));
+			decompress_rle_ud(dest, source->data, decomp_size, stride, SDL_Swap16LE(source->height));
 		break;
 		case 3: // LZG left-to-right
 			decompress_lzg_lr(dest, source->data, decomp_size);
 		break;
 		case 4: // LZG up-to-down
-			decompress_lzg_ud(dest, source->data, decomp_size, stride, SDL_SwapLE16(source->height));
+			decompress_lzg_ud(dest, source->data, decomp_size, stride, SDL_Swap16LE(source->height));
 		break;
 	}
 }
 
 int calc_stride(image_data_type* image_data) {
-	int width = SDL_SwapLE16(image_data->width);
-	int flags = SDL_SwapLE16(image_data->flags);
+	int width = SDL_Swap16LE(image_data->width);
+	int flags = SDL_Swap16LE(image_data->flags);
 	int depth = ((flags >> 12) & 7) + 1;
 	return (depth * width + 7) / 8;
 }
@@ -838,10 +838,10 @@ byte* conv_to_8bpp(byte* in_data, int width, int height, int stride, int depth) 
 }
 
 image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
-	int height = SDL_SwapLE16(image_data->height);
+	int height = SDL_Swap16LE(image_data->height);
 	if (height == 0) return NULL;
-	int width = SDL_SwapLE16(image_data->width);
-	int flags = SDL_SwapLE16(image_data->flags);
+	int width = SDL_Swap16LE(image_data->width);
+	int flags = SDL_Swap16LE(image_data->flags);
 	int depth = ((flags >> 12) & 7) + 1;
 	int cmeth = (flags >> 8) & 0x0F;
 	int stride = calc_stride(image_data);
@@ -851,7 +851,7 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 	decompr_img(dest, image_data, dest_size, cmeth, stride);
 	byte* image_8bpp = conv_to_8bpp(dest, width, height, stride, depth);
 	free(dest); dest = NULL;
-	image_type* image = SDL_CreateRGBSurface(0, width, height, 8, 0, 0, 0, 0);
+	image_type* image = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_INDEX8);
 	if (image == NULL) {
 		sdlperror("decode_image: SDL_CreateRGBSurface");
 		quit(1);
@@ -879,7 +879,7 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 	colors[0].g = 0;
 	colors[0].b = 0;
 	colors[0].a = SDL_ALPHA_TRANSPARENT;
-	SDL_SetPaletteColors(image->format->palette, colors, 0, 16); // SDL_SetColors = deprecated
+	SDL_SetPaletteColors(SDL_GetSurfacePalette(image), colors, 0, 16); // SDL_SetColors = deprecated
 	return image;
 }
 
@@ -898,17 +898,17 @@ image_type* load_image(int resource_id, dat_pal_type* palette) {
 			image = decode_image((image_data_type*) image_data, palette);
 		} break;
 		case data_directory: { // directory
-			SDL_RWops* rw = SDL_RWFromConstMem(image_data, size);
+			SDL_IOStream* rw = SDL_IOFromConstMem(image_data, size);
 			if (rw == NULL) {
-				sdlperror("load_image: SDL_RWFromConstMem");
+				sdlperror("load_image: SDL_IOFromConstMem");
 				return NULL;
 			}
-			image = IMG_Load_RW(rw, 0);
+			image = IMG_Load_IO(rw, 0);
 			if (image == NULL) {
-				printf("load_image: IMG_Load_RW: %s\n", IMG_GetError());
+				printf("load_image: IMG_Load_IO: %s\n", SDL_GetError());
 			}
-			if (SDL_RWclose(rw) != 0) {
-				sdlperror("load_image: SDL_RWclose");
+			if (SDL_CloseIO(rw) != 0) {
+				sdlperror("load_image: SDL_CloseIO");
 			}
 		} break;
 	}
@@ -918,23 +918,23 @@ image_type* load_image(int resource_id, dat_pal_type* palette) {
 	if (image != NULL) {
 		// should immediately start using the onscreen pixel format, so conversion will not be needed
 
-		if (SDL_SetColorKey(image, SDL_TRUE, 0) != 0) { //sdl 1.2: SDL_SRCCOLORKEY
-			sdlperror("load_image: SDL_SetColorKey");
+		if (SDL_SetSurfaceColorKey(image, true, 0) != 0) { //sdl 1.2: true
+			sdlperror("load_image: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
-//		printf("bpp = %d\n", image->format->BitsPerPixel);
+//		printf("bpp = %d\n", SDL_GetPixelFormatDetails(image->format)->bits_per_pixel);
 /*
 		if (SDL_SetSurfaceAlphaMod(image, 0) != 0) { //sdl 1.2: SDL_SetAlpha removed
 			sdlperror("load_image: SDL_SetAlpha");
 			quit(1);
 		}
 */
-//		image_type* colored_image = SDL_ConvertSurfaceFormat(image, SDL_PIXELFORMAT_ARGB8888, 0);
+//		image_type* colored_image = SDL_ConvertSurface(image, SDL_PIXELFORMAT_ARGB8888);
 //		if (!colored_image) {
 //			sdlperror("load_image: SDL_ConvertSurfaceFormat");
 //			quit(1);
 //		}
-//		SDL_FreeSurface(image);
+//		SDL_DestroySurface(image);
 //		image = colored_image;
 	}
 	return image;
@@ -952,32 +952,40 @@ void draw_image_transp(image_type* image,image_type* mask,int xpos,int ypos) {
 // seg009:157E
 int set_joy_mode() {
 	// stub
-	if (SDL_NumJoysticks() < 1) {
+	int num_joysticks = 0;
+	SDL_JoystickID* joystick_ids = SDL_GetJoysticks(&num_joysticks);
+	if (num_joysticks < 1) {
 		is_joyst_mode = 0;
 	} else {
 		if (gamecontrollerdb_file[0] != '\0') {
-			SDL_GameControllerAddMappingsFromFile(gamecontrollerdb_file);
+			SDL_AddGamepadMappingsFromFile(gamecontrollerdb_file);
 		}
 
-		if (SDL_IsGameController(0)) {
-			sdl_controller_ = SDL_GameControllerOpen(0);
+		if (SDL_IsGamepad(joystick_ids[0])) {
+			sdl_controller_ = SDL_OpenGamepad(joystick_ids[0]);
 			if (sdl_controller_ == NULL) {
 				is_joyst_mode = 0;
 			} else {
 				is_joyst_mode = 1;
 			}
 		}
-		// We have a joystick connected, but it's NOT compatible with the SDL_GameController
+		// We have a joystick connected, but it's NOT compatible with the SDL_Gamepad
 		// interface, so we resort to the classic SDL_Joystick interface instead
 		else {
-			sdl_joystick_ = SDL_JoystickOpen(0);
+			sdl_joystick_ = SDL_OpenJoystick(joystick_ids[0]);
 			is_joyst_mode = 1;
 			using_sdl_joystick_interface = 1;
 		}
 	}
+	SDL_free(joystick_ids);
 	if (enable_controller_rumble && is_joyst_mode) {
-		sdl_haptic = SDL_HapticOpen(0);
-		SDL_HapticRumbleInit(sdl_haptic); // initialize the device for simple rumble
+		int haptic_count = 0;
+		SDL_HapticID* haptic_ids = SDL_GetHaptics(&haptic_count);
+		if (haptic_ids && haptic_count > 0) {
+			sdl_haptic = SDL_OpenHaptic(haptic_ids[0]);
+			SDL_InitHapticRumble(sdl_haptic);
+		}
+		SDL_free(haptic_ids);
 	} else {
 		sdl_haptic = NULL;
 	}
@@ -991,21 +999,21 @@ surface_type* make_offscreen_buffer(const rect_type* rect) {
 	// stub
 #ifndef USE_ALPHA
 	// Bit order matches onscreen buffer, good for fading.
-	return SDL_CreateRGBSurface(0, rect->right, rect->bottom, 24, Rmsk, Gmsk, Bmsk, 0);
+	return SDL_CreateSurface(rect->right, rect->bottom, SURFACE_FORMAT_24BPP);
 #else
-	return SDL_CreateRGBSurface(0, rect->right, rect->bottom, 32, Rmsk, Gmsk, Bmsk, Amsk);
+	return SDL_CreateSurface(rect->right, rect->bottom, SURFACE_FORMAT_32BPP);
 #endif
 	//return surface;
 }
 
 // seg009:17BD
 void free_surface(surface_type* surface) {
-	SDL_FreeSurface(surface);
+	SDL_DestroySurface(surface);
 }
 
 // seg009:17EA
 void free_peel(peel_type* peel_ptr) {
-	SDL_FreeSurface(peel_ptr->peel);
+	SDL_DestroySurface(peel_ptr->peel);
 	free(peel_ptr);
 }
 
@@ -1178,9 +1186,9 @@ static void load_font_character_offsets(rawfont_type* data) {
 	int n_chars = data->last_char - data->first_char + 1;
 	byte* pos = (byte*) &data->offsets[n_chars];
 	for (int index = 0; index < n_chars; ++index) {
-		data->offsets[index] = SDL_SwapLE16(pos - (byte*) data);
+		data->offsets[index] = SDL_Swap16LE(pos - (byte*) data);
 		image_data_type* image_data = (image_data_type*) pos;
-		int image_bytes = SDL_SwapLE16(image_data->height) * calc_stride(image_data);
+		int image_bytes = SDL_Swap16LE(image_data->height) * calc_stride(image_data);
 		pos = (byte*) &image_data->data + image_bytes;
 	}
 }
@@ -1189,13 +1197,13 @@ font_type load_font_from_data(/*const*/ rawfont_type* data) {
 	font_type font;
 	font.first_char = data->first_char;
 	font.last_char = data->last_char;
-	font.height_above_baseline = SDL_SwapLE16(data->height_above_baseline);
-	font.height_below_baseline = SDL_SwapLE16(data->height_below_baseline);
-	font.space_between_lines = SDL_SwapLE16(data->space_between_lines);
-	font.space_between_chars = SDL_SwapLE16(data->space_between_chars);
+	font.height_above_baseline = SDL_Swap16LE(data->height_above_baseline);
+	font.height_below_baseline = SDL_Swap16LE(data->height_below_baseline);
+	font.space_between_lines = SDL_Swap16LE(data->space_between_lines);
+	font.space_between_chars = SDL_Swap16LE(data->space_between_chars);
 	int n_chars = font.last_char - font.first_char + 1;
 	// Allow loading a font even if the offsets for each character image were not supplied in the raw data.
-	if (SDL_SwapLE16(data->offsets[0]) == 0) {
+	if (SDL_Swap16LE(data->offsets[0]) == 0) {
 		load_font_character_offsets(data);
 	}
 	chtab_type* chtab = malloc(sizeof(chtab_type) + sizeof(image_type*) * n_chars);
@@ -1204,13 +1212,13 @@ font_type load_font_from_data(/*const*/ rawfont_type* data) {
 	memset(&dat_pal, 0, sizeof(dat_pal));
 	dat_pal.vga[1].r = dat_pal.vga[1].g = dat_pal.vga[1].b = 0x3F; // white
 	for (int index = 0, chr = data->first_char; chr <= data->last_char; ++index, ++chr) {
-		/*const*/ image_data_type* image_data = (/*const*/ image_data_type*)((/*const*/ byte*)data + SDL_SwapLE16(data->offsets[index]));
+		/*const*/ image_data_type* image_data = (/*const*/ image_data_type*)((/*const*/ byte*)data + SDL_Swap16LE(data->offsets[index]));
 		//image_data->flags=0;
-		if (image_data->height == SDL_SwapLE16(0)) image_data->height = SDL_SwapLE16(1); // HACK: decode_image() returns NULL if height==0.
+		if (image_data->height == SDL_Swap16LE(0)) image_data->height = SDL_Swap16LE(1); // HACK: decode_image() returns NULL if height==0.
 		image_type* image;
 		chtab->images[index] = image = decode_image(image_data, &dat_pal);
-		if (SDL_SetColorKey(image, SDL_TRUE, 0) != 0) {
-			sdlperror("load_font_from_data: SDL_SetColorKey");
+		if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+			sdlperror("load_font_from_data: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 	}
@@ -1623,8 +1631,8 @@ int input_str(const rect_type* rect,char* buffer,int max_length,const char *init
 	//SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
 	SDL_Rect sdlrect;
 	rect_to_sdlrect(rect, &sdlrect);
-	SDL_SetTextInputRect(&sdlrect);
-	SDL_StartTextInput();
+	SDL_SetTextInputArea(window_, &sdlrect, 0);
+	SDL_StartTextInput(window_);
 
 	word key;
 	short current_xpos;
@@ -1660,7 +1668,7 @@ int input_str(const rect_type* rect,char* buffer,int max_length,const char *init
 				}
 				if (key == SDL_SCANCODE_RETURN) { // Enter
 					buffer[length] = 0;
-					SDL_StopTextInput();
+					SDL_StopTextInput(window_);
 					return length;
 				} else break;
 			}
@@ -1673,7 +1681,7 @@ int input_str(const rect_type* rect,char* buffer,int max_length,const char *init
 		if (key == SDL_SCANCODE_ESCAPE) { // Esc
 			draw_rect(rect, bgcolor);
 			buffer[0] = 0;
-			SDL_StopTextInput();
+			SDL_StopTextInput(window_);
 			return -1;
 		}
 		if (length != 0 && (key == SDL_SCANCODE_BACKSPACE ||
@@ -1792,7 +1800,7 @@ void restore_peel(peel_type* peel_ptr) {
 	//printf("restoring peel at (x=%d, y=%d)\n", peel_ptr.rect.left, peel_ptr.rect.top); // debug
 	method_6_blit_img_to_scr(peel_ptr->peel, peel_ptr->rect.left, peel_ptr->rect.top, /*0x10*/0);
 	free_peel(peel_ptr);
-	//SDL_FreeSurface(peel_ptr.peel);
+	//SDL_DestroySurface(peel_ptr.peel);
 }
 
 // seg009:3BE9
@@ -1802,10 +1810,9 @@ peel_type* read_peel_from_screen(const rect_type* rect) {
 	//memset(&result, 0, sizeof(result));
 	result->rect = *rect;
 #ifndef USE_ALPHA
-	SDL_Surface* peel_surface = SDL_CreateRGBSurface(0, rect->right - rect->left, rect->bottom - rect->top,
-	                                                 24, Rmsk, Gmsk, Bmsk, 0);
+	SDL_Surface* peel_surface = SDL_CreateSurface(rect->right - rect->left, rect->bottom - rect->top, SURFACE_FORMAT_24BPP);
 #else
-	SDL_Surface* peel_surface = SDL_CreateRGBSurface(0, rect->right - rect->left, rect->bottom - rect->top, 32, Rmsk, Gmsk, Bmsk, Amsk);
+	SDL_Surface* peel_surface = SDL_CreateSurface(rect->right - rect->left, rect->bottom - rect->top, SURFACE_FORMAT_32BPP);
 #endif
 	if (peel_surface == NULL) {
 		sdlperror("read_peel_from_screen: SDL_CreateRGBSurface");
@@ -1866,14 +1873,19 @@ int speaker_note_index;
 // Tracks how long the last (partially played) speaker note has been playing (for the audio callback).
 int current_speaker_note_samples_already_emitted;
 
+// The properties of the audio device.
+SDL_AudioSpec* digi_audiospec = NULL;
+// SDL3 audio stream handle.
+SDL_AudioStream* digi_audio_stream = NULL;
+
 void speaker_sound_stop(void) {
 	if (!speaker_playing) return;
-	SDL_LockAudio();
+	SDL_LockAudioStream(digi_audio_stream);
 	speaker_playing = 0;
 	current_speaker_sound = NULL;
 	speaker_note_index = 0;
 	current_speaker_note_samples_already_emitted = 0;
-	SDL_UnlockAudio();
+	SDL_UnlockAudioStream(digi_audio_stream);
 }
 
 // The current buffer, holds the resampled sound data.
@@ -1883,15 +1895,13 @@ byte* digi_remaining_pos = NULL;
 // The remaining length.
 int digi_remaining_length = 0;
 
-// The properties of the audio device.
-SDL_AudioSpec* digi_audiospec = NULL;
 // The desired samplerate. Everything will be resampled to this.
 const int digi_samplerate = 44100;
 
 void stop_digi(void) {
 //	SDL_PauseAudio(1);
 	if (!digi_playing) return;
-	SDL_LockAudio();
+	SDL_LockAudioStream(digi_audio_stream);
 	digi_playing = 0;
 	/*
 //	if (SDL_GetAudioStatus() == SDL_AUDIO_PLAYING) {
@@ -1906,7 +1916,7 @@ void stop_digi(void) {
 	digi_buffer = NULL;
 	digi_remaining_length = 0;
 	digi_remaining_pos = NULL;
-	SDL_UnlockAudio();
+	SDL_UnlockAudioStream(digi_audio_stream);
 }
 
 // Decoder for the currently playing OGG sound. (This also holds the playback position.)
@@ -1917,9 +1927,9 @@ void stop_ogg(void) {
 	// SDL_PauseAudio(1);
 	if (!ogg_playing) return;
 	ogg_playing = 0;
-	SDL_LockAudio();
+	SDL_LockAudioStream(digi_audio_stream);
 	ogg_decoder = NULL;
-	SDL_UnlockAudio();
+	SDL_UnlockAudioStream(digi_audio_stream);
 }
 
 // seg009:7214
@@ -1967,18 +1977,18 @@ void speaker_callback(void *userdata, Uint8 *stream, int len) {
 	int samples_requested = len / bytes_per_sample;
 
 	if (current_speaker_sound == NULL) return;
-	word tempo = SDL_SwapLE16(current_speaker_sound->tempo);
+	word tempo = SDL_Swap16LE(current_speaker_sound->tempo);
 
 	int total_samples_left = samples_requested;
 	while (total_samples_left > 0) {
 		note_type* note = current_speaker_sound->notes + speaker_note_index;
-		if (SDL_SwapLE16(note->frequency) == 0x12 /*end*/) {
+		if (SDL_Swap16LE(note->frequency) == 0x12 /*end*/) {
 			speaker_playing = 0;
 			current_speaker_sound = NULL;
 			speaker_note_index = 0;
 			SDL_Event event;
 			memset(&event, 0, sizeof(event));
-			event.type = SDL_USEREVENT;
+			event.type = SDL_EVENT_USER;
 			event.user.code = userevent_SOUND;
 			SDL_PushEvent(&event);
 			return;
@@ -1988,10 +1998,10 @@ void speaker_callback(void *userdata, Uint8 *stream, int len) {
 		int note_samples_to_emit = MIN(note_length_in_samples - current_speaker_note_samples_already_emitted, total_samples_left);
 		total_samples_left -= note_samples_to_emit;
 		size_t copy_len = (size_t)note_samples_to_emit * bytes_per_sample;
-		if (SDL_SwapLE16(note->frequency) <= 0x01 /*rest*/) {
-			memset(stream, digi_audiospec->silence, copy_len);
+		if (SDL_Swap16LE(note->frequency) <= 0x01 /*rest*/) {
+			memset(stream, 0, copy_len);
 		} else {
-			generate_square_wave(stream, (float)SDL_SwapLE16(note->frequency), note_samples_to_emit);
+			generate_square_wave(stream, (float)SDL_Swap16LE(note->frequency), note_samples_to_emit);
 		}
 		stream += copy_len;
 
@@ -2012,7 +2022,7 @@ void play_speaker_sound(sound_buffer_type* buffer) {
 	current_speaker_sound = &buffer->speaker;
 	speaker_note_index = 0;
 	speaker_playing = 1;
-	SDL_PauseAudio(0);
+	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }
 
 void digi_callback(void *userdata, Uint8 *stream, int len) {
@@ -2024,17 +2034,17 @@ void digi_callback(void *userdata, Uint8 *stream, int len) {
 		// Copy the next part of the input of the output.
 		memcpy(stream, digi_remaining_pos, copy_len);
 		// In case the sound does not fill the buffer: fill the rest of the buffer with silence.
-		memset(stream + copy_len, digi_audiospec->silence, len - copy_len);
+		memset(stream + copy_len, 0, len - copy_len);
 	} else {
 		// If sound is off: Mute the sound but keep track of where we are.
-		memset(stream, digi_audiospec->silence, len);
+		memset(stream, 0, len);
 	}
 	// If the sound ended, push an event.
 	if (digi_playing && digi_remaining_length == 0) {
 		//printf("digi_callback(): sound ended\n");
 		SDL_Event event;
 		memset(&event, 0, sizeof(event));
-		event.type = SDL_USEREVENT;
+		event.type = SDL_EVENT_USER;
 		event.user.code = userevent_SOUND;
 		digi_playing = 0;
 		SDL_PushEvent(&event);
@@ -2057,11 +2067,11 @@ void ogg_callback(void *userdata, Uint8 *stream, int len) {
 			// In case the sound does not fill the buffer: fill the rest of the buffer with silence.
 			int bytes_filled = samples_filled * bytes_per_sample;
 			int remaining_bytes = (samples_requested - samples_filled) * bytes_per_sample;
-			memset(stream + bytes_filled, digi_audiospec->silence, remaining_bytes);
+			memset(stream + bytes_filled, 0, remaining_bytes);
 		}
 	} else {
 		// If sound is off: Mute the sound, but keep track of where we are.
-		memset(stream, digi_audiospec->silence, len);
+		memset(stream, 0, len);
 		// Let the decoder run normally (to advance the position), but discard the result.
 		byte* discarded_samples = alloca(len);
 		samples_filled = stb_vorbis_get_samples_short_interleaved(ogg_decoder, output_channels,
@@ -2072,7 +2082,7 @@ void ogg_callback(void *userdata, Uint8 *stream, int len) {
 		//printf("ogg_callback(): sound ended\n");
 		SDL_Event event;
 		memset(&event, 0, sizeof(event));
-		event.type = SDL_USEREVENT;
+		event.type = SDL_EVENT_USER;
 		event.user.code = userevent_SOUND;
 		ogg_playing = 0;
 		SDL_PushEvent(&event);
@@ -2098,7 +2108,7 @@ void audio_callback(void* userdata, Uint8* stream_orig, int len_orig) {
 		stream = stream_orig;
 	}
 
-	memset(stream, digi_audiospec->silence, len);
+	memset(stream, 0, len);
 	if (digi_playing) {
 		digi_callback(userdata, stream, len);
 	} else if (speaker_playing) {
@@ -2116,30 +2126,18 @@ void audio_callback(void* userdata, Uint8* stream_orig, int len_orig) {
 	if (audio_speed > 1) {
 
 #ifdef FAST_FORWARD_MUTE
-		memset(stream_orig, digi_audiospec->silence, len_orig);
+		memset(stream_orig, 0, len_orig);
 #else
 #ifdef FAST_FORWARD_RESAMPLE_SOUND
-		static SDL_AudioCVT cvt;
-		static bool cvt_initialized = false;
-		if (!cvt_initialized) {
-			SDL_BuildAudioCVT(&cvt,
-				digi_audiospec->format, digi_audiospec->channels, digi_audiospec->freq * audio_speed,
-				digi_audiospec->format, digi_audiospec->channels, digi_audiospec->freq);
-			cvt_initialized = true;
+		SDL_AudioSpec src_spec = { .format = digi_audiospec->format, .channels = digi_audiospec->channels, .freq = digi_audiospec->freq * audio_speed };
+		SDL_AudioSpec dst_spec = { .format = digi_audiospec->format, .channels = digi_audiospec->channels, .freq = digi_audiospec->freq };
+		Uint8* converted = NULL; int converted_len = 0;
+		if (SDL_ConvertAudioSamples(&src_spec, stream, len, &dst_spec, &converted, &converted_len)) {
+			memcpy(stream_orig, converted, MIN(converted_len, len_orig));
+			SDL_free(converted);
+		} else {
+			memcpy(stream_orig, stream, len_orig);
 		}
-		//realloc(stream, len * cvt.len_mult);
-		//cvt.buf = stream;
-		cvt.len = len;
-		cvt.buf = malloc(cvt.len * cvt.len_mult);
-		memcpy(cvt.buf, stream, cvt.len);
-		//printf("cvt.needed = %d\n", cvt.needed);
-		//printf("cvt.len_mult = %d\n", cvt.len_mult);
-		//printf("cvt.len_ratio = %lf\n", cvt.len_ratio);
-		SDL_ConvertAudio(&cvt);
-
-		memcpy(stream_orig, cvt.buf, len_orig);
-		free(cvt.buf);
-		cvt.buf = NULL;
 #else
 		// Hack: use the beginning of the buffer instead of resampling.
 		memcpy(stream_orig, stream, len_orig);
@@ -2152,44 +2150,34 @@ void audio_callback(void* userdata, Uint8* stream_orig, int len_orig) {
 
 }
 
+// SDL3 audio callback: feeds audio_callback output into the stream.
+static void audio_callback_sdl3(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount) {
+	Uint8* buf = (Uint8*)alloca(additional_amount);
+	audio_callback(userdata, buf, additional_amount);
+	SDL_PutAudioStreamData(stream, buf, additional_amount);
+}
+
 int digi_unavailable = 0;
 void init_digi() {
 	if (digi_unavailable) return;
 	if (digi_audiospec != NULL) return;
-	// Open the audio device. Called once.
-	//printf("init_digi(): called\n");
 
-	SDL_AudioFormat desired_audioformat;
-	SDL_version version;
-	SDL_GetVersion(&version);
-	//printf("SDL Version = %d.%d.%d\n", version.major, version.minor, version.patch);
-	if (version.major <= 2 && version.minor <= 0 && version.patch <= 3) {
-		// In versions before 2.0.4, 16-bit audio samples don't work properly (the sound becomes garbled).
-		// See: https://bugzilla.libsdl.org/show_bug.cgi?id=2389
-		// Workaround: set the audio format to 8-bit, if we are linking against an older SDL2 version.
-		desired_audioformat = AUDIO_U8;
-		printf("Your SDL.dll is older than 2.0.4. Using 8-bit audio format to work around resampling bug.");
-	} else {
-		desired_audioformat = AUDIO_S16SYS;
-	}
+	static SDL_AudioSpec spec;
+	spec.freq     = digi_samplerate;
+	spec.format   = SDL_AUDIO_S16;
+	spec.channels = 2;
+	digi_audiospec = &spec;
 
-	SDL_AudioSpec *desired;
-	desired = (SDL_AudioSpec *)malloc(sizeof(SDL_AudioSpec));
-	memset(desired, 0, sizeof(SDL_AudioSpec));
-	desired->freq = digi_samplerate; //buffer->digi.sample_rate;
-	desired->format = desired_audioformat;
-	desired->channels = 2;
-	desired->samples = 1024;
-	desired->callback = audio_callback;
-	desired->userdata = NULL;
-	if (SDL_OpenAudio(desired, NULL) != 0) {
-		sdlperror("init_digi: SDL_OpenAudio");
-		//quit(1);
+	digi_audio_stream = SDL_OpenAudioDeviceStream(
+		SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, digi_audiospec,
+		audio_callback_sdl3, NULL);
+	if (digi_audio_stream == NULL) {
+		sdlperror("init_digi: SDL_OpenAudioDeviceStream");
 		digi_unavailable = 1;
+		digi_audiospec = NULL;
 		return;
 	}
-	//SDL_PauseAudio(0);
-	digi_audiospec = desired;
+	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }
 
 const int sound_channel = 0;
@@ -2309,10 +2297,10 @@ void play_ogg_sound(sound_buffer_type *buffer) {
 	// Need to rewind the music, or else the decoder might continue where it left off, the last time this sound played.
 	stb_vorbis_seek_start(buffer->ogg.decoder);
 
-	SDL_LockAudio();
+	SDL_LockAudioStream(digi_audio_stream);
 	ogg_decoder = buffer->ogg.decoder;
-	SDL_UnlockAudio();
-	SDL_PauseAudio(0);
+	SDL_UnlockAudioStream(digi_audio_stream);
+	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 
 	ogg_playing = 1;
 }
@@ -2336,15 +2324,15 @@ bool determine_wave_version(sound_buffer_type *buffer, waveinfo_type* waveinfo) 
 
 	switch (version) {
 		case 1: // 1.0 and 1.1
-			waveinfo->sample_rate = SDL_SwapLE16(buffer->digi.sample_rate);
+			waveinfo->sample_rate = SDL_Swap16LE(buffer->digi.sample_rate);
 			waveinfo->sample_size = buffer->digi.sample_size;
-			waveinfo->sample_count = SDL_SwapLE16(buffer->digi.sample_count);
+			waveinfo->sample_count = SDL_Swap16LE(buffer->digi.sample_count);
 			waveinfo->samples = buffer->digi.samples;
 			return true;
 		case 2: // 1.3 and 1.4 (and PoP2)
-			waveinfo->sample_rate = SDL_SwapLE16(buffer->digi_new.sample_rate);
+			waveinfo->sample_rate = SDL_Swap16LE(buffer->digi_new.sample_rate);
 			waveinfo->sample_size = buffer->digi_new.sample_size;
-			waveinfo->sample_count = SDL_SwapLE16(buffer->digi_new.sample_count);
+			waveinfo->sample_count = SDL_Swap16LE(buffer->digi_new.sample_count);
 			waveinfo->samples = buffer->digi_new.samples;
 			return true;
 		case 3: // ambiguous
@@ -2412,13 +2400,13 @@ void play_digi_sound(sound_buffer_type* buffer) {
 		printf("Tried to play unconverted digi sound.\n");
 		return;
 	}
-	SDL_LockAudio();
+	SDL_LockAudioStream(digi_audio_stream);
 	digi_buffer = (byte*) buffer->converted.samples;
 	digi_playing = 1;
 	digi_remaining_length = buffer->converted.length;
 	digi_remaining_pos = digi_buffer;
-	SDL_UnlockAudio();
-	SDL_PauseAudio(0);
+	SDL_UnlockAudioStream(digi_audio_stream);
+	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }
 
 void free_sound(sound_buffer_type* buffer) {
@@ -2484,35 +2472,31 @@ int check_sound_playing() {
 void apply_aspect_ratio() {
 	// Allow us to use a consistent set of screen co-ordinates, even if the screen size changes
 	if (use_correct_aspect_ratio) {
-		SDL_RenderSetLogicalSize(renderer_, 320 * 5, 200 * 6); // 4:3
+		SDL_SetRenderLogicalPresentation(renderer_, 320 * 5, 200 * 6, SDL_LOGICAL_PRESENTATION_LETTERBOX); // 4:3
 	} else {
-		SDL_RenderSetLogicalSize(renderer_, 320, 200); // 16:10
+		SDL_SetRenderLogicalPresentation(renderer_, 320, 200, SDL_LOGICAL_PRESENTATION_LETTERBOX); // 16:10
 	}
 	window_resized();
 }
 
 void window_resized() {
-#if SDL_VERSION_ATLEAST(2,0,5) // SDL_RenderSetIntegerScale
 	if (use_integer_scaling) {
 		int window_width, window_height;
-		// On high-DPI screens, this is what we need instead of SDL_GetWindowSize().
-		//SDL_GL_GetDrawableSize(window_, &window_width, &window_height);
-		SDL_GetRendererOutputSize(renderer_, &window_width, &window_height);
+		SDL_GetRenderOutputSize(renderer_, &window_width, &window_height);
 		int render_width, render_height;
-		SDL_RenderGetLogicalSize(renderer_, &render_width, &render_height);
+		SDL_GetRenderLogicalPresentation(renderer_, &render_width, &render_height, NULL);
 		// Disable integer scaling if it would result in downscaling.
-		// Because then the only suitable integer scaling factor is zero, i.e. the picture disappears.
-		SDL_bool makes_sense = (window_width >= render_width && window_height >= render_height);
-		SDL_RenderSetIntegerScale(renderer_, makes_sense);
+		bool makes_sense = (window_width >= render_width && window_height >= render_height);
+		SDL_RendererLogicalPresentation mode = makes_sense ? SDL_LOGICAL_PRESENTATION_INTEGER_SCALE : SDL_LOGICAL_PRESENTATION_LETTERBOX;
+		SDL_SetRenderLogicalPresentation(renderer_, render_width, render_height, mode);
 	}
-#endif
 }
 
 void init_overlay(void) {
 	static bool initialized = false;
 	if (!initialized) {
-		overlay_surface = SDL_CreateRGBSurface(0, 320, 200, 32, Rmsk, Gmsk, Bmsk, Amsk);
-		merged_surface = SDL_CreateRGBSurface(0, 320, 200, 24, Rmsk, Gmsk, Bmsk, 0);
+		overlay_surface = SDL_CreateSurface(320, 200, SURFACE_FORMAT_32BPP);
+		merged_surface = SDL_CreateSurface(320, 200, SURFACE_FORMAT_24BPP);
 		initialized = true;
 	}
 }
@@ -2529,23 +2513,21 @@ void init_scaling(void) {
 	if (scaling_type == 1) {
 		if (!is_renderer_targettexture_supported && onscreen_surface_2x == NULL) {
 #ifdef __amigaos4__
-			overlay_surface = SDL_CreateRGBSurface(0, 320*2, 200*2, 24, Rmsk, Gmsk, Bmsk, 0);
+			overlay_surface = SDL_CreateSurface(320*2, 200*2, SURFACE_FORMAT_24BPP);
 #else
-			onscreen_surface_2x = SDL_CreateRGBSurface(0, 320*2, 200*2, 24, Rmsk, Gmsk, Bmsk, 0);
+			onscreen_surface_2x = SDL_CreateSurface(320*2, 200*2, SURFACE_FORMAT_24BPP);
 #endif
 		}
 		if (texture_fuzzy == NULL) {
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
 			int access = is_renderer_targettexture_supported ? SDL_TEXTUREACCESS_TARGET : SDL_TEXTUREACCESS_STREAMING;
 			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, access, 320*2, 200*2);
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+			SDL_SetTextureScaleMode(texture_fuzzy, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_fuzzy;
 	} else if (scaling_type == 2) {
 		if (texture_blurry == NULL) {
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
 			texture_blurry = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 320, 200);
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+			SDL_SetTextureScaleMode(texture_blurry, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_blurry;
 	} else {
@@ -2562,7 +2544,7 @@ void set_gr_mode(byte grmode) {
 #ifdef SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING
 	SDL_SetHint(SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
 #endif
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE | SDL_INIT_GAMECONTROLLER) != 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD) != 0) {
 		sdlperror("set_gr_mode: SDL_Init");
 		quit(1);
 	}
@@ -2575,9 +2557,9 @@ void set_gr_mode(byte grmode) {
 	//SDL_EnableUNICODE(1); //deprecated
 	Uint32 flags = 0;
 	if (!start_fullscreen) start_fullscreen = check_param("full") != NULL;
-	if (start_fullscreen) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+	if (start_fullscreen) flags |= SDL_WINDOW_FULLSCREEN;
 	flags |= SDL_WINDOW_RESIZABLE;
-	flags |= SDL_WINDOW_ALLOW_HIGHDPI; // for Retina displays
+	flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY; // for Retina displays
 
 	// Should use different default window dimensions when using 4:3 aspect ratio
 	if (use_correct_aspect_ratio && pop_window_width == 640 && pop_window_height == 400) {
@@ -2601,33 +2583,15 @@ void set_gr_mode(byte grmode) {
 #ifdef USE_REPLAY
 	if (!is_validate_mode) // run without a window if validating a replay
 #endif
-	window_ = SDL_CreateWindow(WINDOW_TITLE,
-	                           SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-	                           pop_window_width, pop_window_height, flags);
+	window_ = SDL_CreateWindow(WINDOW_TITLE, pop_window_width, pop_window_height, flags);
 	// Make absolutely sure that VSync will be off, to prevent timer issues.
 	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-	flags = 0;
-	switch (use_hardware_acceleration) {
-		case 0:  flags |= SDL_RENDERER_SOFTWARE;    break;
-		case 1:  flags |= SDL_RENDERER_ACCELERATED; break;
-		case 2:  // let SDL decide
-		         // fallthrough!
-		default: break;
+	{
+		const char* renderer_name = (use_hardware_acceleration == 0) ? "software" : NULL;
+		renderer_ = SDL_CreateRenderer(window_, renderer_name);
 	}
-	renderer_ = SDL_CreateRenderer(window_, -1 , flags | SDL_RENDERER_TARGETTEXTURE);
-	SDL_RendererInfo renderer_info;
-	if (SDL_GetRendererInfo(renderer_, &renderer_info) == 0) {
-		if (renderer_info.flags & SDL_RENDERER_TARGETTEXTURE) {
-			is_renderer_targettexture_supported = true;
-		}
-	}
-	if (use_integer_scaling) {
-#if SDL_VERSION_ATLEAST(2,0,5) // SDL_RenderSetIntegerScale
-		SDL_RenderSetIntegerScale(renderer_, SDL_TRUE);
-#else
-		printf("Warning: You need to compile with SDL 2.0.5 or newer for the use_integer_scaling option.\n");
-#endif
-	}
+	// SDL3: all renderers support render targets.
+	is_renderer_targettexture_supported = true;
 
 	SDL_Surface* icon = IMG_Load(locate_file("data/icon.png"));
 	if (icon == NULL) {
@@ -2645,7 +2609,7 @@ void set_gr_mode(byte grmode) {
 	 * subsequently displayed.
 	 * The function handling the screen updates is update_screen()
 	 * */
-	onscreen_surface_ = SDL_CreateRGBSurface(0, 320, 200, 24, Rmsk, Gmsk, Bmsk, 0);
+	onscreen_surface_ = SDL_CreateSurface(320, 200, SURFACE_FORMAT_24BPP);
 	if (onscreen_surface_ == NULL) {
 		sdlperror("set_gr_mode: SDL_CreateRGBSurface");
 		quit(1);
@@ -2653,7 +2617,7 @@ void set_gr_mode(byte grmode) {
 	init_overlay();
 	init_scaling();
 	if (start_fullscreen) {
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_HideCursor();
 	}
 
 
@@ -2774,14 +2738,12 @@ void update_screen() {
 		// The result is not as blurry as if we did only a smooth scaling, but not as sharp as if we did only nearest-neighbor scaling.
 		if (is_renderer_targettexture_supported) {
 			SDL_UpdateTexture(texture_sharp, NULL, surface->pixels, surface->pitch);
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
 			SDL_SetRenderTarget(renderer_, target_texture);
-			SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 			SDL_RenderClear(renderer_);
-			SDL_RenderCopy(renderer_, texture_sharp, NULL, NULL);
+			SDL_RenderTexture(renderer_, texture_sharp, NULL, NULL);
 			SDL_SetRenderTarget(renderer_, NULL);
 		} else {
-			SDL_BlitScaled(surface, NULL, onscreen_surface_2x, NULL);
+			SDL_BlitSurfaceScaled(surface, NULL, onscreen_surface_2x, NULL, SDL_SCALEMODE_NEAREST);
 			surface = onscreen_surface_2x;
 			SDL_UpdateTexture(target_texture, NULL, surface->pixels, surface->pitch);
 		}
@@ -2789,7 +2751,7 @@ void update_screen() {
 		SDL_UpdateTexture(target_texture, NULL, surface->pixels, surface->pitch);
 	}
 	SDL_RenderClear(renderer_);
-	SDL_RenderCopy(renderer_, target_texture, NULL, NULL);
+	SDL_RenderTexture(renderer_, target_texture, NULL, NULL);
 	SDL_RenderPresent(renderer_);
 }
 
@@ -2859,15 +2821,15 @@ void load_from_opendats_metadata(int resource_id, const char* extension, FILE** 
 			fp = pointer->handle;
 			dat_table_type* dat_table = pointer->dat_table;
 			int i;
-			for (i = 0; i < SDL_SwapLE16(dat_table->res_count); ++i) {
-				if (SDL_SwapLE16(dat_table->entries[i].id) == resource_id) {
+			for (i = 0; i < SDL_Swap16LE(dat_table->res_count); ++i) {
+				if (SDL_Swap16LE(dat_table->entries[i].id) == resource_id) {
 					break;
 				}
 			}
-			if (i < SDL_SwapLE16(dat_table->res_count)) {
+			if (i < SDL_Swap16LE(dat_table->res_count)) {
 				// found
 				*result = data_DAT;
-				*size = SDL_SwapLE16(dat_table->entries[i].size);
+				*size = SDL_Swap16LE(dat_table->entries[i].size);
 				if (strcmp(extension,"png") == 0 && *size <= 2) {
 					// Skip empty images in DATs, so we can fall back to directories.
 					// This is useful for teleport graphics for example.
@@ -2875,7 +2837,7 @@ void load_from_opendats_metadata(int resource_id, const char* extension, FILE** 
 					*result = data_none;
 					*size = 0;
 				} else
-				if (fseek(fp, SDL_SwapLE32(dat_table->entries[i].offset), SEEK_SET) ||
+				if (fseek(fp, SDL_Swap32LE(dat_table->entries[i].offset), SEEK_SET) ||
 				    fread(checksum, 1, 1, fp) != 1
 				) {
 					printf("Cannot seek or cannot read checksum: ");
@@ -3022,14 +2984,14 @@ void method_1_blit_rect(surface_type* target_surface,surface_type* source_surfac
 
 	if (blit == blitters_0_no_transp) {
 		// Disable transparency.
-		if (SDL_SetColorKey(source_surface, 0, 0) != 0) {
-			sdlperror("method_1_blit_rect: SDL_SetColorKey");
+		if (SDL_SetSurfaceColorKey(source_surface, 0, 0) != 0) {
+			sdlperror("method_1_blit_rect: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 	} else {
 		// Enable transparency.
-		if (SDL_SetColorKey(source_surface, SDL_TRUE, 0) != 0) {
-			sdlperror("method_1_blit_rect: SDL_SetColorKey");
+		if (SDL_SetSurfaceColorKey(source_surface, true, 0) != 0) {
+			sdlperror("method_1_blit_rect: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 	}
@@ -3042,16 +3004,16 @@ void method_1_blit_rect(surface_type* target_surface,surface_type* source_surfac
 image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,byte color) {
 	int w = image->w;
 	int h = image->h;
-	if (SDL_SetColorKey(image, SDL_TRUE, 0) != 0) {
-		sdlperror("method_3_blit_mono: SDL_SetColorKey");
+	if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+		sdlperror("method_3_blit_mono: SDL_SetSurfaceColorKey");
 		quit(1);
 	}
-	SDL_Surface* colored_image = SDL_ConvertSurfaceFormat(image, SDL_PIXELFORMAT_ARGB8888, 0);
+	SDL_Surface* colored_image = SDL_ConvertSurface(image, SDL_PIXELFORMAT_ARGB8888);
 
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_NONE);
 	/* Causes problems with SDL 2.0.5 (see #105)
-	if (SDL_SetColorKey(colored_image, SDL_TRUE, 0) != 0) {
-		sdlperror("method_3_blit_mono: SDL_SetColorKey");
+	if (SDL_SetSurfaceColorKey(colored_image, true, 0) != 0) {
+		sdlperror("method_3_blit_mono: SDL_SetSurfaceColorKey");
 		quit(1);
 	}
 	*/
@@ -3062,7 +3024,7 @@ image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,b
 	}
 
 	rgb_type palette_color = palette[color];
-	uint32_t rgb_color = SDL_MapRGB(colored_image->format, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) & 0xFFFFFF;
+	uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(colored_image->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) & 0xFFFFFF;
 	int stride = colored_image->pitch;
 	for (int y = 0; y < h; ++y) {
 		uint32_t* pixel_ptr = (uint32_t*) ((byte*)colored_image->pixels + stride * y);
@@ -3085,14 +3047,14 @@ image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,b
 		sdlperror("method_3_blit_mono: SDL_BlitSurface");
 		quit(1);
 	}
-	SDL_FreeSurface(colored_image);
+	SDL_DestroySurface(colored_image);
 
 	return image;
 }
 
 // Workaround for a bug in SDL2 (before v2.0.4):
 // https://bugzilla.libsdl.org/show_bug.cgi?id=2986
-// SDL_FillRect onto a 24-bit surface swaps Red and Blue component
+// SDL_FillSurfaceRect onto a 24-bit surface swaps Red and Blue component
 
 bool RGB24_bug_checked = false;
 bool RGB24_bug_affected;
@@ -3100,26 +3062,26 @@ bool RGB24_bug_affected;
 bool RGB24_bug_check(void) {
 	if (!RGB24_bug_checked) {
 		// Check if the bug occurs in this version of SDL.
-		SDL_Surface* test_surface = SDL_CreateRGBSurface(0, 1, 1, 24, 0, 0, 0, 0);
+		SDL_Surface* test_surface = SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_RGB24);
 		if (NULL == test_surface) sdlperror("SDL_CreateSurface in RGB24_bug_check");
 		// Fill with red.
-		SDL_FillRect(test_surface, NULL, SDL_MapRGB(test_surface->format, 0xFF, 0, 0));
+		SDL_FillSurfaceRect(test_surface, NULL, SDL_MapRGB(SDL_GetPixelFormatDetails(test_surface->format), NULL, 0xFF, 0, 0));
 		if (0 != SDL_LockSurface(test_surface)) sdlperror("SDL_LockSurface in RGB24_bug_check");
 		// Read red component of pixel.
-		RGB24_bug_affected = (*(Uint32*)test_surface->pixels & test_surface->format->Rmask) == 0;
+		RGB24_bug_affected = (*(Uint32*)test_surface->pixels & SDL_GetPixelFormatDetails(test_surface->format)->Rmask) == 0;
 		SDL_UnlockSurface(test_surface);
-		SDL_FreeSurface(test_surface);
+		SDL_DestroySurface(test_surface);
 		RGB24_bug_checked = true;
 	}
 	return RGB24_bug_affected;
 }
 
-int safe_SDL_FillRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color) {
-	if (dst->format->BitsPerPixel == 24 && RGB24_bug_check()) {
-		// In the buggy version, SDL_FillRect swaps R and B, so we swap it once more.
+int safe_SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color) {
+	if (SDL_GetPixelFormatDetails(dst->format)->bits_per_pixel == 24 && RGB24_bug_check()) {
+		// In the buggy version, SDL_FillSurfaceRect swaps R and B, so we swap it once more.
 		color = ((color & 0xFF) << 16) | (color & 0xFF00) | ((color & 0xFF0000) >> 16);
 	}
-	return SDL_FillRect(dst, rect, color);
+	return SDL_FillSurfaceRect(dst, rect, color);
 }
 // End of workaround.
 
@@ -3128,12 +3090,12 @@ const rect_type* method_5_rect(const rect_type* rect,int blit,byte color) {
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
 #ifndef USE_ALPHA
-	uint32_t rgb_color = SDL_MapRGBA(current_target_surface->format, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, 0xFF);
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, 0xFF);
 #else
-	uint32_t rgb_color = SDL_MapRGBA(current_target_surface->format, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, color == 0 ? SDL_ALPHA_TRANSPARENT : SDL_ALPHA_OPAQUE);
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, color == 0 ? SDL_ALPHA_TRANSPARENT : SDL_ALPHA_OPAQUE);
 #endif
-	if (safe_SDL_FillRect(current_target_surface, &dest_rect, rgb_color) != 0) {
-		sdlperror("method_5_rect: SDL_FillRect");
+	if (safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color) != 0) {
+		sdlperror("method_5_rect: SDL_FillSurfaceRect");
 		quit(1);
 	}
 	return rect;
@@ -3143,28 +3105,28 @@ void draw_rect_with_alpha(const rect_type* rect, byte color, byte alpha) {
 	SDL_Rect dest_rect;
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
-	uint32_t rgb_color = SDL_MapRGBA(overlay_surface->format, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, alpha);
-	if (safe_SDL_FillRect(current_target_surface, &dest_rect, rgb_color) != 0) {
-		sdlperror("draw_rect_with_alpha: SDL_FillRect");
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, alpha);
+	if (safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color) != 0) {
+		sdlperror("draw_rect_with_alpha: SDL_FillSurfaceRect");
 		quit(1);
 	}
 }
 
 void draw_rect_contours(const rect_type* rect, byte color) {
 	// TODO: handle 24 bit surfaces? (currently, 32 bit surface is assumed)
-	if (current_target_surface->format->BitsPerPixel != 32) {
-		printf("draw_rect_contours: not implemented for %d bit surfaces\n", current_target_surface->format->BitsPerPixel);
+	if (SDL_GetPixelFormatDetails(current_target_surface->format)->bits_per_pixel != 32) {
+		printf("draw_rect_contours: not implemented for %d bit surfaces\n", SDL_GetPixelFormatDetails(current_target_surface->format)->bits_per_pixel);
 		return;
 	}
 	SDL_Rect dest_rect;
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
-	uint32_t rgb_color = SDL_MapRGBA(overlay_surface->format, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, 0xFF);
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, 0xFF);
 	if (SDL_LockSurface(current_target_surface) != 0) {
 		sdlperror("draw_rect_contours: SDL_LockSurface");
 		quit(1);
 	}
-	int bytes_per_pixel = current_target_surface->format->BytesPerPixel;
+	int bytes_per_pixel = SDL_GetPixelFormatDetails(current_target_surface->format)->bytes_per_pixel;
 	int pitch = current_target_surface->pitch;
 	byte* pixels = current_target_surface->pixels;
 	int xmin = MIN(dest_rect.x,               current_target_surface->w);
@@ -3194,13 +3156,13 @@ void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* ima
 		printf("blit_xor: dest_rect and src_rect have different sizes\n");
 		quit(1);
 	}
-	SDL_Surface* helper_surface = SDL_CreateRGBSurface(0, dest_rect->w, dest_rect->h, 24, Rmsk, Gmsk, Bmsk, 0);
+	SDL_Surface* helper_surface = SDL_CreateSurface(dest_rect->w, dest_rect->h, SURFACE_FORMAT_24BPP);
 	if (helper_surface == NULL) {
 		sdlperror("blit_xor: SDL_CreateRGBSurface");
 		quit(1);
 	}
-	SDL_Surface* image_24 = SDL_ConvertSurface(image, helper_surface->format, 0);
-	//SDL_CreateRGBSurface(0, src_rect->w, src_rect->h, 24, Rmsk, Gmsk, Bmsk, 0);
+	SDL_Surface* image_24 = SDL_ConvertSurface(image, helper_surface->format);
+	//SDL_CreateSurface(src_rect->w, src_rect->h, SURFACE_FORMAT_24BPP);
 	if (image_24 == NULL) {
 		sdlperror("blit_xor: SDL_CreateRGBSurface");
 		quit(1);
@@ -3235,18 +3197,18 @@ void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* ima
 		sdlperror("blit_xor: SDL_BlitSurface 2065");
 		quit(1);
 	}
-	SDL_FreeSurface(image_24);
-	SDL_FreeSurface(helper_surface);
+	SDL_DestroySurface(image_24);
+	SDL_DestroySurface(helper_surface);
 }
 
 #ifdef USE_COLORED_TORCHES
 void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
-	if (SDL_SetColorKey(image, SDL_TRUE, 0) != 0) {
-		sdlperror("draw_colored_torch: SDL_SetColorKey");
+	if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+		sdlperror("draw_colored_torch: SDL_SetSurfaceColorKey");
 		quit(1);
 	}
 
-	SDL_Surface* colored_image = SDL_ConvertSurfaceFormat(image, SDL_PIXELFORMAT_ARGB8888, 0);
+	SDL_Surface* colored_image = SDL_ConvertSurface(image, SDL_PIXELFORMAT_ARGB8888);
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_NONE);
 
 	if (SDL_LockSurface(colored_image) != 0) {
@@ -3259,8 +3221,8 @@ void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
 	int iRed = ((color >> 4) & 3) * 85;
 	int iGreen = ((color >> 2) & 3) * 85;
 	int iBlue = ((color >> 0) & 3) * 85;
-	uint32_t old_color = SDL_MapRGB(colored_image->format, 0xFC, 0x84, 0x00) & 0xFFFFFF; // the orange in the flame
-	uint32_t new_color = SDL_MapRGB(colored_image->format, iRed, iGreen, iBlue) & 0xFFFFFF;
+	uint32_t old_color = SDL_MapRGB(SDL_GetPixelFormatDetails(colored_image->format), NULL, 0xFC, 0x84, 0x00) & 0xFFFFFF; // the orange in the flame
+	uint32_t new_color = SDL_MapRGB(SDL_GetPixelFormatDetails(colored_image->format), NULL, iRed, iGreen, iBlue) & 0xFFFFFF;
 	int stride = colored_image->pitch;
 	for (int y = 0; y < h; ++y) {
 		uint32_t* pixel_ptr = (uint32_t*) ((byte*)colored_image->pixels + stride * y);
@@ -3275,7 +3237,7 @@ void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
 	SDL_UnlockSurface(colored_image);
 
 	method_6_blit_img_to_scr(colored_image, xpos, ypos, blitters_0_no_transp);
-	SDL_FreeSurface(colored_image);
+	SDL_DestroySurface(colored_image);
 }
 #endif
 
@@ -3307,25 +3269,25 @@ image_type* method_6_blit_img_to_scr(image_type* image,int xpos,int ypos,int bli
 #endif
 
 	SDL_SetSurfaceBlendMode(image, SDL_BLENDMODE_NONE);
-	SDL_SetColorKey(image, SDL_FALSE, 0);
+	SDL_SetSurfaceColorKey(image, false, 0);
 	SDL_SetSurfaceAlphaMod(image, 255);
 
-	//printf("format = %s\n", SDL_GetPixelFormatName(image->format->format));
+	//printf("format = %s\n", SDL_GetPixelFormatName(image->format));
 	// Fix the background color of teleport images on SDL_image 2.6.2, where they are loaded as RGBA.
 	// For transparency, paletted images need colorkeying, RGB(A) images need blending.
 	if (blit == blitters_0_no_transp) {
-		if (SDL_ISPIXELFORMAT_INDEXED(image->format->format)) {
-			SDL_SetColorKey(image, SDL_FALSE, 0);
-			//printf("colorkey = SDL_FALSE\n");
+		if (SDL_ISPIXELFORMAT_INDEXED(image->format)) {
+			SDL_SetSurfaceColorKey(image, false, 0);
+			//printf("colorkey = false\n");
 		} else {
 			SDL_SetSurfaceBlendMode(image, SDL_BLENDMODE_NONE);
 			//printf("SDL_BLENDMODE_NONE\n");
 		}
 	}
 	else {
-		if (SDL_ISPIXELFORMAT_INDEXED(image->format->format)) {
-			SDL_SetColorKey(image, SDL_TRUE, 0);
-			//printf("colorkey = SDL_TRUE\n");
+		if (SDL_ISPIXELFORMAT_INDEXED(image->format)) {
+			SDL_SetSurfaceColorKey(image, true, 0);
+			//printf("colorkey = true\n");
 		} else {
 			SDL_SetSurfaceBlendMode(image, SDL_BLENDMODE_BLEND);
 			//printf("SDL_BLENDMODE_BLEND\n");
@@ -3353,10 +3315,10 @@ int wait_time[NUM_TIMERS];
 
 
 #ifdef USE_COMPAT_TIMER
-Uint32 timer_callback(Uint32 interval, void *param) {
+Uint32 timer_callback(void *param, SDL_TimerID id, Uint32 interval) {
 	SDL_Event event;
 	memset(&event, 0, sizeof(event));
-	event.type = SDL_USEREVENT;
+	event.type = SDL_EVENT_USER;
 	event.user.code = userevent_TIMER;
 	event.user.data1 = param;
 	SDL_PushEvent(&event);
@@ -3414,13 +3376,13 @@ void start_timer(int timer_index, int length) {
 
 void toggle_fullscreen(void) {
 	uint32_t flags = SDL_GetWindowFlags(window_);
-	if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
-		SDL_SetWindowFullscreen(window_, 0);
-		SDL_ShowCursor(SDL_ENABLE);
+	if (flags & SDL_WINDOW_FULLSCREEN) {
+		SDL_SetWindowFullscreen(window_, false);
+		SDL_ShowCursor();
 	}
 	else {
-		SDL_SetWindowFullscreen(window_, SDL_WINDOW_FULLSCREEN_DESKTOP);
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_SetWindowFullscreen(window_, true);
+		SDL_HideCursor();
 	}
 }
 
@@ -3435,10 +3397,10 @@ void process_events() {
 	SDL_Event event;
 	while (SDL_PollEvent(&event) == 1) { // while there are still events to be processed
 		switch (event.type) {
-			case SDL_KEYDOWN:
+			case SDL_EVENT_KEY_DOWN:
 			{
-				int modifier = event.key.keysym.mod;
-				int scancode = event.key.keysym.scancode;
+				int modifier = event.key.mod;
+				int scancode = event.key.scancode;
 
 				// Handle these separately, so they won't interrupt things that are usually interrupted by a keypress. (pause, cutscene)
 #ifdef USE_FAST_FORWARD
@@ -3450,8 +3412,8 @@ void process_events() {
 #endif
 #ifdef USE_SCREENSHOT
 				if (scancode == SDL_SCANCODE_F12) {
-					if (modifier & KMOD_SHIFT) {
-						save_level_screenshot((modifier & KMOD_CTRL) != 0);
+					if (modifier & SDL_KMOD_SHIFT) {
+						save_level_screenshot((modifier & SDL_KMOD_CTRL) != 0);
 					} else {
 						save_screenshot();
 					}
@@ -3464,7 +3426,7 @@ void process_events() {
 					break; // Prevent repeated keystrokes opening/closing the menu as long as the key is held down.
 				} else
 #endif
-				if ((modifier & KMOD_ALT) &&
+				if ((modifier & SDL_KMOD_ALT) &&
 				    scancode == SDL_SCANCODE_RETURN)
 				{
 					// Only if the Enter key was pressed down right now.
@@ -3493,9 +3455,7 @@ void process_events() {
 						case SDL_SCANCODE_PRINTSCREEN:
 						case SDL_SCANCODE_VOLUMEUP:
 						case SDL_SCANCODE_VOLUMEDOWN:
-						// Why are there two mute key codes?
 						case SDL_SCANCODE_MUTE:
-						case SDL_SCANCODE_AUDIOMUTE:
 						case SDL_SCANCODE_PAUSE:
 							break;
 
@@ -3504,9 +3464,9 @@ void process_events() {
 							if (scancode == SDL_SCANCODE_TAB && ignore_tab) break;
 
 							last_key_scancode = scancode;
-							if (modifier & KMOD_SHIFT) last_key_scancode |= WITH_SHIFT;
-							if (modifier & KMOD_CTRL ) last_key_scancode |= WITH_CTRL ;
-							if (modifier & KMOD_ALT  ) last_key_scancode |= WITH_ALT  ;
+							if (modifier & SDL_KMOD_SHIFT) last_key_scancode |= WITH_SHIFT;
+							if (modifier & SDL_KMOD_CTRL ) last_key_scancode |= WITH_CTRL ;
+							if (modifier & SDL_KMOD_ALT  ) last_key_scancode |= WITH_ALT  ;
 					}
 
 #ifdef USE_AUTO_INPUT_MODE
@@ -3537,82 +3497,82 @@ void process_events() {
 				}
 				break;
 			}
-			case SDL_KEYUP:
+			case SDL_EVENT_KEY_UP:
 				// If Alt was held down from Alt+Tab but now it's released: stop ignoring Tab.
-				if (event.key.keysym.scancode == SDL_SCANCODE_TAB && ignore_tab) ignore_tab = false;
+				if (event.key.scancode == SDL_SCANCODE_TAB && ignore_tab) ignore_tab = false;
 
 #ifdef USE_FAST_FORWARD
-				if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
+				if (event.key.scancode == SDL_SCANCODE_GRAVE) {
 					init_timer(BASE_FPS); // fast-forward off
 					audio_speed = 1;
 					break;
 				}
 #endif
 
-				key_states[event.key.keysym.scancode] &= ~KEYSTATE_HELD;
+				key_states[event.key.scancode] &= ~KEYSTATE_HELD;
 #ifdef USE_MENU
 				// Prevent repeated keystrokes opening/closing the menu as long as the key is held down.
-				if (event.key.keysym.scancode == SDL_SCANCODE_BACKSPACE || event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+				if (event.key.scancode == SDL_SCANCODE_BACKSPACE || event.key.scancode == SDL_SCANCODE_ESCAPE) {
 					escape_key_suppressed = false;
 				}
 #endif
 				break;
-			case SDL_CONTROLLERAXISMOTION:
-				if (event.caxis.axis < 6) {
-					joy_axis[event.caxis.axis] = event.caxis.value;
-					if (abs(event.caxis.value) > abs(joy_axis_max[event.caxis.axis]))
-						joy_axis_max[event.caxis.axis] = event.caxis.value;
+			case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+				if (event.gaxis.axis < 6) {
+					joy_axis[event.gaxis.axis] = event.gaxis.value;
+					if (abs(event.gaxis.value) > abs(joy_axis_max[event.gaxis.axis]))
+						joy_axis_max[event.gaxis.axis] = event.gaxis.value;
 
 #ifdef USE_AUTO_INPUT_MODE
-					if (!is_joyst_mode && (event.caxis.value >= joystick_threshold || event.caxis.value <= -joystick_threshold)) {
+					if (!is_joyst_mode && (event.gaxis.value >= joystick_threshold || event.gaxis.value <= -joystick_threshold)) {
 						is_joyst_mode = 1;
 						is_keyboard_mode = 0;
 					}
 #endif
 				}
 				break;
-			case SDL_CONTROLLERDEVICEADDED:
-				SDL_GameControllerOpen(event.cdevice.which);
+			case SDL_EVENT_GAMEPAD_ADDED:
+				SDL_OpenGamepad(event.gdevice.which);
 				if (gamecontrollerdb_file[0] != '\0') {
-					SDL_GameControllerAddMappingsFromFile(gamecontrollerdb_file);
+					SDL_AddGamepadMappingsFromFile(gamecontrollerdb_file);
 				}
 				is_joyst_mode = 1;
 				using_sdl_joystick_interface = 0;
 				break;
-			case SDL_CONTROLLERDEVICEREMOVED:
-				if (sdl_controller_ == SDL_GameControllerFromInstanceID(event.cdevice.which)) {
+			case SDL_EVENT_GAMEPAD_REMOVED:
+				if (sdl_controller_ == SDL_GetGamepadFromID(event.gdevice.which)) {
 					sdl_controller_ = NULL;
 					is_joyst_mode = 0;
 					is_keyboard_mode = 1;
 				}
-				SDL_GameControllerClose(SDL_GameControllerFromInstanceID(event.cdevice.which));
+				SDL_CloseGamepad(SDL_GetGamepadFromID(event.gdevice.which));
 				break;
-			case SDL_CONTROLLERBUTTONDOWN:
+			case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
 				//Make sure sdl_controller_ always points to the active controller
-				sdl_controller_ = SDL_GameControllerFromInstanceID(event.cdevice.which);
+				sdl_controller_ = SDL_GetGamepadFromID(event.gdevice.which);
 #ifdef USE_AUTO_INPUT_MODE
 				if (!is_joyst_mode) {
 					is_joyst_mode = 1;
 					is_keyboard_mode = 0;
 				}
 #endif
-				switch (event.cbutton.button)
+				switch (event.gbutton.button)
 				{
-					case SDL_CONTROLLER_BUTTON_DPAD_LEFT:  joy_button_states[JOYINPUT_DPAD_LEFT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // left
-					case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: joy_button_states[JOYINPUT_DPAD_RIGHT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // right
-					case SDL_CONTROLLER_BUTTON_DPAD_UP:    joy_button_states[JOYINPUT_DPAD_UP] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // up
-					case SDL_CONTROLLER_BUTTON_DPAD_DOWN:  joy_button_states[JOYINPUT_DPAD_DOWN] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // down
+					case SDL_GAMEPAD_BUTTON_DPAD_LEFT:  joy_button_states[JOYINPUT_DPAD_LEFT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // left
+					case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: joy_button_states[JOYINPUT_DPAD_RIGHT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // right
+					case SDL_GAMEPAD_BUTTON_DPAD_UP:    joy_button_states[JOYINPUT_DPAD_UP] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // up
+					case SDL_GAMEPAD_BUTTON_DPAD_DOWN:  joy_button_states[JOYINPUT_DPAD_DOWN] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // down
 
-					case SDL_CONTROLLER_BUTTON_A:          joy_button_states[JOYINPUT_A] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** A (down) ***/
-					case SDL_CONTROLLER_BUTTON_Y:          joy_button_states[JOYINPUT_Y] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** Y (up) ***/
-					case SDL_CONTROLLER_BUTTON_X:          joy_button_states[JOYINPUT_X] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** X (Shift) ***/
-					case SDL_CONTROLLER_BUTTON_B:          joy_button_states[JOYINPUT_B] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** B (unused) ***/
+					case SDL_GAMEPAD_BUTTON_SOUTH:          joy_button_states[JOYINPUT_A] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** A (down) ***/
+					case SDL_GAMEPAD_BUTTON_NORTH:          joy_button_states[JOYINPUT_Y] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** Y (up) ***/
+					case SDL_GAMEPAD_BUTTON_WEST:          joy_button_states[JOYINPUT_X] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** X (Shift) ***/
+					case SDL_GAMEPAD_BUTTON_EAST:          joy_button_states[JOYINPUT_B] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** B (unused) ***/
 
-					case SDL_CONTROLLER_BUTTON_START:
-					case SDL_CONTROLLER_BUTTON_BACK:
-						if(event.cbutton.button == SDL_CONTROLLER_BUTTON_START)
+					case SDL_GAMEPAD_BUTTON_START:
+					case SDL_GAMEPAD_BUTTON_BACK:
+						if(event.gbutton.button == SDL_GAMEPAD_BUTTON_START)
 							joy_button_states[JOYINPUT_START] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
-						else if(event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK)
+						else if(event.gbutton.button == SDL_GAMEPAD_BUTTON_BACK)
 							joy_button_states[JOYINPUT_BACK] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
 #ifdef USE_MENU
 						last_key_scancode = SDL_SCANCODE_BACKSPACE;  /*** bring up pause menu ***/
@@ -3624,40 +3584,40 @@ void process_events() {
 					default: break;
 				}
 				break;
-			case SDL_CONTROLLERBUTTONUP:
-				switch (event.cbutton.button)
+			case SDL_EVENT_GAMEPAD_BUTTON_UP:
+				switch (event.gbutton.button)
 				{
-					case SDL_CONTROLLER_BUTTON_DPAD_LEFT:  joy_button_states[JOYINPUT_DPAD_LEFT] &= ~KEYSTATE_HELD; break; // left
-					case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: joy_button_states[JOYINPUT_DPAD_RIGHT] &= ~KEYSTATE_HELD; break; // right
-					case SDL_CONTROLLER_BUTTON_DPAD_UP:    joy_button_states[JOYINPUT_DPAD_UP] &= ~KEYSTATE_HELD; break; // up
-					case SDL_CONTROLLER_BUTTON_DPAD_DOWN:  joy_button_states[JOYINPUT_DPAD_DOWN] &= ~KEYSTATE_HELD; break; // down
+					case SDL_GAMEPAD_BUTTON_DPAD_LEFT:  joy_button_states[JOYINPUT_DPAD_LEFT] &= ~KEYSTATE_HELD; break; // left
+					case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: joy_button_states[JOYINPUT_DPAD_RIGHT] &= ~KEYSTATE_HELD; break; // right
+					case SDL_GAMEPAD_BUTTON_DPAD_UP:    joy_button_states[JOYINPUT_DPAD_UP] &= ~KEYSTATE_HELD; break; // up
+					case SDL_GAMEPAD_BUTTON_DPAD_DOWN:  joy_button_states[JOYINPUT_DPAD_DOWN] &= ~KEYSTATE_HELD; break; // down
 
-					case SDL_CONTROLLER_BUTTON_A:          joy_button_states[JOYINPUT_A] &= ~KEYSTATE_HELD; break; /*** A (down) ***/
-					case SDL_CONTROLLER_BUTTON_Y:          joy_button_states[JOYINPUT_Y] &= ~KEYSTATE_HELD; break; /*** Y (up) ***/
-					case SDL_CONTROLLER_BUTTON_X:          joy_button_states[JOYINPUT_X] &= ~KEYSTATE_HELD; break; /*** X (Shift) ***/
-					case SDL_CONTROLLER_BUTTON_B:          joy_button_states[JOYINPUT_B] &= ~KEYSTATE_HELD; break; /*** B (unused) ***/
+					case SDL_GAMEPAD_BUTTON_SOUTH:          joy_button_states[JOYINPUT_A] &= ~KEYSTATE_HELD; break; /*** A (down) ***/
+					case SDL_GAMEPAD_BUTTON_NORTH:          joy_button_states[JOYINPUT_Y] &= ~KEYSTATE_HELD; break; /*** Y (up) ***/
+					case SDL_GAMEPAD_BUTTON_WEST:          joy_button_states[JOYINPUT_X] &= ~KEYSTATE_HELD; break; /*** X (Shift) ***/
+					case SDL_GAMEPAD_BUTTON_EAST:          joy_button_states[JOYINPUT_B] &= ~KEYSTATE_HELD; break; /*** B (unused) ***/
 
-					case SDL_CONTROLLER_BUTTON_START:      joy_button_states[JOYINPUT_START] &= ~KEYSTATE_HELD; break;
-					case SDL_CONTROLLER_BUTTON_BACK:       joy_button_states[JOYINPUT_BACK] &= ~KEYSTATE_HELD; break;
+					case SDL_GAMEPAD_BUTTON_START:      joy_button_states[JOYINPUT_START] &= ~KEYSTATE_HELD; break;
+					case SDL_GAMEPAD_BUTTON_BACK:       joy_button_states[JOYINPUT_BACK] &= ~KEYSTATE_HELD; break;
 
 					default: break;
 				}
 				break;
-			case SDL_JOYBUTTONDOWN:
-			case SDL_JOYBUTTONUP:
-			case SDL_JOYAXISMOTION:
-				// Only handle the event if the joystick is incompatible with the SDL_GameController interface.
-				// (Otherwise it will interfere with the normal action of the SDL_GameController API.)
+			case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+			case SDL_EVENT_JOYSTICK_BUTTON_UP:
+			case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+				// Only handle the event if the joystick is incompatible with the SDL_Gamepad interface.
+				// (Otherwise it will interfere with the normal action of the SDL_Gamepad API.)
 				if (!using_sdl_joystick_interface) {
 					break;
 				}
-				if (event.type == SDL_JOYAXISMOTION) {
+				if (event.type == SDL_EVENT_JOYSTICK_AXIS_MOTION) {
 					int axis = -1;
 					if (event.jaxis.axis == SDL_JOYSTICK_X_AXIS) {
-						axis = SDL_CONTROLLER_AXIS_LEFTX;
+						axis = SDL_GAMEPAD_AXIS_LEFTX;
 					}
 					else if (event.jaxis.axis == SDL_JOYSTICK_Y_AXIS) {
-						axis = SDL_CONTROLLER_AXIS_LEFTY;
+						axis = SDL_GAMEPAD_AXIS_LEFTY;
 					}
 					if (axis == -1)
 						break;
@@ -3665,9 +3625,9 @@ void process_events() {
 					if (abs(event.jaxis.value) > abs(joy_axis_max[axis]))
 						joy_axis_max[axis] = event.jaxis.value;
 
-					// Disregard SDL_JOYAXISMOTION events within joystick 'dead zone'
-					int joy_x = joy_axis[SDL_CONTROLLER_AXIS_LEFTX];
-					int joy_y = joy_axis[SDL_CONTROLLER_AXIS_LEFTY];
+					// Disregard SDL_EVENT_JOYSTICK_AXIS_MOTION events within joystick 'dead zone'
+					int joy_x = joy_axis[SDL_GAMEPAD_AXIS_LEFTX];
+					int joy_y = joy_axis[SDL_GAMEPAD_AXIS_LEFTY];
 					if ((dword)(joy_x*joy_x) + (dword)(joy_y*joy_y) < (dword)(joystick_threshold*joystick_threshold)) {
 						break;
 					}
@@ -3678,74 +3638,54 @@ void process_events() {
 					is_keyboard_mode = 0;
 				}
 #endif
-				if (event.type == SDL_JOYBUTTONDOWN) {
+				if (event.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN) {
 					if      (event.jbutton.button == SDL_JOYSTICK_BUTTON_Y)   joy_button_states[JOYINPUT_Y] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; // Y (up)
 					else if (event.jbutton.button == SDL_JOYSTICK_BUTTON_X)   joy_button_states[JOYINPUT_X] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;    // X (Shift)
 				}
-				else if (event.type == SDL_JOYBUTTONUP) {
+				else if (event.type == SDL_EVENT_JOYSTICK_BUTTON_UP) {
 					if      (event.jbutton.button == SDL_JOYSTICK_BUTTON_Y)   joy_button_states[JOYINPUT_Y] &= ~KEYSTATE_HELD;  // Y (up)
 					else if (event.jbutton.button == SDL_JOYSTICK_BUTTON_X)   joy_button_states[JOYINPUT_X] &= ~KEYSTATE_HELD;    // X (Shift)
 				}
 				break;
 
-			case SDL_TEXTINPUT:
+			case SDL_EVENT_TEXT_INPUT:
 				last_text_input = event.text.text[0]; // UTF-8 formatted char text input
 
 				// Make the +/- keys work on the main keyboard, on any keyboard layout.
-				// We check SDL_TEXTINPUT instead of SDL_KEYDOWN.
-				// If '+' is on Shift+something then we can't detect it in SDL_KEYDOWN,
-				// because event.key.keysym.sym only tells us what character would the key type without shift.
+				// We check SDL_EVENT_TEXT_INPUT instead of SDL_EVENT_KEY_DOWN.
+				// If '+' is on Shift+something then we can't detect it in SDL_EVENT_KEY_DOWN,
+				// because event.key.key only tells us what character would the key type without shift.
 				switch (last_text_input) {
 					case '-': last_key_scancode = SDL_SCANCODE_KP_MINUS; break;
 					case '+': last_key_scancode = SDL_SCANCODE_KP_PLUS;  break;
 				}
 
 				break;
-			case SDL_WINDOWEVENT:
-				// In case the user switches away while holding a key: do as if all keys were released.
-				// (DOSBox does the same.)
-
-/* // not implemented in SDL2 for now
- *
-			if ((event.active.state & SDL_APPINPUTFOCUS) && event.active.gain == 0) {
-				memset(key_states, 0, sizeof(key_states));
-			}
-			// Note: event.active.state can contain multiple flags or'ed.
-			// If the game is in full screen, and I switch away (Alt+Tab) and back, most of the screen will be black, until it is redrawn.
-			if ((event.active.state & SDL_APPACTIVE) && event.active.gain == 1) {
-				update_screen();
-			}
-*/
-				switch (event.window.event) {
 #ifdef __amigaos4__
-					case SDL_WINDOWEVENT_MINIMIZED: /* pause game */
-						if (!is_menu_shown) {
-							last_key_scancode = SDL_SCANCODE_BACKSPACE;
-						}
-						break;
-					case SDL_WINDOWEVENT_RESTORED: /* show "game paused/menu" */
-						update_screen();
-						break;
-#endif
-					case SDL_WINDOWEVENT_SIZE_CHANGED:
-						window_resized();
-						// fallthrough!
-					//case SDL_WINDOWEVENT_MOVED:
-					//case SDL_WINDOWEVENT_RESTORED:
-					case SDL_WINDOWEVENT_EXPOSED:
-						update_screen();
-						break;
-
-					case SDL_WINDOWEVENT_FOCUS_GAINED:
-					// Fix for this bug: When playing back a recording, Alt+Tabbing back to SDLPoP stops the replay if Alt is released before Tab.
-					{ // If Alt is held down from Alt+Tab: ignore it until it's released.
-						const Uint8 *state = SDL_GetKeyboardState(NULL);
-						if (state[SDL_SCANCODE_TAB]) ignore_tab = true;
-					}
-					break;
+			case SDL_EVENT_WINDOW_MINIMIZED: /* pause game */
+				if (!is_menu_shown) {
+					last_key_scancode = SDL_SCANCODE_BACKSPACE;
 				}
 				break;
-			case SDL_USEREVENT:
+			case SDL_EVENT_WINDOW_RESTORED: /* show "game paused/menu" */
+				update_screen();
+				break;
+#endif
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+				window_resized();
+				// fallthrough!
+			//case SDL_EVENT_WINDOW_MOVED:
+			//case SDL_EVENT_WINDOW_RESTORED:
+			case SDL_EVENT_WINDOW_EXPOSED:
+				update_screen();
+				break;
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:
+			{ // If Alt is held down from Alt+Tab: ignore it until it's released.
+				const bool *state = SDL_GetKeyboardState(NULL);
+				if (state[SDL_SCANCODE_TAB]) ignore_tab = true;
+			}
+			break;
+			case SDL_EVENT_USER:
 				if (event.user.code == userevent_TIMER /*&& event.user.data1 == (void*)timer_index*/) {
 #ifdef USE_COMPAT_TIMER
 					for (int index = 0; index < NUM_TIMERS; ++index) {
@@ -3758,7 +3698,7 @@ void process_events() {
 				}
 				break;
 #ifdef USE_MENU
-			case SDL_MOUSEBUTTONDOWN:
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 				switch(event.button.button) {
 					case SDL_BUTTON_LEFT:
 						if (!is_menu_shown) {
@@ -3775,13 +3715,13 @@ void process_events() {
 				}
 
 				break;
-			case SDL_MOUSEWHEEL:
+			case SDL_EVENT_MOUSE_WHEEL:
 				if (is_menu_shown) {
 					menu_control_scroll_y = -event.wheel.y;
 				}
 				break;
 #endif
-			case SDL_QUIT:
+			case SDL_EVENT_QUIT:
 #ifdef USE_MENU
 				if (is_menu_shown) {
 					menu_was_closed();
@@ -3853,12 +3793,12 @@ void init_timer(int frequency) {
 void set_clip_rect(const rect_type* rect) {
 	SDL_Rect clip_rect;
 	rect_to_sdlrect(rect, &clip_rect);
-	SDL_SetClipRect(current_target_surface, &clip_rect);
+	SDL_SetSurfaceClipRect(current_target_surface, &clip_rect);
 }
 
 // seg009:365C
 void reset_clip_rect() {
-	SDL_SetClipRect(current_target_surface, NULL);
+	SDL_SetSurfaceClipRect(current_target_surface, NULL);
 }
 
 // seg009:1983
@@ -3875,19 +3815,19 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 		}
 		*/
 		// Make the black pixels transparent.
-		if (SDL_SetColorKey(offscreen_surface, SDL_TRUE, 0) != 0) {	// SDL_SRCCOLORKEY old
-			sdlperror("set_bg_attr: SDL_SetColorKey");
+		if (SDL_SetSurfaceColorKey(offscreen_surface, true, 0) != 0) {	// true old
+			sdlperror("set_bg_attr: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 		SDL_Rect rect = {0,0,0,0};
 		rect.w = offscreen_surface->w;
 		rect.h = offscreen_surface->h;
 		rgb_type palette_color = palette[hc_pal_index];
-		uint32_t rgb_color = SDL_MapRGB(onscreen_surface_->format, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) /*& 0xFFFFFF*/;
+		uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(onscreen_surface_->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) /*& 0xFFFFFF*/;
 		//SDL_UpdateRect(onscreen_surface_, 0, 0, 0, 0);
 		// First clear the screen with the color of the flash.
-		if (safe_SDL_FillRect(onscreen_surface_, &rect, rgb_color) != 0) {
-			sdlperror("set_bg_attr: SDL_FillRect");
+		if (safe_SDL_FillSurfaceRect(onscreen_surface_, &rect, rgb_color) != 0) {
+			sdlperror("set_bg_attr: SDL_FillSurfaceRect");
 			quit(1);
 		}
 		//SDL_UpdateRect(onscreen_surface_, 0, 0, 0, 0);
@@ -3917,8 +3857,8 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 			quit(1);
 		}
 		*/
-		if (SDL_SetColorKey(offscreen_surface, 0, 0) != 0) {
-			sdlperror("set_bg_attr: SDL_SetColorKey");
+		if (SDL_SetSurfaceColorKey(offscreen_surface, 0, 0) != 0) {
+			sdlperror("set_bg_attr: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 	}
@@ -4204,7 +4144,7 @@ void set_chtab_palette(chtab_type* chtab, byte* colors, int n_colors) {
 			if (current_image != NULL) {
 
 				int n_colors_to_be_set = n_colors;
-				SDL_Palette* current_palette = current_image->format->palette;
+				SDL_Palette* current_palette = SDL_GetSurfacePalette(current_image);
 
 				// Fix crashing with the guard graphics of Christmas of Persia.
 				if (current_palette != NULL) {

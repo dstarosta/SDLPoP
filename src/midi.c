@@ -1,4 +1,4 @@
-/*
+﻿/*
 SDLPoP, a port/conversion of the DOS game Prince of Persia.
 Copyright (C) 2013-2025  Dávid Nagy
 
@@ -43,6 +43,7 @@ CREDITS:
 
 extern short midi_playing; // seg009.c
 extern SDL_AudioSpec* digi_audiospec; // seg009.c
+extern SDL_AudioStream* digi_audio_stream; // seg009.c
 extern int digi_unavailable; // seg009.c
 
 static opl3_chip opl_chip;
@@ -118,22 +119,22 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
         printf("Warning: Tried to play a midi sound without the 'MThd' chunk header.\n");
         return 0;
     }
-    if (SDL_SwapBE32(midi->chunk_length) != 6) {
+    if (SDL_Swap32BE(midi->chunk_length) != 6) {
         printf("Warning: Midi file with an invalid header length (expected 6, is %d)\n",
-               SDL_SwapBE32(midi->chunk_length));
+               SDL_Swap32BE(midi->chunk_length));
         return 0;
     }
-    word midi_format = SDL_SwapBE16(midi->header.format);
+    word midi_format = SDL_Swap16BE(midi->header.format);
     if (midi_format >= 2) {
         printf("Warning: Unsupported midi format %d (only type 0 or 1 files are supported)\n", midi_format);
         return 0;
     }
-    word num_tracks = SDL_SwapBE16(midi->header.num_tracks);
+    word num_tracks = SDL_Swap16BE(midi->header.num_tracks);
     if (num_tracks < 1) {
         printf("Warning: Midi sound does not have any tracks.\n");
         return 0;
     }
-    int division = SDL_SwapBE16(midi->header.time_division);
+    int division = SDL_Swap16BE(midi->header.time_division);
     if (division < 0) {
         division = (-(division / 256)) * (division & 0xFF); // Translate time delta from the alternative SMTPE format.
     }
@@ -155,7 +156,7 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
             free_parsed_midi(parsed_midi);
             return 0;
         }
-        next_track_chunk = (midi_raw_chunk_type*) (track_chunk->data + (dword) SDL_SwapBE32(track_chunk->chunk_length));
+        next_track_chunk = (midi_raw_chunk_type*) (track_chunk->data + (dword) SDL_Swap32BE(track_chunk->chunk_length));
         midi_track_type* track = &parsed_midi->tracks[track_index];
         byte* buffer_position = track_chunk->data;
         for (;;) {
@@ -680,13 +681,13 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
 void stop_midi() {
     if (!midi_playing) return;
 //	SDL_PauseAudio(1);
-    SDL_LockAudio();
+    SDL_LockAudioStream(digi_audio_stream);
     midi_playing = 0;
     if (mt32_ok) {
         mt32_reset_pending = 1;
     }
     free_parsed_midi(&parsed_midi);
-    SDL_UnlockAudio();
+    SDL_UnlockAudioStream(digi_audio_stream);
 }
 
 static void* mt32_init_data;
@@ -718,17 +719,17 @@ static void* load_mt32_init_from_dat(dat_type* dat, int* out_size) {
         return NULL;
     }
     dat_table_type* table = dat->dat_table;
-    int count = SDL_SwapLE16(table->res_count);
+    int count = SDL_Swap16LE(table->res_count);
     for (int i = 0; i < count; ++i) {
         // 0xFFFF == resource id -1
-        if (SDL_SwapLE16(table->entries[i].id) != 0xFFFF) {
+        if (SDL_Swap16LE(table->entries[i].id) != 0xFFFF) {
             continue;
         }
-        int size = (int) SDL_SwapLE16(table->entries[i].size);
+        int size = (int) SDL_Swap16LE(table->entries[i].size);
         if (size <= 4) {
             return NULL;
         }
-        if (fseek(dat->handle, SDL_SwapLE32(table->entries[i].offset), SEEK_SET) != 0) {
+        if (fseek(dat->handle, SDL_Swap32LE(table->entries[i].offset), SEEK_SET) != 0) {
             return NULL;
         }
         byte checksum;
@@ -966,5 +967,5 @@ void play_midi_sound(sound_buffer_type* buffer) {
     ticks_per_beat = parsed_midi.ticks_per_beat;
     mixing_freq = digi_audiospec->freq;
     midi_playing = 1;
-    SDL_PauseAudio(0);
+    SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }

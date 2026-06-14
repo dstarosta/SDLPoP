@@ -39,7 +39,7 @@ void init_lighting() {
 		return;
 	}
 
-	screen_overlay = SDL_CreateRGBSurface(0, 320, 192, 32, Rmsk, Gmsk, Bmsk, Amsk);
+	screen_overlay = SDL_CreateSurface(320, 192, SURFACE_FORMAT_32BPP);
 	if (screen_overlay == NULL) {
 		sdlperror("SDL_CreateRGBSurface (screen_overlay)");
 		enable_lighting = 0;
@@ -58,7 +58,7 @@ void init_lighting() {
 	}
 
 	// ambient lighting
-	bgcolor = SDL_MapRGBA(screen_overlay->format, ambient_level, ambient_level, ambient_level, SDL_ALPHA_OPAQUE);
+	bgcolor = SDL_MapRGBA(SDL_GetPixelFormatDetails(screen_overlay->format), NULL, ambient_level, ambient_level, ambient_level, SDL_ALPHA_OPAQUE);
 }
 
 // Recreate the lighting overlay based on the torches in the current room.
@@ -69,9 +69,9 @@ void redraw_lighting() {
 	if (curr_room_tiles == NULL) return;
 	if (is_cutscene) return;
 
-	int result = SDL_FillRect(screen_overlay, NULL, bgcolor);
+	int result = SDL_FillSurfaceRect(screen_overlay, NULL, bgcolor);
 	if (result != 0) {
-		sdlperror("SDL_FillRect (screen_overlay)");
+		sdlperror("SDL_FillSurfaceRect (screen_overlay)");
 	}
 
 	// TODO: Also process nearby offscreen torches?

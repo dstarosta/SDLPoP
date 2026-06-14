@@ -316,15 +316,15 @@ void start_with_replay_file(const char *filename) {
 	}
 }
 
-// The functions options_process_* below each process (read/write) a section of options variables (using SDL_RWops)
+// The functions options_process_* below each process (read/write) a section of options variables (using SDL_IOStream)
 // This is I/O for the *binary* representation of the relevant options - this gets saved as part of a replay.
 
-typedef int rw_process_func_type(SDL_RWops* rw, void* data, size_t data_size);
-typedef void process_options_section_func_type(SDL_RWops* rw, rw_process_func_type process_func);
+typedef int rw_process_func_type(SDL_IOStream* rw, void* data, size_t data_size);
+typedef void process_options_section_func_type(SDL_IOStream* rw, rw_process_func_type process_func);
 
 #define process(x) if (!process_func(rw, &(x), sizeof(x))) return
 
-void options_process_features(SDL_RWops* rw, rw_process_func_type process_func) {
+void options_process_features(SDL_IOStream* rw, rw_process_func_type process_func) {
 	process(enable_copyprot);
 	process(enable_quicksave);
 	process(enable_quicksave_penalty);
@@ -332,7 +332,7 @@ void options_process_features(SDL_RWops* rw, rw_process_func_type process_func) 
 
 fixes_options_type fixes_options_replay;
 
-void options_process_enhancements(SDL_RWops* rw, rw_process_func_type process_func) {
+void options_process_enhancements(SDL_IOStream* rw, rw_process_func_type process_func) {
 	process(use_fixes_and_enhancements);
 	process(fixes_options_replay.enable_crouch_after_climbing);
 	process(fixes_options_replay.enable_freeze_time_during_end_music);
@@ -341,7 +341,7 @@ void options_process_enhancements(SDL_RWops* rw, rw_process_func_type process_fu
 	process(fixes_options_replay.enable_jump_grab);
 }
 
-void options_process_fixes(SDL_RWops* rw, rw_process_func_type process_func) {
+void options_process_fixes(SDL_IOStream* rw, rw_process_func_type process_func) {
 	process(fixes_options_replay.fix_gate_sounds);
 	process(fixes_options_replay.fix_two_coll_bug);
 	process(fixes_options_replay.fix_infinite_down_bug);
@@ -382,7 +382,7 @@ void options_process_fixes(SDL_RWops* rw, rw_process_func_type process_func) {
 	process(fixes_options_replay.fix_falling_through_floor_during_sword_strike);
 }
 
-void options_process_custom_general(SDL_RWops* rw, rw_process_func_type process_func) {
+void options_process_custom_general(SDL_IOStream* rw, rw_process_func_type process_func) {
 	process(custom->start_minutes_left);
 	process(custom->start_ticks_left);
 	process(custom->start_hitp);
@@ -459,7 +459,7 @@ void options_process_custom_general(SDL_RWops* rw, rw_process_func_type process_
 	process(custom->shadow_step_room);
 }
 
-void options_process_custom_per_level(SDL_RWops* rw, rw_process_func_type process_func) {
+void options_process_custom_per_level(SDL_IOStream* rw, rw_process_func_type process_func) {
 	process(custom->tbl_level_type);
 	process(custom->tbl_level_color);
 	process(custom->tbl_guard_type);
@@ -490,19 +490,19 @@ replay_options_section_type replay_options_sections[] = {
 
 // output the current options to a memory buffer (e.g. to remember them before a replay is loaded)
 size_t save_options_to_buffer(void* options_buffer, size_t max_size, process_options_section_func_type* process_section_func) {
-	SDL_RWops* rw = SDL_RWFromMem(options_buffer, (int)max_size);
+	SDL_IOStream* rw = SDL_IOFromMem(options_buffer, (int)max_size);
 	process_section_func(rw, process_rw_write);
-	Sint64 section_size = SDL_RWtell(rw);
+	Sint64 section_size = SDL_TellIO(rw);
 	if (section_size < 0) section_size = 0;
-	SDL_RWclose(rw);
+	SDL_CloseIO(rw);
 	return (size_t) section_size;
 }
 
 // restore the options from a memory buffer (e.g. reapply the original options after a replay is finished)
 void load_options_from_buffer(void* options_buffer, size_t options_size, process_options_section_func_type* process_section_func) {
-	SDL_RWops* rw = SDL_RWFromMem(options_buffer, (int)options_size);
+	SDL_IOStream* rw = SDL_IOFromMem(options_buffer, (int)options_size);
 	process_section_func(rw, process_rw_read);
-	SDL_RWclose(rw);
+	SDL_CloseIO(rw);
 }
 
 

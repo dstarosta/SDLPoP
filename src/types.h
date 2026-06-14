@@ -24,16 +24,8 @@ The authors of this program may be contacted at https://forum.princed.org
 #define STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"
 
-#if !defined(_MSC_VER)
-# include <SDL2/SDL.h>
-# include <SDL2/SDL_image.h>
-#else
-// These headers for SDL seem to be the pkgconfig/meson standard as per the
-// latest versions. If the old ones should be used, the ifdef must be used
-// to compare versions. 
-# include <SDL.h>
-# include <SDL_image.h>
-#endif
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
 
 #if SDL_BYTEORDER != SDL_LIL_ENDIAN
 //#error This program is not (yet) prepared for big endian CPUs, please contact the author.
@@ -51,15 +43,14 @@ The authors of this program may be contacted at https://forum.princed.org
   #define Amsk 0xff000000
 #endif
 
-// This macro is from SDL_types.h / SDL_stdinc.h .
-// It used to be #undefined at the end of that file, but since some time in 2006 it's kept available.
-// And SDL's definition changed in SDL 2.0.6, which caused a warning at this redefinition.
-// So we should just use the macro from SDL and not define our own.
 /* Make sure the types really have the right sizes */
-/*
-#define SDL_COMPILE_TIME_ASSERT(name, x)               \
-       typedef int SDL_dummy_ ## name[(x) * 2 - 1]
-*/
+#ifndef SDL_COMPILE_TIME_ASSERT
+#define SDL_COMPILE_TIME_ASSERT(name, x) typedef int SDL_dummy_ ## name[(x) * 2 - 1]
+#endif
+
+/* SDL3: SDL_CreateSurface takes a format enum; map our endian-aware masks to it. */
+#define SURFACE_FORMAT_24BPP  SDL_GetPixelFormatForMasks(24, Rmsk, Gmsk, Bmsk, 0)
+#define SURFACE_FORMAT_32BPP  SDL_GetPixelFormatForMasks(32, Rmsk, Gmsk, Bmsk, Amsk)
 
 typedef Uint8 byte;
 typedef Sint8 sbyte;

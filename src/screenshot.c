@@ -56,7 +56,7 @@ void show_result(int result, const char* what) {
 		printf("Saved %s to \"%s\".\n", what, screenshot_filename);
 		snprintf(sprintf_temp, sizeof(sprintf_temp), "Saved %s", what);
 	} else {
-		printf("Could not save %s to \"%s\". Error: %s\n", what, screenshot_filename, IMG_GetError());
+		printf("Could not save %s to \"%s\". Error: %s\n", what, screenshot_filename, SDL_GetError());
 		snprintf(sprintf_temp, sizeof(sprintf_temp), "Could not save %s", what);
 	}
 	display_text_bottom(sprintf_temp);
@@ -583,7 +583,7 @@ void save_level_screenshot(bool want_extras) {
 	int image_width = map_width*320;
 	int image_height = map_height*189+3+8;
 
-	SDL_Surface* map_surface = SDL_CreateRGBSurface(0, image_width, image_height, 32, Rmsk, Gmsk, Bmsk, Amsk);
+	SDL_Surface* map_surface = SDL_CreateSurface(image_width, image_height, SURFACE_FORMAT_32BPP);
 	if (map_surface == NULL) {
 		sdlperror("SDL_CreateRGBSurface (map_surface)");
 		//exit(1);
@@ -680,7 +680,7 @@ void save_level_screenshot(bool want_extras) {
 	int result = IMG_SavePNG(map_surface, screenshot_filename);
 	show_result(result, "level map");
 
-	SDL_FreeSurface(map_surface);
+	SDL_DestroySurface(map_surface);
 
 	//printf("random_seed = 0x%08X\n", random_seed);
 }

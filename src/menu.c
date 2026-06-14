@@ -360,7 +360,7 @@ NAMES_LIST(use_hardware_acceleration_setting_names, {"OFF", "ON", "AUTO",});
 NAMES_LIST(scaling_type_setting_names, {"Sharp", "Fuzzy", "Blurry",});
 
 int integer_scaling_possible =
-#if SDL_VERSION_ATLEAST(2,0,5) // SDL_RenderSetIntegerScale
+#if SDL_VERSION_ATLEAST(2,0,5) // SDL_SetRenderIntegerScale
 	1
 #else
 	0
@@ -1159,23 +1159,24 @@ bool is_mouse_over_rect(rect_type* rect) {
 // Maps the cursor position into a coordinate between (0,0) and (320,200) and sets mouse_x, mouse_y and mouse_moved.
 void read_mouse_state(void) {
 	float scale_x, scale_y;
-	SDL_RenderGetScale(renderer_, &scale_x, &scale_y);
+	SDL_GetRenderScale(renderer_, &scale_x, &scale_y);
 	int logical_width, logical_height;
-	SDL_RenderGetLogicalSize(renderer_, &logical_width, &logical_height);
+	SDL_GetRenderLogicalPresentation(renderer_, &logical_width, &logical_height, NULL);
 	int logical_scale_x = logical_width / 320; // These may be higher than 1, if 4:3 aspect ratio scaling is enabled.
 	int logical_scale_y = logical_height / 200;
 	scale_x *= logical_scale_x;
 	scale_y *= logical_scale_y;
 	if (!(scale_x > 0 && scale_y > 0 && logical_scale_x > 0 && logical_scale_y > 0)) return;
 	SDL_Rect viewport;
-	SDL_RenderGetViewport(renderer_, &viewport); // Get the width/height of the 'black bars' around the rendering area.
+	SDL_GetRenderViewport(renderer_, &viewport); // Get the width/height of the 'black bars' around the rendering area.
 	viewport.x /= logical_scale_x;
 	viewport.y /= logical_scale_y;
 	int last_mouse_x = mouse_x;
 	int last_mouse_y = mouse_y;
-	SDL_GetMouseState(&mouse_x, &mouse_y);
-	mouse_x = (int) ((float)mouse_x/scale_x - viewport.x + 0.5f);
-	mouse_y = (int) ((float)mouse_y/scale_y - viewport.y + 0.5f);
+	float raw_x, raw_y;
+	SDL_GetMouseState(&raw_x, &raw_y);
+	mouse_x = (int) (raw_x/scale_x - (float)viewport.x + 0.5f);
+	mouse_y = (int) (raw_y/scale_y - (float)viewport.y + 0.5f);
 	mouse_moved = (last_mouse_x != mouse_x || last_mouse_y != mouse_y);
 }
 
@@ -1395,7 +1396,7 @@ void turn_setting_on_off(int setting_id, byte new_state, void* linked) {
 			break;
 		case SETTING_FULLSCREEN:
 			start_fullscreen = new_state;
-			SDL_SetWindowFullscreen(window_, (new_state != 0) * SDL_WINDOW_FULLSCREEN_DESKTOP);
+			SDL_SetWindowFullscreen(window_, (new_state != 0) * SDL_WINDOW_FULLSCREEN);
 			break;
 		case SETTING_USE_CORRECT_ASPECT_RATIO:
 			use_correct_aspect_ratio = new_state;
@@ -1403,13 +1404,7 @@ void turn_setting_on_off(int setting_id, byte new_state, void* linked) {
 			break;
 		case SETTING_USE_INTEGER_SCALING:
 			use_integer_scaling = new_state;
-			if (new_state) {
-				window_resized();
-			} else {
-#if SDL_VERSION_ATLEAST(2,0,5) // SDL_RenderSetIntegerScale
-				SDL_RenderSetIntegerScale(renderer_, SDL_FALSE);
-#endif
-			}
+			apply_aspect_ratio();
 			break;
 #ifdef USE_LIGHTING
 		case SETTING_ENABLE_LIGHTING:
@@ -1523,7 +1518,7 @@ void draw_setting_explanation(setting_type* setting) {
 void draw_image_with_blending(image_type* image, int xpos, int ypos) {
 	SDL_Rect src_rect = {0, 0, image->w, image->h};
 	SDL_Rect dest_rect = {xpos, ypos, image->w, image->h};
-	SDL_SetColorKey(image, SDL_TRUE, 0);
+	SDL_SetSurfaceColorKey(image, true, 0);
 	if (SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect) != 0) {
 		sdlperror("SDL_BlitSurface");
 		quit(1);
@@ -1591,9 +1586,9 @@ void draw_setting(setting_type* setting, rect_type* parent, int* y_offset, int i
 
 		SDL_Rect dest_rect;
 		rect_to_sdlrect(&setting_box, &dest_rect);
-		uint32_t rgb_color = SDL_MapRGBA(overlay_surface->format, 55, 55, 55, 255);
-		if (SDL_FillRect(overlay_surface, &dest_rect, rgb_color) != 0) {
-			sdlperror("draw_setting: SDL_FillRect");
+		uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, 55, 55, 55, 255);
+		if (SDL_FillSurfaceRect(overlay_surface, &dest_rect, rgb_color) != 0) {
+			sdlperror("draw_setting: SDL_FillSurfaceRect");
 			quit(1);
 		}
 		rect_type left_side_of_setting_box = setting_box;
@@ -1974,8 +1969,8 @@ void draw_confirmation_dialog(int which_dialog, const char* text) {
 		if (highlighted_button != old_highlighted_button) {
 			old_highlighted_button = highlighted_button;
 			// Need to redraw the dialog box.
-			uint32_t clear_color = SDL_MapRGBA(current_target_surface->format, 0, 0, 0, 255);
-			SDL_FillRect(overlay_surface, NULL, clear_color);
+			uint32_t clear_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, 0, 0, 0, 255);
+			SDL_FillSurfaceRect(overlay_surface, NULL, clear_color);
 			draw_rect(&copyprot_dialog->peel_rect, color_0_black);
 			dialog_method_2_frame(copyprot_dialog);
 			rect_type rect;
@@ -2039,8 +2034,8 @@ void draw_select_level_dialog(void) {
 
 			old_edited_level_number = menu_current_level;
 			// Need to redraw the dialog box.
-			uint32_t clear_color = SDL_MapRGBA(current_target_surface->format, 0, 0, 0, 255);
-			SDL_FillRect(overlay_surface, NULL, clear_color);
+			uint32_t clear_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, 0, 0, 0, 255);
+			SDL_FillSurfaceRect(overlay_surface, NULL, clear_color);
 			draw_rect(&copyprot_dialog->peel_rect, color_0_black);
 			dialog_method_2_frame(copyprot_dialog);
 			rect_type rect;
@@ -2164,14 +2159,14 @@ void process_additional_menu_input() {
 	have_mouse_input = (mouse_moved || mouse_clicked || mouse_button_clicked_right || menu_control_scroll_y);
 
 	dword flags = SDL_GetWindowFlags(window_);
-	if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+	if (flags & SDL_WINDOW_FULLSCREEN) {
 		if (have_mouse_input) {
-			SDL_ShowCursor(SDL_ENABLE);
+			SDL_ShowCursor();
 		} else if (have_keyboard_or_controller_input) {
-			SDL_ShowCursor(SDL_DISABLE);
+			SDL_HideCursor();
 		}
 	} else {
-		SDL_ShowCursor(SDL_ENABLE);
+		SDL_ShowCursor();
 	}
 }
 
@@ -2201,13 +2196,13 @@ int key_test_paused_menu(int key) {
 			joy_y = 1;
 		int y_threshold = 14000;
 		int x_threshold = 26000; // Less sensitive, to prevent accidentally changing a setting.
-		if (joy_axis[SDL_CONTROLLER_AXIS_LEFTY] < -y_threshold) {
+		if (joy_axis[SDL_GAMEPAD_AXIS_LEFTY] < -y_threshold) {
 			joy_y = -1;
-		} else if (joy_axis[SDL_CONTROLLER_AXIS_LEFTY] > y_threshold) {
+		} else if (joy_axis[SDL_GAMEPAD_AXIS_LEFTY] > y_threshold) {
 			joy_y = 1;
-		} else if (joy_axis[SDL_CONTROLLER_AXIS_LEFTX] < -x_threshold) {
+		} else if (joy_axis[SDL_GAMEPAD_AXIS_LEFTX] < -x_threshold) {
 			joy_x = -1;
-		} else if (joy_axis[SDL_CONTROLLER_AXIS_LEFTX] > x_threshold) {
+		} else if (joy_axis[SDL_GAMEPAD_AXIS_LEFTX] > x_threshold) {
 			joy_x = 1;
 		}
 
@@ -2305,11 +2300,11 @@ int key_test_paused_menu(int key) {
 	return 0;
 }
 
-typedef int rw_process_func_type(SDL_RWops* rw, void* data, size_t data_size);
+typedef int rw_process_func_type(SDL_IOStream* rw, void* data, size_t data_size);
 
 // For serializing/unserializing options in the in-game settings menu
 #define process(x) if (!process_func(rw, &(x), sizeof(x))) return
-void process_ingame_settings_user_managed(SDL_RWops* rw, rw_process_func_type process_func) {
+void process_ingame_settings_user_managed(SDL_IOStream* rw, rw_process_func_type process_func) {
 	process(enable_pause_menu);
 	process(enable_info_screen);
 	process(is_sound_on);
@@ -2340,7 +2335,7 @@ void process_ingame_settings_user_managed(SDL_RWops* rw, rw_process_func_type pr
 	process(key_esc       );
 }
 
-void process_ingame_settings_mod_managed(SDL_RWops* rw, rw_process_func_type process_func) {
+void process_ingame_settings_mod_managed(SDL_IOStream* rw, rw_process_func_type process_func) {
 	process(enable_copyprot);
 	process(enable_quicksave);
 	process(enable_quicksave_penalty);
@@ -2407,16 +2402,16 @@ void calculate_exe_crc(void) {
 }
 
 void save_ingame_settings(void) {
-	SDL_RWops* rw = SDL_RWFromFile(locate_save_file("SDLPoP.cfg"), "wb");
+	SDL_IOStream* rw = SDL_IOFromFile(locate_save_file("SDLPoP.cfg"), "wb");
 	if (rw != NULL) {
 		calculate_exe_crc();
-		SDL_RWwrite(rw, &exe_crc, sizeof(exe_crc), 1);
+		SDL_WriteIO(rw, &exe_crc, sizeof(exe_crc));
 		byte levelset_name_length = (byte)strnlen(levelset_name, UINT8_MAX);
-		SDL_RWwrite(rw, &levelset_name_length, sizeof(levelset_name_length), 1);
-		SDL_RWwrite(rw, levelset_name, levelset_name_length, 1);
+		SDL_WriteIO(rw, &levelset_name_length, sizeof(levelset_name_length));
+		SDL_WriteIO(rw, levelset_name, levelset_name_length);
 		process_ingame_settings_user_managed(rw, process_rw_write);
 		process_ingame_settings_mod_managed(rw, process_rw_write);
-		SDL_RWclose(rw);
+		SDL_CloseIO(rw);
 	}
 }
 
@@ -2433,19 +2428,19 @@ void load_ingame_settings(void) {
 		}
 	}
 	// If there is a SDLPoP.cfg file, let it override the settings
-	SDL_RWops* rw = SDL_RWFromFile(cfg_filename, "rb");
+	SDL_IOStream* rw = SDL_IOFromFile(cfg_filename, "rb");
 	if (rw != NULL) {
 		// SDLPoP.cfg should be invalidated if the prince executable changes.
 		// This allows us not to worry about future and backward compatibility of this file.
 		calculate_exe_crc();
 		dword expected_crc = 0;
-		SDL_RWread(rw, &expected_crc, sizeof(expected_crc), 1);
+		SDL_ReadIO(rw, &expected_crc, sizeof(expected_crc));
 //		printf("CRC-32: exe = %x, expected = %x\n", exe_crc, expected_crc);
 		if (exe_crc == expected_crc) {
 			byte cfg_levelset_name_length;
 			char cfg_levelset_name[256] = {0};
-			SDL_RWread(rw, &cfg_levelset_name_length, sizeof(cfg_levelset_name_length), 1);
-			SDL_RWread(rw, cfg_levelset_name, cfg_levelset_name_length, 1);
+			SDL_ReadIO(rw, &cfg_levelset_name_length, sizeof(cfg_levelset_name_length));
+			SDL_ReadIO(rw, cfg_levelset_name, cfg_levelset_name_length);
 //			printf("%s, %s\n", cfg_levelset_name, levelset_name);
 			process_ingame_settings_user_managed(rw, process_rw_read); // Load the settings.
 			// For mod-managed settings: discard the CFG settings when switching to different mod.
@@ -2453,7 +2448,7 @@ void load_ingame_settings(void) {
 				process_ingame_settings_mod_managed(rw, process_rw_read);
 			}
 		}
-		SDL_RWclose(rw);
+		SDL_CloseIO(rw);
 	}
 }
 
@@ -2467,10 +2462,10 @@ void menu_was_closed(void) {
 	}
 	// In fullscreen mode, hide the mouse cursor (because it is only needed in the menu).
 	dword flags = SDL_GetWindowFlags(window_);
-	if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
-		SDL_ShowCursor(SDL_DISABLE);
+	if (flags & SDL_WINDOW_FULLSCREEN) {
+		SDL_HideCursor();
 	} else {
-		SDL_ShowCursor(SDL_ENABLE);
+		SDL_ShowCursor();
 	}
 }
 

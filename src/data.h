@@ -507,7 +507,7 @@ extern const short y_land[] INIT(= {-8, 55, 118, 181, 244});
 // data:5888
 extern word curr_guard_color;
 // data:288C
-extern byte key_states[SDL_NUM_SCANCODES];
+extern byte key_states[SDL_SCANCODE_COUNT];
 // data:24A6
 // List of the left-most position of every tile on the screen (and the 5 tiles to the left off-screen, and the 5 tiles to the right off-screen)
 extern const byte x_bump[] INIT(= {-12, 2, 16, 30, 44, 58, 72, 86, 100, 114, 128, 142, 156, 170, 184, 198, 212, 226, 240, 254});
@@ -631,8 +631,8 @@ extern SDL_Texture* texture_fuzzy;
 extern SDL_Texture* texture_blurry;
 extern SDL_Texture* target_texture;
 
-extern SDL_GameController* sdl_controller_ INIT( = 0 );
-extern SDL_Joystick* sdl_joystick_; // in case our joystick is not compatible with SDL_GameController
+extern SDL_Gamepad* sdl_controller_ INIT( = 0 );
+extern SDL_Joystick* sdl_joystick_; // in case our joystick is not compatible with SDL_Gamepad
 extern byte using_sdl_joystick_interface;
 extern int joy_axis[JOY_AXIS_NUM]; // hor/ver axes for left/right sticks + left and right triggers (in total 6 axes)
 extern int joy_axis_max[JOY_AXIS_NUM]; // Same as above, but stores the highest value reached between game updates

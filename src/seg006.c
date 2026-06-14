@@ -1,4 +1,4 @@
-/*
+﻿/*
 SDLPoP, a port/conversion of the DOS game Prince of Persia.
 Copyright (C) 2013-2025  Dávid Nagy
 
@@ -595,9 +595,9 @@ void play_seq() {
 				word command1 = (word)*(SEQTBL_0 + Char.curr_seq);
 				word command2 =  (word)*(SEQTBL_0 + Char.curr_seq+1);
 				//for some reason, this works, but normal pointer cast crashes (?)
-				Char.curr_seq = SDL_SwapLE16(command1 | (command2<<8));
+				Char.curr_seq = SDL_Swap16LE(command1 | (command2<<8));
 				#else
-				Char.curr_seq = SDL_SwapLE16(*(const word*)(SEQTBL_0 + Char.curr_seq));
+				Char.curr_seq = SDL_Swap16LE(*(const word*)(SEQTBL_0 + Char.curr_seq));
 				#endif
 				break;
 			case SEQ_UP: // up

@@ -20,6 +20,7 @@ DOSBox-style. Both a CM-32L pair and an MT-32 pair are accepted; the emulator id
 */
 
 #include "mt32synth.h"
+extern SDL_AudioStream* digi_audio_stream; // seg009.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -147,10 +148,9 @@ static int load_dll(const char* rom_dir) {
 
     // 2) Next to the executable (SDL knows where that is on every platform).
     if (!dll) {
-        char* base = SDL_GetBasePath();
+        const char* base = SDL_GetBasePath();
         if (base) {
             dll = open_libmt32emu_in(base);
-            SDL_free(base);
         }
     }
 
@@ -436,11 +436,11 @@ void mt32_reset_context(bool restore_timbres) {
     mt32synth_apply_reverb_pref();
 
     // Reset render state under the audio lock.
-    SDL_LockAudio();
+    SDL_LockAudioStream(digi_audio_stream);
     render_have = 0;
     resample_pos = 0.0;
     have_last = 0;
-    SDL_UnlockAudio();
+    SDL_UnlockAudioStream(digi_audio_stream);
 }
 
 // Dumps the synth's current memory state (PoP's just-applied init) into state_bank, so it can be

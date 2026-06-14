@@ -523,8 +523,8 @@ void check_quick_op() {
 
 #endif // USE_QUICKSAVE
 
-Uint32 temp_shift_release_callback(Uint32 interval, void* param) {
-    const Uint8* state = SDL_GetKeyboardState(NULL);
+Uint32 temp_shift_release_callback(void* param, SDL_TimerID id, Uint32 interval) {
+    const bool* state = SDL_GetKeyboardState(NULL);
     if (state[SDL_SCANCODE_LSHIFT]) key_states[SDL_SCANCODE_LSHIFT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
     if (state[SDL_SCANCODE_RSHIFT]) key_states[SDL_SCANCODE_RSHIFT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
     return 0; // causes the timer to be removed
@@ -669,13 +669,11 @@ int process_key() {
             need_show_text = 1;
             break;
         case SDL_SCANCODE_C | WITH_CTRL: { // Ctrl+C
-            SDL_version verc, verl;
-            SDL_VERSION (&verc);
-            SDL_GetVersion (&verl);
-            snprintf (sprintf_temp, sizeof (sprintf_temp),
-                      "SDL COMP v%u.%u.%u LINK v%u.%u.%u",
-                      verc.major, verc.minor, verc.patch,
-                      verl.major, verl.minor, verl.patch);
+            int verl = SDL_GetVersion();
+            snprintf(sprintf_temp, sizeof(sprintf_temp),
+                     "SDL COMP v%d.%d.%d LINK v%d.%d.%d",
+                     SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_MICRO_VERSION,
+                     SDL_VERSIONNUM_MAJOR(verl), SDL_VERSIONNUM_MINOR(verl), SDL_VERSIONNUM_MICRO(verl));
             answer_text = sprintf_temp;
             need_show_text = 1;
         }
@@ -1363,11 +1361,11 @@ void read_joyst_control() {
     }
 
     if (joystick_only_horizontal) {
-        get_joystick_state_hor_only(joy_axis_ptr[SDL_CONTROLLER_AXIS_LEFTX], joy_left_stick_states);
-        get_joystick_state_hor_only(joy_axis_ptr[SDL_CONTROLLER_AXIS_RIGHTX], joy_right_stick_states);
+        get_joystick_state_hor_only(joy_axis_ptr[SDL_GAMEPAD_AXIS_LEFTX], joy_left_stick_states);
+        get_joystick_state_hor_only(joy_axis_ptr[SDL_GAMEPAD_AXIS_RIGHTX], joy_right_stick_states);
     } else {
-        get_joystick_state(joy_axis_ptr[SDL_CONTROLLER_AXIS_LEFTX], joy_axis_ptr[SDL_CONTROLLER_AXIS_LEFTY], joy_left_stick_states);
-        get_joystick_state(joy_axis_ptr[SDL_CONTROLLER_AXIS_RIGHTX], joy_axis_ptr[SDL_CONTROLLER_AXIS_RIGHTY], joy_right_stick_states);
+        get_joystick_state(joy_axis_ptr[SDL_GAMEPAD_AXIS_LEFTX], joy_axis_ptr[SDL_GAMEPAD_AXIS_LEFTY], joy_left_stick_states);
+        get_joystick_state(joy_axis_ptr[SDL_GAMEPAD_AXIS_RIGHTX], joy_axis_ptr[SDL_GAMEPAD_AXIS_RIGHTY], joy_right_stick_states);
     }
 
     if (joy_left_stick_states[0] == -1 || joy_right_stick_states[0] == -1 || joy_button_states[JOYINPUT_DPAD_LEFT] & key_state)
@@ -1383,8 +1381,8 @@ void read_joyst_control() {
         control_y = CONTROL_HELD_DOWN;
 
     if (joy_button_states[JOYINPUT_X] & key_state ||
-            joy_axis_ptr[SDL_CONTROLLER_AXIS_TRIGGERLEFT] > 8000 ||
-            joy_axis_ptr[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] > 8000) {
+            joy_axis_ptr[SDL_GAMEPAD_AXIS_LEFT_TRIGGER] > 8000 ||
+            joy_axis_ptr[SDL_GAMEPAD_AXIS_RIGHT_TRIGGER] > 8000) {
         control_shift = CONTROL_HELD;
     }
 
@@ -1741,7 +1739,7 @@ int do_paused() {
     }
 
     // As we processed input for current gameplay tick change all input to reflect their current status
-    for (int i = 0; i < SDL_NUM_SCANCODES; i++) {
+    for (int i = 0; i < SDL_SCANCODE_COUNT; i++) {
         key_states[i] &= ~KEYSTATE_HELD_NEW;
     }
     for (int i = 0; i < JOYINPUT_NUM; i++) {
@@ -2313,7 +2311,7 @@ void load_title_images(int bgcolor) {
             color.a = 0xFF;
         }
         if (NULL != chtab_title40) {
-            SDL_SetPaletteColors(chtab_title40->images[0]->format->palette, &color, 14, 1);
+            SDL_SetPaletteColors(SDL_GetSurfacePalette(chtab_title40->images[0]), &color, 14, 1);
         }
     } else if (graphics_mode == gmEga || graphics_mode == gmTga) {
         // ...

@@ -672,8 +672,8 @@ void set_options_to_default(void);
 void load_global_options(void);
 void check_mod_param(void);
 void load_mod_options(void);
-int process_rw_write(SDL_RWops* rw, void* data, size_t data_size);
-int process_rw_read(SDL_RWops* rw, void* data, size_t data_size);
+int process_rw_write(SDL_IOStream* rw, void* data, size_t data_size);
+int process_rw_read(SDL_IOStream* rw, void* data, size_t data_size);
 void load_dos_exe_modifications(const char* folder_name);
 
 // REPLAY.C

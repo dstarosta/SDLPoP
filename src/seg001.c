@@ -668,7 +668,7 @@ void load_intro(int which_imgs,cutscene_ptr_type func,int free_sounds) {
 
 	// Free the images that are not needed anymore.
 	free_all_chtabs_from(id_chtab_9_princessbed);
-	SDL_FreeSurface(get_image(id_chtab_8_princessroom, 0));
+	SDL_DestroySurface(get_image(id_chtab_8_princessroom, 0));
 	if (NULL != chtab_addrs[id_chtab_8_princessroom]) chtab_addrs[id_chtab_8_princessroom]->images[0] = NULL;
 
 	load_chtab_from_file(id_chtab_3_princessinstory, 800, "PV.DAT", 1<<9);

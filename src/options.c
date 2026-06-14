@@ -832,13 +832,12 @@ void load_mod_options() {
 	turn_custom_options_on_off(use_custom_options);
 }
 
-int process_rw_write(SDL_RWops* rw, void* data, size_t data_size) {
-	return (int)SDL_RWwrite(rw, data, data_size, 1);
+int process_rw_write(SDL_IOStream* rw, void* data, size_t data_size) {
+	return SDL_WriteIO(rw, data, data_size) == data_size ? 1 : 0;
 }
 
-int process_rw_read(SDL_RWops* rw, void* data, size_t data_size) {
-	return (int)SDL_RWread(rw, data, data_size, 1);
-	// if this returns 0, most likely the end of the stream has been reached
+int process_rw_read(SDL_IOStream* rw, void* data, size_t data_size) {
+	return SDL_ReadIO(rw, data, data_size) == data_size ? 1 : 0;
 }
 
 

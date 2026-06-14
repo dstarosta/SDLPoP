@@ -961,8 +961,8 @@ SDL_Surface* hflip(SDL_Surface* input) {
 	int height = input->h;
 
 	// The simplest way to create a surface with same format as input:
-	SDL_Surface* output = SDL_ConvertSurface(input, input->format, 0);
-	SDL_SetSurfacePalette(output, input->format->palette);
+	SDL_Surface* output = SDL_ConvertSurface(input, input->format);
+	SDL_SetSurfacePalette(output, SDL_GetSurfacePalette(input));
 	// The copied image will be overwritten anyway.
 	if (output == NULL) {
 		sdlperror("hflip: SDL_ConvertSurface");
@@ -971,8 +971,8 @@ SDL_Surface* hflip(SDL_Surface* input) {
 
 	SDL_SetSurfaceBlendMode(input, SDL_BLENDMODE_NONE);
 	// Temporarily turn off alpha and colorkey on input. So we overwrite the output image.
-	SDL_SetColorKey(input, SDL_FALSE, 0);
-	SDL_SetColorKey(output, SDL_FALSE, 0);
+	SDL_SetSurfaceColorKey(input, false, 0);
+	SDL_SetSurfaceColorKey(output, false, 0);
 	SDL_SetSurfaceAlphaMod(input, 255);
 
 	for (int source_x = 0, target_x = width-1; source_x < width; ++source_x, --target_x) {
@@ -1037,7 +1037,7 @@ void draw_mid(int index) {
 	}
 	if (need_free_image) {
 		//free(image);
-		SDL_FreeSurface(image);
+		SDL_DestroySurface(image);
 	}
 	if (need_free_mask) {
 		free(mask);
