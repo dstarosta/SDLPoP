@@ -569,13 +569,13 @@ chtab_type* load_sprites_from_file(int resource,int palette_bits, int quit_on_er
 //		if (image == NULL) printf(" failed");
 		if (image != NULL) {
 /*
-			if (SDL_SetSurfaceAlphaMod(image, 0) != 0) {
+			if (!SDL_SetSurfaceAlphaMod(image, 0)) {
 				sdlperror("load_sprites_from_file: SDL_SetAlpha");
 				quit(1);
 			}
 */
 			/*
-			if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+			if (!SDL_SetSurfaceColorKey(image, true, 0)) {
 				sdlperror("load_sprites_from_file: SDL_SetSurfaceColorKey");
 				quit(1);
 			}
@@ -856,7 +856,7 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 		sdlperror("decode_image: SDL_CreateRGBSurface");
 		quit(1);
 	}
-	if (SDL_LockSurface(image) != 0) {
+	if (!SDL_LockSurface(image)) {
 		sdlperror("decode_image: SDL_LockSurface");
 	}
 	for (int y = 0; y < height; ++y) {
@@ -907,7 +907,7 @@ image_type* load_image(int resource_id, dat_pal_type* palette) {
 			if (image == NULL) {
 				printf("load_image: IMG_Load_IO: %s\n", SDL_GetError());
 			}
-			if (SDL_CloseIO(rw) != 0) {
+			if (!SDL_CloseIO(rw)) {
 				sdlperror("load_image: SDL_CloseIO");
 			}
 		} break;
@@ -918,13 +918,13 @@ image_type* load_image(int resource_id, dat_pal_type* palette) {
 	if (image != NULL) {
 		// should immediately start using the onscreen pixel format, so conversion will not be needed
 
-		if (SDL_SetSurfaceColorKey(image, true, 0) != 0) { //sdl 1.2: true
+		if (!SDL_SetSurfaceColorKey(image, true, 0)) { //sdl 1.2: true
 			sdlperror("load_image: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 //		printf("bpp = %d\n", SDL_GetPixelFormatDetails(image->format)->bits_per_pixel);
 /*
-		if (SDL_SetSurfaceAlphaMod(image, 0) != 0) { //sdl 1.2: SDL_SetAlpha removed
+		if (!SDL_SetSurfaceAlphaMod(image, 0)) { //sdl 1.2: SDL_SetAlpha removed
 			sdlperror("load_image: SDL_SetAlpha");
 			quit(1);
 		}
@@ -1050,7 +1050,7 @@ void flip_not_ega(byte* memory,int height,int stride) {
 void flip_screen(surface_type* surface) {
 	// stub
 	if (graphics_mode != gmEga) {
-		if (SDL_LockSurface(surface) != 0) {
+		if (!SDL_LockSurface(surface)) {
 			sdlperror("flip_screen: SDL_LockSurface");
 			quit(1);
 		}
@@ -1217,7 +1217,7 @@ font_type load_font_from_data(/*const*/ rawfont_type* data) {
 		if (image_data->height == SDL_Swap16LE(0)) image_data->height = SDL_Swap16LE(1); // HACK: decode_image() returns NULL if height==0.
 		image_type* image;
 		chtab->images[index] = image = decode_image(image_data, &dat_pal);
-		if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+		if (!SDL_SetSurfaceColorKey(image, true, 0)) {
 			sdlperror("load_font_from_data: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
@@ -2544,12 +2544,12 @@ void set_gr_mode(byte grmode) {
 #ifdef SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING
 	SDL_SetHint(SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
 #endif
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD) != 0) {
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
 		sdlperror("set_gr_mode: SDL_Init");
 		quit(1);
 	}
 	if (enable_controller_rumble) {
-		if (SDL_InitSubSystem(SDL_INIT_HAPTIC) != 0) {
+		if (!SDL_InitSubSystem(SDL_INIT_HAPTIC)) {
 			printf("Warning: Haptic subsystem unavailable, ignoring enable_controller_rumble = true\n");
 		}
 	}
@@ -2622,7 +2622,7 @@ void set_gr_mode(byte grmode) {
 
 
 	//SDL_WM_SetCaption(WINDOW_TITLE, NULL);
-//	if (SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL) != 0) {  //deprecated
+//	if (!SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL)) {  //deprecated
 //		sdlperror("set_gr_mode: SDL_EnableKeyRepeat");
 //		quit(1);
 //	}
@@ -2984,18 +2984,18 @@ void method_1_blit_rect(surface_type* target_surface,surface_type* source_surfac
 
 	if (blit == blitters_0_no_transp) {
 		// Disable transparency.
-		if (SDL_SetSurfaceColorKey(source_surface, 0, 0) != 0) {
+		if (!SDL_SetSurfaceColorKey(source_surface, 0, 0)) {
 			sdlperror("method_1_blit_rect: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 	} else {
 		// Enable transparency.
-		if (SDL_SetSurfaceColorKey(source_surface, true, 0) != 0) {
+		if (!SDL_SetSurfaceColorKey(source_surface, true, 0)) {
 			sdlperror("method_1_blit_rect: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
 	}
-	if (SDL_BlitSurface(source_surface, &src_rect, target_surface, &dest_rect) != 0) {
+	if (!SDL_BlitSurface(source_surface, &src_rect, target_surface, &dest_rect)) {
 		sdlperror("method_1_blit_rect: SDL_BlitSurface");
 		quit(1);
 	}
@@ -3004,7 +3004,7 @@ void method_1_blit_rect(surface_type* target_surface,surface_type* source_surfac
 image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,byte color) {
 	int w = image->w;
 	int h = image->h;
-	if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+	if (!SDL_SetSurfaceColorKey(image, true, 0)) {
 		sdlperror("method_3_blit_mono: SDL_SetSurfaceColorKey");
 		quit(1);
 	}
@@ -3012,13 +3012,13 @@ image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,b
 
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_NONE);
 	/* Causes problems with SDL 2.0.5 (see #105)
-	if (SDL_SetSurfaceColorKey(colored_image, true, 0) != 0) {
+	if (!SDL_SetSurfaceColorKey(colored_image, true, 0)) {
 		sdlperror("method_3_blit_mono: SDL_SetSurfaceColorKey");
 		quit(1);
 	}
 	*/
 
-	if (SDL_LockSurface(colored_image) != 0) {
+	if (!SDL_LockSurface(colored_image)) {
 		sdlperror("method_3_blit_mono: SDL_LockSurface");
 		quit(1);
 	}
@@ -3043,7 +3043,7 @@ image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,b
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_BLEND);
 	SDL_SetSurfaceBlendMode(current_target_surface, SDL_BLENDMODE_BLEND);
 	SDL_SetSurfaceAlphaMod(colored_image, 255);
-	if (SDL_BlitSurface(colored_image, &src_rect, current_target_surface, &dest_rect) != 0) {
+	if (!SDL_BlitSurface(colored_image, &src_rect, current_target_surface, &dest_rect)) {
 		sdlperror("method_3_blit_mono: SDL_BlitSurface");
 		quit(1);
 	}
@@ -3094,7 +3094,7 @@ const rect_type* method_5_rect(const rect_type* rect,int blit,byte color) {
 #else
 	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, color == 0 ? SDL_ALPHA_TRANSPARENT : SDL_ALPHA_OPAQUE);
 #endif
-	if (safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color) != 0) {
+	if (!safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color)) {
 		sdlperror("method_5_rect: SDL_FillSurfaceRect");
 		quit(1);
 	}
@@ -3106,7 +3106,7 @@ void draw_rect_with_alpha(const rect_type* rect, byte color, byte alpha) {
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
 	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, alpha);
-	if (safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color) != 0) {
+	if (!safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color)) {
 		sdlperror("draw_rect_with_alpha: SDL_FillSurfaceRect");
 		quit(1);
 	}
@@ -3122,7 +3122,7 @@ void draw_rect_contours(const rect_type* rect, byte color) {
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
 	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, 0xFF);
-	if (SDL_LockSurface(current_target_surface) != 0) {
+	if (!SDL_LockSurface(current_target_surface)) {
 		sdlperror("draw_rect_contours: SDL_LockSurface");
 		quit(1);
 	}
@@ -3169,15 +3169,15 @@ void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* ima
 	}
 	SDL_Rect dest_rect2 = *src_rect;
 	// Read what is currently where we want to draw the new image.
-	if (SDL_BlitSurface(target_surface, dest_rect, helper_surface, &dest_rect2) != 0) {
+	if (!SDL_BlitSurface(target_surface, dest_rect, helper_surface, &dest_rect2)) {
 		sdlperror("blit_xor: SDL_BlitSurface");
 		quit(1);
 	}
-	if (SDL_LockSurface(image_24) != 0) {
+	if (!SDL_LockSurface(image_24)) {
 		sdlperror("blit_xor: SDL_LockSurface");
 		quit(1);
 	}
-	if (SDL_LockSurface(helper_surface) != 0) {
+	if (!SDL_LockSurface(helper_surface)) {
 		sdlperror("blit_xor: SDL_LockSurface");
 		quit(1);
 	}
@@ -3193,7 +3193,7 @@ void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* ima
 	SDL_UnlockSurface(image_24);
 	SDL_UnlockSurface(helper_surface);
 	// Put the new area in place of the old one.
-	if (SDL_BlitSurface(helper_surface, src_rect, target_surface, dest_rect) != 0) {
+	if (!SDL_BlitSurface(helper_surface, src_rect, target_surface, dest_rect)) {
 		sdlperror("blit_xor: SDL_BlitSurface 2065");
 		quit(1);
 	}
@@ -3203,7 +3203,7 @@ void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* ima
 
 #ifdef USE_COLORED_TORCHES
 void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
-	if (SDL_SetSurfaceColorKey(image, true, 0) != 0) {
+	if (!SDL_SetSurfaceColorKey(image, true, 0)) {
 		sdlperror("draw_colored_torch: SDL_SetSurfaceColorKey");
 		quit(1);
 	}
@@ -3211,7 +3211,7 @@ void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
 	SDL_Surface* colored_image = SDL_ConvertSurface(image, SDL_PIXELFORMAT_ARGB8888);
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_NONE);
 
-	if (SDL_LockSurface(colored_image) != 0) {
+	if (!SDL_LockSurface(colored_image)) {
 		sdlperror("draw_colored_torch: SDL_LockSurface");
 		quit(1);
 	}
@@ -3293,12 +3293,12 @@ image_type* method_6_blit_img_to_scr(image_type* image,int xpos,int ypos,int bli
 			//printf("SDL_BLENDMODE_BLEND\n");
 		}
 	}
-	if (SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect) != 0) {
+	if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
 		sdlperror("method_6_blit_img_to_scr: SDL_BlitSurface 2247");
 		//quit(1);
 	}
 /*
-	if (SDL_SetSurfaceAlphaMod(image, 0) != 0) {
+	if (!SDL_SetSurfaceAlphaMod(image, 0)) {
 		sdlperror("method_6_blit_img_to_scr: SDL_SetAlpha");
 		quit(1);
 	}
@@ -3809,13 +3809,13 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 	if (!enable_flash) return;
 	if (vga_pal_index == 0) {
 		/*
-		if (SDL_SetAlpha(offscreen_surface, SDL_SRCALPHA, 0) != 0) {
+		if (!SDL_SetAlpha(offscreen_surface, SDL_SRCALPHA, 0)) {
 			sdlperror("set_bg_attr: SDL_SetAlpha");
 			quit(1);
 		}
 		*/
 		// Make the black pixels transparent.
-		if (SDL_SetSurfaceColorKey(offscreen_surface, true, 0) != 0) {	// true old
+		if (!SDL_SetSurfaceColorKey(offscreen_surface, true, 0)) {	// true old
 			sdlperror("set_bg_attr: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
@@ -3826,7 +3826,7 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 		uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(onscreen_surface_->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) /*& 0xFFFFFF*/;
 		//SDL_UpdateRect(onscreen_surface_, 0, 0, 0, 0);
 		// First clear the screen with the color of the flash.
-		if (safe_SDL_FillSurfaceRect(onscreen_surface_, &rect, rgb_color) != 0) {
+		if (!safe_SDL_FillSurfaceRect(onscreen_surface_, &rect, rgb_color)) {
 			sdlperror("set_bg_attr: SDL_FillSurfaceRect");
 			quit(1);
 		}
@@ -3835,7 +3835,7 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 			flip_screen(offscreen_surface);
 		}
 		// Then draw the offscreen image onto it.
-		if (SDL_BlitSurface(offscreen_surface, &rect, onscreen_surface_, &rect) != 0) {
+		if (!SDL_BlitSurface(offscreen_surface, &rect, onscreen_surface_, &rect)) {
 			sdlperror("set_bg_attr: SDL_BlitSurface");
 			quit(1);
 		}
@@ -3852,12 +3852,12 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 //		if (hc_pal_index != 0) SDL_Delay(2*(1000/60));
 		//SDL_Flip(onscreen_surface_);
 		/*
-		if (SDL_SetAlpha(offscreen_surface, 0, 0) != 0) {
+		if (!SDL_SetAlpha(offscreen_surface, 0, 0)) {
 			sdlperror("set_bg_attr: SDL_SetAlpha");
 			quit(1);
 		}
 		*/
-		if (SDL_SetSurfaceColorKey(offscreen_surface, 0, 0) != 0) {
+		if (!SDL_SetSurfaceColorKey(offscreen_surface, 0, 0)) {
 			sdlperror("set_bg_attr: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
@@ -3963,11 +3963,11 @@ int fade_in_frame(palette_fade_type* palette_buffer) {
 	}
 
 	int h = offscreen_surface->h;
-	if (SDL_LockSurface(onscreen_surface_) != 0) {
+	if (!SDL_LockSurface(onscreen_surface_)) {
 		sdlperror("fade_in_frame: SDL_LockSurface");
 		quit(1);
 	}
-	if (SDL_LockSurface(offscreen_surface) != 0) {
+	if (!SDL_LockSurface(offscreen_surface)) {
 		sdlperror("fade_in_frame: SDL_LockSurface");
 		quit(1);
 	}
@@ -4076,11 +4076,11 @@ int fade_out_frame(palette_fade_type* palette_buffer) {
 	}
 
 	int h = offscreen_surface->h;
-	if (SDL_LockSurface(onscreen_surface_) != 0) {
+	if (!SDL_LockSurface(onscreen_surface_)) {
 		sdlperror("fade_out_frame: SDL_LockSurface");
 		quit(1);
 	}
-	if (SDL_LockSurface(offscreen_surface) != 0) {
+	if (!SDL_LockSurface(offscreen_surface)) {
 		sdlperror("fade_out_frame: SDL_LockSurface");
 		quit(1);
 	}
@@ -4153,7 +4153,7 @@ void set_chtab_palette(chtab_type* chtab, byte* colors, int n_colors) {
 					if (current_palette->ncolors < n_colors_to_be_set) {
 						n_colors_to_be_set = current_palette->ncolors;
 					}
-					if (SDL_SetPaletteColors(current_palette, scolors, 0, n_colors_to_be_set) != 0) {
+					if (!SDL_SetPaletteColors(current_palette, scolors, 0, n_colors_to_be_set)) {
 						sdlperror("set_chtab_palette: SDL_SetPaletteColors");
 						quit(1);
 					}

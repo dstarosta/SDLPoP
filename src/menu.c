@@ -1,4 +1,4 @@
-/*
+﻿/*
 SDLPoP, a port/conversion of the DOS game Prince of Persia.
 Copyright (C) 2013-2025  Dávid Nagy
 
@@ -1519,7 +1519,7 @@ void draw_image_with_blending(image_type* image, int xpos, int ypos) {
 	SDL_Rect src_rect = {0, 0, image->w, image->h};
 	SDL_Rect dest_rect = {xpos, ypos, image->w, image->h};
 	SDL_SetSurfaceColorKey(image, true, 0);
-	if (SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect) != 0) {
+	if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
 		sdlperror("SDL_BlitSurface");
 		quit(1);
 	}
@@ -1587,7 +1587,7 @@ void draw_setting(setting_type* setting, rect_type* parent, int* y_offset, int i
 		SDL_Rect dest_rect;
 		rect_to_sdlrect(&setting_box, &dest_rect);
 		uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, 55, 55, 55, 255);
-		if (SDL_FillSurfaceRect(overlay_surface, &dest_rect, rgb_color) != 0) {
+		if (!SDL_FillSurfaceRect(overlay_surface, &dest_rect, rgb_color)) {
 			sdlperror("draw_setting: SDL_FillSurfaceRect");
 			quit(1);
 		}

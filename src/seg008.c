@@ -1,4 +1,4 @@
-/*
+﻿/*
 SDLPoP, a port/conversion of the DOS game Prince of Persia.
 Copyright (C) 2013-2025  Dávid Nagy
 
@@ -978,7 +978,7 @@ SDL_Surface* hflip(SDL_Surface* input) {
 	for (int source_x = 0, target_x = width-1; source_x < width; ++source_x, --target_x) {
 		SDL_Rect srcrect = {source_x, 0, 1, height};
 		SDL_Rect dstrect = {target_x, 0, 1, height};
-		if (SDL_BlitSurface(input/*32*/, &srcrect, output, &dstrect) != 0) {
+		if (!SDL_BlitSurface(input/*32*/, &srcrect, output, &dstrect)) {
 			sdlperror("hflip: SDL_BlitSurface");
 			quit(1);
 		}
