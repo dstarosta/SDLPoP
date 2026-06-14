@@ -87,6 +87,11 @@ to look. It checks two places, in order:
 
     `PRINCE.DAT` file with MT-32 support is about 25 KB in size vs 4 KB in the older versions.
 
+The MIDI music files **`data/PRINCE/MIDI1SND.DAT`** and **`data/PRINCE/MIDI2SND.DAT`** must also
+come from **Prince of Persia v1.3**. These files are included with SDLPoP and are already the
+correct version. If you replace them with files from an earlier release, certain sounds -- including the victory
+fanfares -- will play with wrong or missing instruments.
+
 ---
 
 ## 3. The ROMs
@@ -150,13 +155,7 @@ A few runtime options in `SDLPoP.ini` file control the MT-32 feature:
   - `0` -- digital: only the digital path is emulated, the fastest mode; clean but more synthetic.
   - `1` -- coarse: coarse low-pass filter emulation, boosts higher frequencies, fixed sample rate.
   - `2` -- accurate: accurate low-pass filter, close to real hardware -- warmer, more bass (default).
-  - `3` -- oversampled: same as accurate but 2× over-sampled; the slowest mode, not recommended because of SDL re-sampling.
-
-* `mt32_sampling_quality` -- quality of the libmt32emu emulator's internal resampler.
-  - `0` -- fastest
-  - `1` -- fast
-  - `2` -- good (default)
-  - `3` -- best
+  - `3` -- oversampled: same as accurate but 2× over-sampled, the slowest mode; no benefit at the game's 44100 Hz output.
 
 * `mt32_reverb` -- adds reverb to the MT-32 emulator's output signal (default: `true`).
 

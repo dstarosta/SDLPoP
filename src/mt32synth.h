@@ -34,9 +34,8 @@ int mt32synth_init(int out_freq, const char* rom_dir);
 // Frees the emulator. Safe to call even if init failed.
 void mt32synth_free(void);
 
-// Clears all sound notes between to prevent reverb when one song starts while another is
-// still playing. MUST be called from the main thread only.
-void mt32synth_all_notes_off(void);
+// Resets the MT-32 context and restores timbers, when necessary.
+void mt32_reset_context(bool restore_timbres);
 
 // Forwards one raw MIDI short message (status, data1, data2) to the emulator.
 void mt32synth_send_message(int status, int data1, int data2);

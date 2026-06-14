@@ -202,8 +202,8 @@ static int load_dll(const char* rom_dir) {
 
 
 static mt32emu_context ctx = NULL;
-static int synth_rate = 32000;   // native rate the emulator renders at
 static int output_rate = 44100;  // SDLPoP's mixing frequency
+static int synth_rate = 44100;  // The emulator's frequency (matches due to the sample quality setting)
 
 static unsigned char* state_bank = NULL;
 static unsigned int   state_bank_len = 0;
@@ -335,7 +335,11 @@ int mt32synth_init(int out_freq, const char* rom_dir) {
     }
 
     mt32emu_set_analog_output_mode(ctx, mt32_quality);
-    mt32emu_set_samplerate_conversion_quality(ctx, mt32_sampling_quality);
+
+    // Force the emulator to output directly at 44100 hz.
+    // mt32synth_generate_stream can resample MIDI, if necessary.
+    mt32emu_set_samplerate_conversion_quality(ctx, 0);
+
     mt32emu_set_stereo_output_samplerate(ctx, (double)output_rate);
 
     if (mt32emu_open_synth(ctx) != MT32EMU_RC_OK) {
@@ -349,8 +353,9 @@ int mt32synth_init(int out_freq, const char* rom_dir) {
     mt32synth_apply_reverb_pref();
 
     synth_rate = (int)mt32emu_get_actual_stereo_output_samplerate(ctx);
+
     if (synth_rate <= 0) {
-        synth_rate = 32000;
+        synth_rate = output_rate;
     }
 
     render_have = 0;
@@ -398,11 +403,10 @@ void mt32synth_free(void) {
     have_last = 0;
 }
 
-void mt32synth_all_notes_off(void) {
+void mt32_reset_context(bool restore_timbres) {
     if (!ctx) {
         return;
     }
-
 
     // Close/open is the only thing that reliably clears the previous song's *live* state: still-
     // ringing partials AND the reverb delay lines (everything lighter leaves them alive). It also
@@ -417,21 +421,26 @@ void mt32synth_all_notes_off(void) {
         return;
     }
 
-    if (state_bank != NULL) {
-        mt32emu_apply_sysex_bank(ctx, state_bank, state_bank_len); // restore timbres (no re-init)
-        // Flush the queued SysEx.
-        int drain_iters = 32 * (synth_rate / output_rate + 1);
-        short drain_buf[MT32_RENDER_CHUNK * 2];
-        for (int i = 0; i < drain_iters; ++i) {
-            mt32emu_render_bit16s(ctx, drain_buf, MT32_RENDER_CHUNK);
-        }
+    // Restore timbres for sounds that require them.
+    if (restore_timbres && state_bank != NULL) {
+        mt32emu_apply_sysex_bank(ctx, state_bank, state_bank_len);
+    }
+
+    // Flush the queued SysEx.
+    int drain_iters = 32 * (synth_rate / output_rate + 1);
+    short drain_buf[MT32_RENDER_CHUNK * 2];
+    for (int i = 0; i < drain_iters; ++i) {
+        mt32emu_render_bit16s(ctx, drain_buf, MT32_RENDER_CHUNK);
     }
 
     mt32synth_apply_reverb_pref();
 
+    // Reset render state under the audio lock.
+    SDL_LockAudio();
     render_have = 0;
     resample_pos = 0.0;
     have_last = 0;
+    SDL_UnlockAudio();
 }
 
 // Dumps the synth's current memory state (PoP's just-applied init) into state_bank, so it can be
@@ -514,14 +523,17 @@ void mt32synth_generate_stream(short* buffer, int num_frames) {
         return;
     }
 
-    // Same native rate as output: pass through, no resampling.
+    // Normal case: the emulator outputs at the rate we requested (output_rate), so render straight
+    // into the buffer with no resampling.
     if (synth_rate == output_rate) {
         mt32emu_render_bit16s(ctx, buffer, (unsigned int)num_frames);
         return;
     }
 
-    // Linear resample from synth_rate to output_rate. step < 1 when upsampling (44100>32000).
+    // Fallback: this libmt32emu build reported a rate other than output_rate, so linearly resample
+    // synth_rate -> output_rate. step > 1 when downsampling (e.g. 48000 -> 44100), < 1 when upsampling.
     double step = (double)synth_rate / (double)output_rate;
+
     for (int frame = 0; frame < num_frames; ++frame) {
         // Ensure both interpolation neighbours (floor(pos) and +1) are available.
         while ((int)floor(resample_pos) + 1 >= render_have) {

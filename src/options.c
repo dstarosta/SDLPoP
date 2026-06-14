@@ -199,7 +199,6 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_byte("scaling_type", &scaling_type, &scaling_type_names_list);
         process_int("mt32_dac", &mt32_dac, NULL);
         process_int("mt32_quality", &mt32_quality, NULL);
-        process_int("mt32_sampling_quality", &mt32_sampling_quality, NULL);
         process_boolean("mt32_reverb", &mt32_reverb);
 		process_boolean("enable_controller_rumble", &enable_controller_rumble);
 		process_boolean("joystick_only_horizontal", &joystick_only_horizontal);
@@ -489,7 +488,6 @@ void set_options_to_default() {
 	scaling_type = 0;
     mt32_dac = 2;
     mt32_quality = 2;
-    mt32_sampling_quality = 2;
     mt32_reverb = 1;
 	enable_controller_rumble = 1;
 	joystick_only_horizontal = 1;
