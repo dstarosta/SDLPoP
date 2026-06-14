@@ -152,8 +152,7 @@ const char* locate_file_(const char* filename, char* path_buffer, int buffer_siz
 }
 
 #ifdef _WIN32
-// These macros are from the SDL2 source. (src/core/windows/SDL_windows.h)
-// The pointers returned by these macros must be freed with SDL_free().
+// Adapted from SDL internals. The pointers must be freed with SDL_free().
 #define WIN_StringToUTF8(S) SDL_iconv_string("UTF-8", "UTF-16LE", (char *)(S), (SDL_wcslen(S)+1)*sizeof(WCHAR))
 #define WIN_UTF8ToString(S) (WCHAR *)SDL_iconv_string("UTF-16LE", "UTF-8", (char *)(S), SDL_strlen(S)+1)
 
@@ -2613,7 +2612,6 @@ void init_overlay(void) {
 	}
 }
 
-SDL_Surface* onscreen_surface_2x;
 
 void init_scaling(void) {
 	// Don't crash in validate mode.
@@ -2623,16 +2621,8 @@ void init_scaling(void) {
 		texture_sharp = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 320, 200);
 	}
 	if (scaling_type == 1) {
-		if (!is_renderer_targettexture_supported && onscreen_surface_2x == NULL) {
-#ifdef __amigaos4__
-			overlay_surface = SDL_CreateSurface(320 * 2, 200 * 2, SURFACE_FORMAT_24BPP);
-#else
-			onscreen_surface_2x = SDL_CreateSurface(320 * 2, 200 * 2, SURFACE_FORMAT_24BPP);
-#endif
-		}
 		if (texture_fuzzy == NULL) {
-			int access = is_renderer_targettexture_supported ? SDL_TEXTUREACCESS_TARGET : SDL_TEXTUREACCESS_STREAMING;
-			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, access, 320 * 2, 200 * 2);
+			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, 320 * 2, 200 * 2);
 			SDL_SetTextureScaleMode(texture_fuzzy, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_fuzzy;
@@ -2706,8 +2696,6 @@ void set_gr_mode(byte grmode) {
 	// SDL3 defaults to LINEAR; switch to NEAREST so sharp mode isn't blurry.
 	// Textures that want linear (fuzzy/blurry modes) override this explicitly.
 	SDL_SetDefaultTextureScaleMode(renderer_, SDL_SCALEMODE_NEAREST);
-	// SDL3: all renderers support render targets.
-	is_renderer_targettexture_supported = true;
 
 	SDL_Surface* icon = load_png_file_as_surface(locate_file("data/icon.png"));
 	if (icon == NULL) {
@@ -2719,11 +2707,9 @@ void set_gr_mode(byte grmode) {
 	apply_aspect_ratio();
 	window_resized();
 
-	/* Migration to SDL2: everything is still blitted to onscreen_surface_, however:
-	 * SDL2 renders textures to the screen instead of surfaces; so, every screen
-	 * update causes the onscreen_surface_ to be copied into the target_texture, which is
-	 * subsequently displayed.
-	 * The function handling the screen updates is update_screen()
+	/* Everything is blitted to onscreen_surface_ (a software surface); every screen
+	 * update copies it into target_texture, which the SDL renderer then displays.
+	 * The function handling screen updates is update_screen().
 	 * */
 	onscreen_surface_ = SDL_CreateSurface(320, 200, SURFACE_FORMAT_24BPP);
 	if (onscreen_surface_ == NULL) {
@@ -2852,17 +2838,11 @@ void update_screen() {
 		// Make "fuzzy pixels" like DOSBox does:
 		// First scale to double size with nearest-neighbor scaling, then scale to full screen with smooth scaling.
 		// The result is not as blurry as if we did only a smooth scaling, but not as sharp as if we did only nearest-neighbor scaling.
-		if (is_renderer_targettexture_supported) {
-			SDL_UpdateTexture(texture_sharp, NULL, surface->pixels, surface->pitch);
-			SDL_SetRenderTarget(renderer_, target_texture);
-			SDL_RenderClear(renderer_);
-			SDL_RenderTexture(renderer_, texture_sharp, NULL, NULL);
-			SDL_SetRenderTarget(renderer_, NULL);
-		} else {
-			SDL_BlitSurfaceScaled(surface, NULL, onscreen_surface_2x, NULL, SDL_SCALEMODE_NEAREST);
-			surface = onscreen_surface_2x;
-			SDL_UpdateTexture(target_texture, NULL, surface->pixels, surface->pitch);
-		}
+		SDL_UpdateTexture(texture_sharp, NULL, surface->pixels, surface->pitch);
+		SDL_SetRenderTarget(renderer_, target_texture);
+		SDL_RenderClear(renderer_);
+		SDL_RenderTexture(renderer_, texture_sharp, NULL, NULL);
+		SDL_SetRenderTarget(renderer_, NULL);
 	} else {
 		SDL_UpdateTexture(target_texture, NULL, surface->pixels, surface->pitch);
 	}

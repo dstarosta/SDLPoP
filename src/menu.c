@@ -386,8 +386,7 @@ setting_type visuals_settings[] = {
 				.required = &integer_scaling_possible,
 				.text = "Use integer scaling",
 				.explanation = "Enable pixel perfect scaling. That is, make all pixels the same size by forcing integer scale factors.\n"
-						"Combining with 4:3 aspect ratio requires at least 1600x1200."
-						"\nYou need to compile with SDL 2.0.5 or newer to enable this."},
+						"Combining with 4:3 aspect ratio requires at least 1600x1200."},
 		{.id = SETTING_SCALING_TYPE, .style = SETTING_STYLE_NUMBER, .number_type = SETTING_BYTE, .max = 2,
 				.linked = &scaling_type, .names_list = &scaling_type_setting_names_list,
 				.text = "Scaling method",

@@ -219,7 +219,7 @@ Since version 1.23 SDLPoP now detects controllers plugged in while the game is a
 
 * Ctrl+C: Show versions of SDL:
     * COMP: the SDL version SDLPoP was compiled against, i.e. the version of the SDL headers.
-    * LINK: the SDL version SDLPoP was linked against, i.e. the version of SDL2.dll (or its equivalent on other platforms).
+    * LINK: the SDL version SDLPoP was linked against, i.e. the version of SDL3.dll (or its equivalent on other platforms).
 * Alt+Enter: Toggle full-screen mode.
 * F6: Quicksave: Save the exact state of the game.
 * F9: Quickload: Load what the last quicksave saved.
@@ -398,7 +398,7 @@ While recording, make a quicksave to mark your place, and press quickload to ret
 
 ### Prerequisites for all platforms
 
-* Make sure that you have the development versions of the `SDL2` and `SDL2_image` libraries installed.
+* Make sure that you have the development version of the `SDL3` library installed.
 * See per-platform installation instructions below.
 
 ### Windows
@@ -407,11 +407,10 @@ While recording, make a quicksave to mark your place, and press quickload to ret
 
 * Use this version of Dev-C++: https://sourceforge.net/projects/orwelldevcpp/
 
-You need the MinGW Development Libraries of SDL2:
+You need the MinGW Development Libraries of SDL3:
 
 * https://github.com/libsdl-org/SDL/releases/latest
-* https://github.com/libsdl-org/SDL_image/releases/latest
-* Download the `*-mingw.tar.gz` files.
+* Download the `*-mingw.tar.gz` file.
 
 To install these, just extract the contents of the `i686-w64-mingw32` folder from each archive to:
 
@@ -433,17 +432,15 @@ To compile, open one of the .dev files and click the compile icon.
        call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" x86
        ```
        This step sets up various environment variables, to enable running the compiler from the command line.
-    2. Set up the environment variable 'SDL2' to point to the SDL2 development library files.
+    2. Set up the environment variable 'SDL3' to point to the SDL3 development library files.
        To do this, you can use a command like so:
        ```
-       set "SDL2=C:\libraries\SDL2-2.0.8"
+       set "SDL3=C:\libraries\SDL3"
        ```
-       You can get the SDL2 library files from here:
+       You can get the SDL3 library files from here:
        * https://github.com/libsdl-org/SDL/releases/latest
-       * https://github.com/libsdl-org/SDL_image/releases/latest
        * Download the Visual C++ 32/64-bit development package, the `*-VC.zip` files.
-       * Copy SDL2_image folder contents into SDL2 folder so that their dlls and header files are placed at the same place, referenced by `SDL2` environmental variable for the compiler.
-       Add `SDL2` and `SDL2_image` dll folder to `PATH` for built executable to find them.
+       Add the SDL3 dll folder to `PATH` for the built executable to find it.
     * (You could create a small batch file to automate the above steps on your system.)
 * Alternatively, you can also build SDLPoP using MSVC with NMake (use the makefile src/NMakefile).
 
@@ -456,26 +453,25 @@ To compile, open one of the .dev files and click the compile icon.
 
 ### GNU/Linux
 
-#### Install SDL2 + SDL2 image
+#### Install SDL3
 
 ##### Arch Linux
 
-    pacman -S sdl2_image
+    pacman -S sdl3
 
 ##### Debian/Ubuntu
 
-    apt-get install libsdl2-image-dev
+Available in Ubuntu 24.04+ and Debian 13+:
+
+    apt-get install libsdl3-dev
 
 ##### Manually
 
-I recommend this if your distro does not have the newest SDL version, because sound may be garbled in SDL versions older than 2.0.4 if the sound output is not 8-bit.
+Download the SDL3 source:
 
-Download the SDL2 and SDL2 image sources:
+* https://github.com/libsdl-org/SDL/releases/latest
 
-* SDL2: https://libsdl.org/download-2.0.php
-* SDL2 image: https://libsdl.org/projects/SDL_image/
-
-Build and install these libraries according to their documentation.
+Build and install the library according to its documentation.
 
 Then build the game:
 
@@ -491,17 +487,17 @@ Remove it with:
 
 ### macOS
 
-#### Install SDL2 + SDL2 image
+#### Install SDL3
 
 ##### With Homebrew
 
-    brew install sdl2 sdl2_image pkg-config
+    brew install sdl3 pkg-config
 
 ##### With Port
 
 Install "port" from https://www.macports.org/, then:
 
-    sudo port install libsdl2 libsdl2_image pkgconfig
+    sudo port install SDL3 pkgconfig
 
 #### Install development tools
 
