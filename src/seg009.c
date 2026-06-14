@@ -879,7 +879,13 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 	colors[0].g = 0;
 	colors[0].b = 0;
 	colors[0].a = SDL_ALPHA_TRANSPARENT;
-	SDL_SetPaletteColors(SDL_GetSurfacePalette(image), colors, 0, 16); // SDL_SetColors = deprecated
+	// SDL3 does not auto-create a palette for INDEX8 surfaces; create one explicitly.
+	SDL_Palette* img_pal = SDL_CreatePalette(256);
+	if (img_pal) {
+		SDL_SetPaletteColors(img_pal, colors, 0, 16);
+		SDL_SetSurfacePalette(image, img_pal);
+		SDL_DestroyPalette(img_pal); // surface now holds the only reference
+	}
 	return image;
 }
 
@@ -2590,6 +2596,9 @@ void set_gr_mode(byte grmode) {
 		const char* renderer_name = (use_hardware_acceleration == 0) ? "software" : NULL;
 		renderer_ = SDL_CreateRenderer(window_, renderer_name);
 	}
+	// SDL3 defaults to LINEAR; switch to NEAREST so sharp mode isn't blurry.
+	// Textures that want linear (fuzzy/blurry modes) override this explicitly.
+	SDL_SetDefaultTextureScaleMode(renderer_, SDL_SCALEMODE_NEAREST);
 	// SDL3: all renderers support render targets.
 	is_renderer_targettexture_supported = true;
 
@@ -3004,42 +3013,43 @@ void method_1_blit_rect(surface_type* target_surface,surface_type* source_surfac
 image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,byte color) {
 	int w = image->w;
 	int h = image->h;
-	if (!SDL_SetSurfaceColorKey(image, true, 0)) {
-		sdlperror("method_3_blit_mono: SDL_SetSurfaceColorKey");
-		quit(1);
-	}
-	SDL_Surface* colored_image = SDL_ConvertSurface(image, SDL_PIXELFORMAT_ARGB8888);
-
-	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_NONE);
-	/* Causes problems with SDL 2.0.5 (see #105)
-	if (!SDL_SetSurfaceColorKey(colored_image, true, 0)) {
-		sdlperror("method_3_blit_mono: SDL_SetSurfaceColorKey");
-		quit(1);
-	}
-	*/
-
-	if (!SDL_LockSurface(colored_image)) {
-		sdlperror("method_3_blit_mono: SDL_LockSurface");
+	// SDL3: SDL_ConvertSurface from INDEX8 can fail; build the ARGB surface manually.
+	SDL_Surface* colored_image = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
+	if (!colored_image) {
+		sdlperror("method_3_blit_mono: SDL_CreateSurface");
 		quit(1);
 	}
 
 	rgb_type palette_color = palette[color];
 	uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(colored_image->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) & 0xFFFFFF;
-	int stride = colored_image->pitch;
+
+	if (!SDL_LockSurface(image)) {
+		SDL_DestroySurface(colored_image);
+		sdlperror("method_3_blit_mono: SDL_LockSurface(src)");
+		quit(1);
+	}
+	if (!SDL_LockSurface(colored_image)) {
+		SDL_UnlockSurface(image);
+		SDL_DestroySurface(colored_image);
+		sdlperror("method_3_blit_mono: SDL_LockSurface(dst)");
+		quit(1);
+	}
+
+	int src_stride = image->pitch;
+	int dst_stride = colored_image->pitch;
 	for (int y = 0; y < h; ++y) {
-		uint32_t* pixel_ptr = (uint32_t*) ((byte*)colored_image->pixels + stride * y);
+		byte* src_row = (byte*)image->pixels + src_stride * y;
+		uint32_t* dst_row = (uint32_t*)((byte*)colored_image->pixels + dst_stride * y);
 		for (int x = 0; x < w; ++x) {
-			// set RGB but leave alpha
-			*pixel_ptr = (*pixel_ptr & 0xFF000000) | rgb_color;
-			//printf("pixel x=%d, y=%d, color = 0x%8x\n", x, y, *pixel_ptr);
-			++pixel_ptr;
+			dst_row[x] = src_row[x] == 0 ? 0x00000000u : (0xFF000000u | rgb_color);
 		}
 	}
+
 	SDL_UnlockSurface(colored_image);
+	SDL_UnlockSurface(image);
 
-	SDL_Rect src_rect = {0, 0, image->w, image->h};
-	SDL_Rect dest_rect = {xpos, ypos, image->w, image->h};
-
+	SDL_Rect src_rect = {0, 0, w, h};
+	SDL_Rect dest_rect = {xpos, ypos, w, h};
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_BLEND);
 	SDL_SetSurfaceBlendMode(current_target_surface, SDL_BLENDMODE_BLEND);
 	SDL_SetSurfaceAlphaMod(colored_image, 255);
@@ -3052,38 +3062,9 @@ image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,b
 	return image;
 }
 
-// Workaround for a bug in SDL2 (before v2.0.4):
-// https://bugzilla.libsdl.org/show_bug.cgi?id=2986
-// SDL_FillSurfaceRect onto a 24-bit surface swaps Red and Blue component
-
-bool RGB24_bug_checked = false;
-bool RGB24_bug_affected;
-
-bool RGB24_bug_check(void) {
-	if (!RGB24_bug_checked) {
-		// Check if the bug occurs in this version of SDL.
-		SDL_Surface* test_surface = SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_RGB24);
-		if (NULL == test_surface) sdlperror("SDL_CreateSurface in RGB24_bug_check");
-		// Fill with red.
-		SDL_FillSurfaceRect(test_surface, NULL, SDL_MapRGB(SDL_GetPixelFormatDetails(test_surface->format), NULL, 0xFF, 0, 0));
-		if (0 != SDL_LockSurface(test_surface)) sdlperror("SDL_LockSurface in RGB24_bug_check");
-		// Read red component of pixel.
-		RGB24_bug_affected = (*(Uint32*)test_surface->pixels & SDL_GetPixelFormatDetails(test_surface->format)->Rmask) == 0;
-		SDL_UnlockSurface(test_surface);
-		SDL_DestroySurface(test_surface);
-		RGB24_bug_checked = true;
-	}
-	return RGB24_bug_affected;
-}
-
 int safe_SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color) {
-	if (SDL_GetPixelFormatDetails(dst->format)->bits_per_pixel == 24 && RGB24_bug_check()) {
-		// In the buggy version, SDL_FillSurfaceRect swaps R and B, so we swap it once more.
-		color = ((color & 0xFF) << 16) | (color & 0xFF00) | ((color & 0xFF0000) >> 16);
-	}
 	return SDL_FillSurfaceRect(dst, rect, color);
 }
-// End of workaround.
 
 const rect_type* method_5_rect(const rect_type* rect,int blit,byte color) {
 	SDL_Rect dest_rect;
@@ -3209,6 +3190,10 @@ void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
 	}
 
 	SDL_Surface* colored_image = SDL_ConvertSurface(image, SDL_PIXELFORMAT_ARGB8888);
+	if (!colored_image) {
+		sdlperror("draw_colored_torch: SDL_ConvertSurface");
+		quit(1);
+	}
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_NONE);
 
 	if (!SDL_LockSurface(colored_image)) {

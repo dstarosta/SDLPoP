@@ -1158,25 +1158,21 @@ bool is_mouse_over_rect(rect_type* rect) {
 
 // Maps the cursor position into a coordinate between (0,0) and (320,200) and sets mouse_x, mouse_y and mouse_moved.
 void read_mouse_state(void) {
-	float scale_x, scale_y;
-	SDL_GetRenderScale(renderer_, &scale_x, &scale_y);
 	int logical_width, logical_height;
 	SDL_GetRenderLogicalPresentation(renderer_, &logical_width, &logical_height, NULL);
 	int logical_scale_x = logical_width / 320; // These may be higher than 1, if 4:3 aspect ratio scaling is enabled.
 	int logical_scale_y = logical_height / 200;
-	scale_x *= logical_scale_x;
-	scale_y *= logical_scale_y;
-	if (!(scale_x > 0 && scale_y > 0 && logical_scale_x > 0 && logical_scale_y > 0)) return;
-	SDL_Rect viewport;
-	SDL_GetRenderViewport(renderer_, &viewport); // Get the width/height of the 'black bars' around the rendering area.
-	viewport.x /= logical_scale_x;
-	viewport.y /= logical_scale_y;
+	if (!(logical_scale_x > 0 && logical_scale_y > 0)) return;
 	int last_mouse_x = mouse_x;
 	int last_mouse_y = mouse_y;
 	float raw_x, raw_y;
 	SDL_GetMouseState(&raw_x, &raw_y);
-	mouse_x = (int) (raw_x/scale_x - (float)viewport.x + 0.5f);
-	mouse_y = (int) (raw_y/scale_y - (float)viewport.y + 0.5f);
+	// SDL3: SDL_GetRenderScale() only returns the explicitly-set scale, not the
+	// logical presentation scale. Use SDL_RenderCoordinatesFromWindow instead.
+	float lx, ly;
+	SDL_RenderCoordinatesFromWindow(renderer_, raw_x, raw_y, &lx, &ly);
+	mouse_x = (int)(lx / logical_scale_x + 0.5f);
+	mouse_y = (int)(ly / logical_scale_y + 0.5f);
 	mouse_moved = (last_mouse_x != mouse_x || last_mouse_y != mouse_y);
 }
 
