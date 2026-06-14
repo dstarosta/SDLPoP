@@ -21,8 +21,8 @@ endif
 
 # -ldl: mt32synth uses dlopen() to load libmt32emu at run time (graceful OPL fallback if the
 # library/ROMs are absent, which is the normal case on AmigaOS4).
-LIBS = -lSDL3_image -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL3 -lpthread -ldl
-#LIBS = -lSDL3_image -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL3 -lpthread -athread=native -use-dynld -ldl
+LIBS = -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL3 -lpthread -ldl
+#LIBS = -ltiff -lwebp -lpng -ljpeg -lz -lm -lvorbisfile -lvorbis -lSDL3 -lpthread -athread=native -use-dynld -ldl
 INCS = -gstabs -ISDK:Local/newlib/include/SDL3 -D__AMIGADATE__=\"$(AMIGADATE)\" -D__USE_INLINE__
 CFLAGS += $(INCS) -Wall -std=gnu99
 

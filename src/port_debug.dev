@@ -1,7 +1,7 @@
 ﻿[Project]
 FileName=port_debug.dev
 Name=SDLPoP
-UnitCount=29
+UnitCount=31
 Type=1
 Ver=2
 ObjFiles=
@@ -12,7 +12,7 @@ ResourceIncludes=
 MakeIncludes=
 Compiler=-Wall -std=c99_@@_-Wextra_@@_-Wno-unused-parameter_@@_
 CppCompiler=-Wall_@@_
-Linker=-l"mingw32"_@@_-l"SDL3"_@@_-l"SDL3_image"_@@_
+Linker=-l"mingw32"_@@_-l"SDL3"_@@_
 IsCpp=0
 Icon=port_debug.ico
 ExeOutput=
@@ -332,6 +332,26 @@ BuildCmd=
 
 [Unit29]
 FileName=mt32synth.c
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit30]
+FileName=stb_image.h
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit31]
+FileName=stb_image_write.h
 CompileCpp=0
 Folder=
 Compile=1

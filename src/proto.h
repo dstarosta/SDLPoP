@@ -600,6 +600,7 @@ int check_sound_playing(void);
 void apply_aspect_ratio(void);
 void window_resized(void);
 void set_gr_mode(byte grmode);
+SDL_Surface* load_png_file_as_surface(const char* path);
 SDL_Surface* get_final_surface(void);
 void update_screen(void);
 void set_pal_arr(int start,int count,const rgb_type* array);

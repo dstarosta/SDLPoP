@@ -32,9 +32,9 @@ const Uint8 ambient_level = 128;
 void init_lighting() {
 	if (!enable_lighting) return;
 
-	lighting_mask = IMG_Load(locate_file(mask_filename));
+	lighting_mask = load_png_file_as_surface(locate_file(mask_filename));
 	if (lighting_mask == NULL) {
-		sdlperror("IMG_Load (lighting_mask)");
+		sdlperror("load_png_file_as_surface (lighting_mask)");
 		enable_lighting = 0;
 		return;
 	}

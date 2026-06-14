@@ -12,8 +12,8 @@ OS      := $(shell uname)
 CPPFLAGS += -Wall -D_GNU_SOURCE=1
 CFLAGS += -std=c99 -O2
 
-LIBS := $(shell pkg-config --libs sdl3 SDL3_image)
-CFLAGS += $(shell pkg-config --cflags sdl3 SDL3_image)
+LIBS := $(shell pkg-config --libs sdl3)
+CFLAGS += $(shell pkg-config --cflags sdl3)
 
 ifeq ($(OS),Darwin)
 CPPFLAGS += -D_THREAD_SAFE -DOSX

@@ -8,7 +8,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=implicit-function-declaration")
 # have CMake output binaries to the directory that contains the source files
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SDLPoP_SOURCE_DIR}/..")
 
-# SDLPoP requires the SDL3 and SDL3_image development libraries.
+# SDLPoP requires the SDL3 development library.
 # You can pass the SDL3 location to CMake like so: -DSDL3="C:/work/libraries/SDL3-3.0.0"
 # Or alternatively, specify the SDL3 location below:
 
@@ -90,8 +90,8 @@ else()
     # By default, a normal binary executable will be created.
     # If you want an Application Bundle instead, pass CREATE_BUNDLE to CMake like so: -DCREATE_BUNDLE=1
 
-    # NOTE: Currently, the SDL3 and SDL3_image frameworks are not being correctly included/linked in the bundle!
-    #       As long as this isn't fixed, these bundles will only work if SDL3 and SDL3_image are installed.
+    # NOTE: Currently, the SDL3 framework is not being correctly included/linked in the bundle!
+    #       As long as this isn't fixed, these bundles will only work if SDL3 is installed.
 
     set (SDLPoP_VERSION "1.24 RC")
     set (MACOSX_BUNDLE_INFO_STRING          ${PROJECT_NAME})
@@ -118,9 +118,9 @@ endif()
 # mt32synth loads libmt32emu dynamically (dlopen/LoadLibrary). ${CMAKE_DL_LIBS} is the
 # portable dynamic-loader library: empty on Windows, "dl" on Linux/*BSD.
 if(WIN32)
-    target_link_libraries(prince mingw32 SDL3 SDL3_image ${CMAKE_DL_LIBS})
+    target_link_libraries(prince mingw32 SDL3 ${CMAKE_DL_LIBS})
 elseif(APPLE)
-    target_link_libraries(prince SDL3 SDL3_image m ${CMAKE_DL_LIBS})
+    target_link_libraries(prince SDL3 m ${CMAKE_DL_LIBS})
 elseif(PSP) # PSP port — SDL3 PSP support not verified; kept at SDL2 until tested
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 	include(FindPkgConfig)
@@ -138,5 +138,5 @@ elseif(PSP) # PSP port — SDL3 PSP support not verified; kept at SDL2 until tes
 		TITLE prince
 	)
 else()
-    	target_link_libraries(prince SDL3 SDL3_image m ${CMAKE_DL_LIBS})
+    	target_link_libraries(prince SDL3 m ${CMAKE_DL_LIBS})
 endif()

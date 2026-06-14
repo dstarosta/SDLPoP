@@ -20,7 +20,28 @@ The authors of this program may be contacted at https://forum.princed.org
 
 #include "common.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #ifdef USE_SCREENSHOT
+
+static int save_surface_as_png(SDL_Surface* surface, const char* filename) {
+	// Convert to a canonical byte-order format so stbi_write_png always gets RGB(A) bytes.
+	// SDL_PIXELFORMAT_RGB24 / RGBA32 are defined to be R,G,B[,A] in memory on any endian.
+	SDL_PixelFormat target_fmt = SDL_ISPIXELFORMAT_ALPHA(surface->format)
+	                             ? SDL_PIXELFORMAT_RGBA32
+	                             : SDL_PIXELFORMAT_RGB24;
+	SDL_Surface* converted = SDL_ConvertSurface(surface, target_fmt);
+	if (converted == NULL) {
+		return -1;
+	}
+	int channels = SDL_ISPIXELFORMAT_ALPHA(target_fmt) ? 4 : 3;
+	SDL_LockSurface(converted);
+	int ok = stbi_write_png(filename, converted->w, converted->h, channels, converted->pixels, converted->pitch);
+	SDL_UnlockSurface(converted);
+	SDL_DestroySurface(converted);
+	return ok ? 0 : -1;
+}
 
 char screenshots_folder[POP_MAX_PATH] = "screenshots";
 char screenshot_filename[POP_MAX_PATH] = "screenshot.png";
@@ -67,7 +88,7 @@ void show_result(int result, const char* what) {
 // Save a screenshot.
 void save_screenshot() {
 	make_screenshot_filename();
-	int result = IMG_SavePNG(get_final_surface(), screenshot_filename);
+	int result = save_surface_as_png(get_final_surface(), screenshot_filename);
 	show_result(result, "screenshot");
 }
 
@@ -88,7 +109,7 @@ void switch_to_room(int room) {
 	check_shadow(); // otherwise the shadow won't appear on level 6
 
 	// for potion bubbles
-	for (int tilepos=0;tilepos<30;tilepos++) {
+	for (int tilepos=0; tilepos<30; tilepos++) {
 		int tile_type = curr_room_tiles[tilepos] & 0x1F;
 		if (tile_type == tiles_10_potion) {
 			int modifier = curr_room_modif[tilepos];
@@ -115,7 +136,7 @@ int ypos[NUMBER_OF_ROOMS+1] = {0};
 void draw_extras(void) {
 	// ambiguous tiles
 	// The editor branch has something similar...
-	for (int tilepos=0;tilepos<30;tilepos++) {
+	for (int tilepos=0; tilepos<30; tilepos++) {
 		int tile_type = curr_room_tiles[tilepos] & 0x1F;
 		int modifier = curr_room_modif[tilepos];
 		int row = tilepos/10;
@@ -205,13 +226,13 @@ void draw_extras(void) {
 
 		// triggered door events
 		if (tile_type == tiles_6_closer || tile_type == tiles_15_opener
-			// These tiles are triggered even if they are not buttons!
-			/*
-			|| (current_level == 1 && drawn_room == 5 && tilepos == 2) // triggered at start
-			|| (current_level == 13 && drawn_room == 24 && tilepos == 0) // triggered when player enters any room from the right after Jaffar died
-			*/
-			|| (has_trigger_potion && drawn_room == 8 && tilepos == 0) // triggered when player drinks an open potion
-		) {
+		        // These tiles are triggered even if they are not buttons!
+		        /*
+		        || (current_level == 1 && drawn_room == 5 && tilepos == 2) // triggered at start
+		        || (current_level == 13 && drawn_room == 24 && tilepos == 0) // triggered when player enters any room from the right after Jaffar died
+		        */
+		        || (has_trigger_potion && drawn_room == 8 && tilepos == 0) // triggered when player drinks an open potion
+		   ) {
 			int first_event = modifier;
 			int last_event = modifier;
 			while (last_event<256 && get_doorlink_next(last_event)) last_event++;
@@ -283,9 +304,9 @@ void draw_extras(void) {
 		}
 
 		if (current_level == /*3*/ custom->checkpoint_level &&
-			drawn_room == /*7*/ custom->checkpoint_clear_tile_room &&
-			tilepos == /*4*/ custom->checkpoint_clear_tile_col * 10 + custom->checkpoint_clear_tile_row
-		) {
+		        drawn_room == /*7*/ custom->checkpoint_clear_tile_room &&
+		        tilepos == /*4*/ custom->checkpoint_clear_tile_col * 10 + custom->checkpoint_clear_tile_row
+		   ) {
 			special_event = "removed"; // this loose floor is removed when restarting at the checkpoint
 		}
 
@@ -294,32 +315,32 @@ void draw_extras(void) {
 		}
 
 		if (current_level == /*3*/ custom->checkpoint_level &&
-			drawn_room == /*2*/ custom->checkpoint_respawn_room &&
-			tilepos == /*6*/ custom->checkpoint_respawn_tilepos
-		) {
+		        drawn_room == /*2*/ custom->checkpoint_respawn_room &&
+		        tilepos == /*6*/ custom->checkpoint_respawn_tilepos
+		   ) {
 			special_event = "check point"; // restart at checkpoint
 			// TODO: Show this room (and connected rooms) even if it is unreachable from the start via room links?
 		}
 
 		if (current_level == /*3*/ custom->skeleton_level &&
-			drawn_room == /*1*/ custom->skeleton_room &&
-			tilepos == /*15*/ custom->skeleton_row * 10 + custom->skeleton_column &&
-			tile_type == tiles_21_skeleton
-		) {
+		        drawn_room == /*1*/ custom->skeleton_room &&
+		        tilepos == /*15*/ custom->skeleton_row * 10 + custom->skeleton_column &&
+		        tile_type == tiles_21_skeleton
+		   ) {
 			special_event = "skel wake"; // skeleton wakes
 		}
 
 		if (current_level == /*3*/ custom->skeleton_level &&
-			drawn_room == /*3*/ custom->skeleton_reappear_room &&
-			tilepos == /*14*/ custom->skeleton_reappear_row * 10 + (custom->skeleton_reappear_x - 58) / 14
-		) {
+		        drawn_room == /*3*/ custom->skeleton_reappear_room &&
+		        tilepos == /*14*/ custom->skeleton_reappear_row * 10 + (custom->skeleton_reappear_x - 58) / 14
+		   ) {
 			special_event = "skel cont"; // skeleton continues here if it falls into this room
 		}
 
 		if (current_level == /*4*/ custom->mirror_level &&
-			drawn_room == /*4*/ custom->mirror_room &&
-			tilepos == /*4*/ custom->mirror_row * 10 + custom->mirror_column
-		) {
+		        drawn_room == /*4*/ custom->mirror_room &&
+		        tilepos == /*4*/ custom->mirror_row * 10 + custom->mirror_column
+		   ) {
 			special_event = "mirror"; // mirror appears
 		}
 
@@ -328,28 +349,28 @@ void draw_extras(void) {
 		// not marked: level 5 shadow, required opening gate
 
 		if (current_level == /*5*/ custom->shadow_steal_level &&
-			drawn_room == /*24*/ custom->shadow_steal_room &&
-			tilepos == 3 &&
-			tile_type == tiles_10_potion
-		) {
+		        drawn_room == /*24*/ custom->shadow_steal_room &&
+		        tilepos == 3 &&
+		        tile_type == tiles_10_potion
+		   ) {
 			special_event = "stolen"; // stolen potion
 		}
 
 		// not marked: level 6 shadow (it's already visible)
 
 		if (current_level == /*6*/ custom->falling_exit_level &&
-			drawn_room == /*1*/ custom->falling_exit_room &&
-			row == 2
-		) {
+		        drawn_room == /*1*/ custom->falling_exit_room &&
+		        row == 2
+		   ) {
 			special_event = "exit\ndown"; // exit by falling
 		}
 
 		// not marked: level 7 falling entry
 
 		if (current_level == /*8*/ custom->mouse_level &&
-			drawn_room == /*16*/ custom->mouse_room &&
-			tilepos == 9 // top right corner
-		) {
+		        drawn_room == /*16*/ custom->mouse_room &&
+		        tilepos == 9 // top right corner
+		   ) {
 			special_event = "mouse"; // mouse comes
 		}
 
@@ -372,10 +393,10 @@ void draw_extras(void) {
 		}
 
 		if (current_level == /*13*/ custom->loose_tiles_level &&
-			(drawn_room == level.roomlinks[/*23*/ custom->loose_tiles_room_1 - 1].up ||
-				drawn_room == level.roomlinks[/*16*/ custom->loose_tiles_room_2 - 1].up) &&
-			(tilepos >= /*22*/ custom->loose_tiles_first_tile && tilepos <= /*27*/ custom->loose_tiles_last_tile)
-		) {
+		        (drawn_room == level.roomlinks[/*23*/ custom->loose_tiles_room_1 - 1].up ||
+		         drawn_room == level.roomlinks[/*16*/ custom->loose_tiles_room_2 - 1].up) &&
+		        (tilepos >= /*22*/ custom->loose_tiles_first_tile && tilepos <= /*27*/ custom->loose_tiles_last_tile)
+		   ) {
 			special_event = "fall"; // falling loose floors
 		}
 
@@ -439,7 +460,8 @@ void draw_extras(void) {
 			load_frame_to_obj();
 			int screen_x = calc_screen_x_coord(obj_x);
 			// Put it above the guard's head.
-			if (Guard.direction == dir_0_right) screen_x -= 10; else screen_x += 10;
+			if (Guard.direction == dir_0_right) screen_x -= 10;
+			else screen_x += 10;
 
 			rect_type event_rect = {y+2, screen_x-16-10, y+63, screen_x+16+10};
 			char guard_info[20];
@@ -483,7 +505,7 @@ void save_level_screenshot(bool want_extras) {
 	// We don't stop on broken room links, because the resulting map might still be usable.
 
 	bool processed[NUMBER_OF_ROOMS+1] = {false};
-	for (int room=1;room<=NUMBER_OF_ROOMS;room++) {
+	for (int room=1; room<=NUMBER_OF_ROOMS; room++) {
 		xpos[room] = 0;
 		ypos[room] = 0;
 	}
@@ -510,7 +532,10 @@ void save_level_screenshot(bool want_extras) {
 				ypos[other_room] = other_y;
 				processed[other_room] = true;
 				printf("Adding room %d to map.\n", other_room);
-				if (queue_end >= NUMBER_OF_ROOMS) { printf("Queue overflow!\n"); break; }
+				if (queue_end >= NUMBER_OF_ROOMS) {
+					printf("Queue overflow!\n");
+					break;
+				}
 				queue[queue_end] = other_room;
 				queue_end++;
 			}
@@ -520,7 +545,7 @@ void save_level_screenshot(bool want_extras) {
 	// Find the bounds of the level.
 	// The starting room is mapped to x=0,y=0, so 0 is a good initial value for max and min.
 	int min_x=0, max_x=0, min_y=0, max_y=0;
-	for (int room=1;room<=NUMBER_OF_ROOMS;room++) {
+	for (int room=1; room<=NUMBER_OF_ROOMS; room++) {
 		if (xpos[room] < min_x) min_x = xpos[room];
 		if (xpos[room] > max_x) max_x = xpos[room];
 		if (ypos[room] < min_y) min_y = ypos[room];
@@ -531,11 +556,12 @@ void save_level_screenshot(bool want_extras) {
 	int clash_y = max_y + 1;
 	int clash_x = min_x;
 
-	#define MAX_MAP_SIZE NUMBER_OF_ROOMS
+#define MAX_MAP_SIZE NUMBER_OF_ROOMS
 	int map[MAX_MAP_SIZE][MAX_MAP_SIZE] = {{0}};
-	for (int room=1;room<=NUMBER_OF_ROOMS;room++) {
+	for (int room=1; room<=NUMBER_OF_ROOMS; room++) {
 		if (processed[room]) {
-			again:;
+again:
+			;
 			int y = ypos[room] - min_y;
 			int x = xpos[room] - min_x;
 			if (x>=0 && y>=0 && x<MAX_MAP_SIZE && y<MAX_MAP_SIZE) {
@@ -597,10 +623,10 @@ void save_level_screenshot(bool want_extras) {
 	has_trigger_potion = false;
 
 	// Is there a trigger potion on the level?
-	for (int room=1;room<=NUMBER_OF_ROOMS;room++) {
+	for (int room=1; room<=NUMBER_OF_ROOMS; room++) {
 		if (processed[room]) {
 			get_room_address(room);
-			for (int tilepos=0;tilepos<30;tilepos++) {
+			for (int tilepos=0; tilepos<30; tilepos++) {
 				int tile_type = curr_room_tiles[tilepos] & 0x1F;
 				if (tile_type == tiles_10_potion && curr_room_modif[tilepos] >> 3 == 6) {
 					has_trigger_potion = true;
@@ -612,20 +638,20 @@ void save_level_screenshot(bool want_extras) {
 	memset(event_used, 0, sizeof(event_used));
 
 	// Find out which door events are used:
-	for (int room=1;room<=NUMBER_OF_ROOMS;room++) {
+	for (int room=1; room<=NUMBER_OF_ROOMS; room++) {
 		if (processed[room]) {
 			get_room_address(room);
-			for (int tilepos=0;tilepos<30;tilepos++) {
+			for (int tilepos=0; tilepos<30; tilepos++) {
 				int tile_type = curr_room_tiles[tilepos] & 0x1F;
 				if (tile_type == tiles_6_closer || tile_type == tiles_15_opener
-					// These tiles are triggered even if they are not buttons!
-					// TODO: Force displaying of special trigger rooms even if they are unreachable via room links?
-					/*
-					|| (current_level == 1 && room == 5 && tilepos == 2) // triggered at start
-					|| (current_level == 13 && room == 24 && tilepos == 0) // triggered when player enters any room from the right after Jaffar died
-					*/
-					|| (has_trigger_potion && room == 8 && tilepos == 0) // triggered when player drinks an open potion
-				) {
+				        // These tiles are triggered even if they are not buttons!
+				        // TODO: Force displaying of special trigger rooms even if they are unreachable via room links?
+				        /*
+				        || (current_level == 1 && room == 5 && tilepos == 2) // triggered at start
+				        || (current_level == 13 && room == 24 && tilepos == 0) // triggered when player enters any room from the right after Jaffar died
+				        */
+				        || (has_trigger_potion && room == 8 && tilepos == 0) // triggered when player drinks an open potion
+				   ) {
 					int modifier = curr_room_modif[tilepos];
 					for (int index = modifier; index < 256; index++) {
 						event_used[index] = true;
@@ -657,8 +683,8 @@ void save_level_screenshot(bool want_extras) {
 	*/
 
 	int old_room = drawn_room;
-	for (int y=0;y<map_height;y++) {
-		for (int x=0;x<map_width;x++) {
+	for (int y=0; y<map_height; y++) {
+		for (int x=0; x<map_width; x++) {
 			int room = map[y][x];
 			if (room) {
 				SDL_Rect dest_rect;
@@ -677,7 +703,7 @@ void save_level_screenshot(bool want_extras) {
 	switch_to_room(old_room);
 
 	make_screenshot_filename();
-	int result = IMG_SavePNG(map_surface, screenshot_filename);
+	int result = save_surface_as_png(map_surface, screenshot_filename);
 	show_result(result, "level map");
 
 	SDL_DestroySurface(map_surface);

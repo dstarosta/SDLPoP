@@ -25,7 +25,6 @@ The authors of this program may be contacted at https://forum.princed.org
 #include "stb_vorbis.c"
 
 #include <SDL3/SDL.h>
-#include <SDL3_image/SDL_image.h>
 
 #if SDL_BYTEORDER != SDL_LIL_ENDIAN
 //#error This program is not (yet) prepared for big endian CPUs, please contact the author.

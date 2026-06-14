@@ -19,6 +19,14 @@ The authors of this program may be contacted at https://forum.princed.org
 */
 
 #include "common.h"
+
+#define STBI_ONLY_PNG
+#define STB_IMAGE_IMPLEMENTATION
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#include "stb_image.h"
+#pragma GCC diagnostic pop
+
 #include <time.h>
 #include <errno.h>
 
@@ -38,7 +46,7 @@ The authors of this program may be contacted at https://forum.princed.org
 
 void sdlperror(const char* header) {
 	const char* error = SDL_GetError();
-	printf("%s: %s\n",header,error);
+	printf("%s: %s\n", header, error);
 	//quit(1);
 }
 
@@ -55,10 +63,9 @@ void find_exe_dir(void) {
 	if (found_exe_dir) return;
 #ifdef __amigaos4__
 	if(g_argc == 0) { // from Workbench
-		struct WBStartup *WBenchMsg = (struct WBStartup *)g_argv;
+		struct WBStartup* WBenchMsg = (struct WBStartup*)g_argv;
 		NameFromLock( WBenchMsg->sm_ArgList->wa_Lock, exe_dir, sizeof(exe_dir) );
-	}
-	else { // from Shell/CLI
+	} else { // from Shell/CLI
 		NameFromLock( GetProgramDir(), exe_dir, sizeof(exe_dir) );
 	}
 #else
@@ -181,7 +188,7 @@ int access_UTF8(const char* filename_UTF8, int mode) {
 	return result;
 }
 
-int stat_UTF8(const char *filename_UTF8, struct stat *_Stat) {
+int stat_UTF8(const char* filename_UTF8, struct stat* _Stat) {
 	WCHAR* filename_UTF16 = WIN_UTF8ToString(filename_UTF8);
 #ifdef _MSC_VER
 	int result = _wstat(filename_UTF16, _Stat);
@@ -256,8 +263,8 @@ directory_listing_type* create_directory_listing_and_find_first_file(const char*
 	if (data->dp != NULL) {
 		struct dirent* ep;
 		while ((ep = readdir(data->dp))) {
-			char *ext = strrchr(ep->d_name, '.');
-			if (ext != NULL && strcasecmp(ext+1, extension) == 0) {
+			char* ext = strrchr(ep->d_name, '.');
+			if (ext != NULL && strcasecmp(ext + 1, extension) == 0) {
 				data->found_filename = ep->d_name;
 				data->extension = extension;
 				ok = true;
@@ -281,8 +288,8 @@ bool find_next_file(directory_listing_type* data) {
 	bool ok = false;
 	struct dirent* ep;
 	while ((ep = readdir(data->dp))) {
-		char *ext = strrchr(ep->d_name, '.');
-		if (ext != NULL && strcasecmp(ext+1, data->extension) == 0) {
+		char* ext = strrchr(ep->d_name, '.');
+		if (ext != NULL && strcasecmp(ext + 1, data->extension) == 0) {
 			data->found_filename = ep->d_name;
 			ok = true;
 			break;
@@ -291,7 +298,7 @@ bool find_next_file(directory_listing_type* data) {
 	return ok;
 }
 
-void close_directory_listing(directory_listing_type *data) {
+void close_directory_listing(directory_listing_type* data) {
 	closedir(data->dp);
 	free(data);
 }
@@ -329,7 +336,7 @@ word prandom(word max) {
 }
 
 // seg009:0467
-int round_xpos_to_byte(int xpos,int round_direction) {
+int round_xpos_to_byte(int xpos, int round_direction) {
 	// stub
 	return xpos;
 }
@@ -350,12 +357,12 @@ int key_test_quit() {
 	word key = read_key();
 	if (key == (SDL_SCANCODE_Q | WITH_CTRL)) { // Ctrl+Q
 
-		#ifdef USE_REPLAY
+#ifdef USE_REPLAY
 		if (recording) save_recorded_replay_dialog();
-		#endif
-		#ifdef USE_MENU
+#endif
+#ifdef USE_MENU
 		if (is_menu_shown) menu_was_closed();
-		#endif
+#endif
 
 		quit(0);
 	}
@@ -404,7 +411,7 @@ const char* check_param(const char* param) {
 }
 
 // seg009:0EDF
-int pop_wait(int timer_index,int time) {
+int pop_wait(int timer_index, int time) {
 	start_timer(timer_index, time);
 	return do_wait(timer_index);
 }
@@ -432,15 +439,14 @@ static FILE* open_dat_from_root_or_data_dir(const char* filename) {
 	return fp;
 }
 
-int showmessage(char* text,int arg_4,void* arg_0);
+int showmessage(char* text, int arg_4, void* arg_0);
 
 // seg009:0F58
 dat_type* open_dat(const char* filename, int optional) {
 	FILE* fp = NULL;
 	if (!use_custom_levelset) {
 		fp = open_dat_from_root_or_data_dir(filename);
-	}
-	else {
+	} else {
 		// Don't complain about missing data files if we are only looking in the mod folder, because they might exist in the data folder.
 		// (This is possible only if open_dat() was called by load_all_sounds().)
 		if (!skip_mod_data_files && skip_normal_data_files) optional = 1;
@@ -468,8 +474,8 @@ dat_type* open_dat(const char* filename, int optional) {
 			goto failed;
 		dat_table = (dat_table_type*) malloc(SDL_Swap16LE(dat_header.table_size));
 		if (dat_table == NULL ||
-		    fseek(fp, SDL_Swap32LE(dat_header.table_offset), SEEK_SET) ||
-		    fread(dat_table, SDL_Swap16LE(dat_header.table_size), 1, fp) != 1)
+		        fseek(fp, SDL_Swap32LE(dat_header.table_offset), SEEK_SET) ||
+		        fread(dat_table, SDL_Swap16LE(dat_header.table_size), 1, fp) != 1)
 			goto failed;
 		pointer->handle = fp;
 		pointer->dat_table = dat_table;
@@ -482,11 +488,11 @@ dat_type* open_dat(const char* filename, int optional) {
 		// strip the .DAT file extension from the filename (use folders simply named TITLE, KID, VPALACE, etc.)
 		strncpy(filename_no_ext, pointer->filename, sizeof(filename_no_ext));
 		size_t len = strlen(filename_no_ext);
-		if (len >= 5 && filename_no_ext[len-4] == '.') {
-			filename_no_ext[len-4] = '\0'; // terminate, so ".DAT" is deleted from the filename
+		if (len >= 5 && filename_no_ext[len - 4] == '.') {
+			filename_no_ext[len - 4] = '\0'; // terminate, so ".DAT" is deleted from the filename
 		}
 		char foldername[POP_MAX_PATH];
-		snprintf_check(foldername,sizeof(foldername),"data/%s",filename_no_ext);
+		snprintf_check(foldername, sizeof(foldername), "data/%s", filename_no_ext);
 		const char* data_path = locate_file(foldername);
 		struct stat path_stat;
 		int result = stat(data_path, &path_stat);
@@ -517,7 +523,7 @@ void set_loaded_palette(dat_pal_type* palette_ptr) {
 	int dest_row, dest_index, source_row;
 	for (dest_row = dest_index = source_row = 0; dest_row < 16; ++dest_row, dest_index += 0x10) {
 		if (palette_ptr->row_bits & (1 << dest_row)) {
-			set_pal_arr(dest_index, 16, palette_ptr->vga + source_row*0x10);
+			set_pal_arr(dest_index, 16, palette_ptr->vga + source_row * 0x10);
 			++source_row;
 		}
 	}
@@ -527,7 +533,7 @@ void set_loaded_palette(dat_pal_type* palette_ptr) {
 word chtab_palette_bits = 1;
 
 // seg009:104E
-chtab_type* load_sprites_from_file(int resource,int palette_bits, int quit_on_error) {
+chtab_type* load_sprites_from_file(int resource, int palette_bits, int quit_on_error) {
 	//int has_palette_bits = 1;
 	dat_shpl_type* shpl = (dat_shpl_type*) load_from_opendats_alloc(resource, "pal", NULL, NULL);
 	if (shpl == NULL) {
@@ -560,36 +566,19 @@ chtab_type* load_sprites_from_file(int resource,int palette_bits, int quit_on_er
 	}
 
 	int n_images = shpl->n_images;
-	size_t alloc_size = sizeof(chtab_type) + sizeof(void *) * n_images;
+	size_t alloc_size = sizeof(chtab_type) + sizeof(void*) * n_images;
 	chtab_type* chtab = (chtab_type*) malloc(alloc_size);
 	memset(chtab, 0, alloc_size);
 	chtab->n_images = n_images;
 	for (int i = 1; i <= n_images; i++) {
-		SDL_Surface* image = load_image(resource + i, pal_ptr);
-//		if (image == NULL) printf(" failed");
-		if (image != NULL) {
-/*
-			if (!SDL_SetSurfaceAlphaMod(image, 0)) {
-				sdlperror("load_sprites_from_file: SDL_SetAlpha");
-				quit(1);
-			}
-*/
-			/*
-			if (!SDL_SetSurfaceColorKey(image, true, 0)) {
-				sdlperror("load_sprites_from_file: SDL_SetSurfaceColorKey");
-				quit(1);
-			}
-			*/
-		}
-//		printf("\n");
-		chtab->images[i-1] = image;
+		chtab->images[i - 1] = load_image(resource + i, pal_ptr);
 	}
 	set_loaded_palette(pal_ptr);
 	return chtab;
 }
 
 // seg009:11A8
-void free_chtab(chtab_type *chtab_ptr) {
+void free_chtab(chtab_type* chtab_ptr) {
 	image_type* curr_image;
 	if (graphics_mode == gmMcgaVga && chtab_ptr->has_palette_bits) {
 		chtab_palette_bits &= ~ chtab_ptr->chtab_palette_bits;
@@ -605,7 +594,7 @@ void free_chtab(chtab_type *chtab_ptr) {
 }
 
 // seg009:8CE6
-void decompress_rle_lr(byte* destination,const byte* source,int dest_length) {
+void decompress_rle_lr(byte* destination, const byte* source, int dest_length) {
 	const byte* src_pos = source;
 	byte* dest_pos = destination;
 	short rem_length = dest_length;
@@ -636,7 +625,7 @@ void decompress_rle_lr(byte* destination,const byte* source,int dest_length) {
 }
 
 // seg009:8D1C
-void decompress_rle_ud(byte* destination,const byte* source,int dest_length,int width,int height) {
+void decompress_rle_ud(byte* destination, const byte* source, int dest_length, int width, int height) {
 	short rem_height = height;
 	const byte* src_pos = source;
 	byte* dest_pos = destination;
@@ -682,7 +671,7 @@ void decompress_rle_ud(byte* destination,const byte* source,int dest_length,int 
 }
 
 // seg009:90FA
-byte* decompress_lzg_lr(byte* dest,const byte* source,int dest_length) {
+byte* decompress_lzg_lr(byte* dest, const byte* source, int dest_length) {
 	byte* window = (byte*) malloc(0x400);
 	if (window == NULL) return NULL;
 	memset(window, 0, 0x400);
@@ -730,7 +719,7 @@ byte* decompress_lzg_lr(byte* dest,const byte* source,int dest_length) {
 }
 
 // seg009:91AD
-byte* decompress_lzg_ud(byte* dest,const byte* source,int dest_length,int stride,int height) {
+byte* decompress_lzg_ud(byte* dest, const byte* source, int dest_length, int stride, int height) {
 	byte* window = (byte*) malloc(0x400);
 	if (window == NULL) return NULL;
 	memset(window, 0, 0x400);
@@ -789,23 +778,23 @@ byte* decompress_lzg_ud(byte* dest,const byte* source,int dest_length,int stride
 }
 
 // seg009:938E
-void decompr_img(byte* dest,const image_data_type* source,int decomp_size,int cmeth, int stride) {
+void decompr_img(byte* dest, const image_data_type* source, int decomp_size, int cmeth, int stride) {
 	switch (cmeth) {
 		case 0: // RAW left-to-right
 			memcpy(dest, &source->data, decomp_size);
-		break;
+			break;
 		case 1: // RLE left-to-right
 			decompress_rle_lr(dest, source->data, decomp_size);
-		break;
+			break;
 		case 2: // RLE up-to-down
 			decompress_rle_ud(dest, source->data, decomp_size, stride, SDL_Swap16LE(source->height));
-		break;
+			break;
 		case 3: // LZG left-to-right
 			decompress_lzg_lr(dest, source->data, decomp_size);
-		break;
+			break;
 		case 4: // LZG up-to-down
 			decompress_lzg_ud(dest, source->data, decomp_size, stride, SDL_Swap16LE(source->height));
-		break;
+			break;
 	}
 }
 
@@ -821,8 +810,8 @@ byte* conv_to_8bpp(byte* in_data, int width, int height, int stride, int depth) 
 	int pixels_per_byte = 8 / depth;
 	int mask = (1 << depth) - 1;
 	for (int y = 0; y < height; ++y) {
-		byte* in_pos = in_data + y*stride;
-		byte* out_pos = out_data + y*width;
+		byte* in_pos = in_data + y * stride;
+		byte* out_pos = out_data + y * width;
 		for (int x_pixel = 0, x_byte = 0; x_byte < stride; ++x_byte) {
 			byte v = *in_pos;
 			int shift = 8;
@@ -850,7 +839,8 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 	memset(dest, 0, dest_size);
 	decompr_img(dest, image_data, dest_size, cmeth, stride);
 	byte* image_8bpp = conv_to_8bpp(dest, width, height, stride, depth);
-	free(dest); dest = NULL;
+	free(dest);
+	dest = NULL;
 	image_type* image = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_INDEX8);
 	if (image == NULL) {
 		sdlperror("decode_image: SDL_CreateRGBSurface");
@@ -861,17 +851,17 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 	}
 	for (int y = 0; y < height; ++y) {
 		// fill image with data
-		memcpy((byte*)image->pixels + y*image->pitch, image_8bpp + y*width, width);
+		memcpy((byte*)image->pixels + y * image->pitch, image_8bpp + y * width, width);
 	}
 	SDL_UnlockSurface(image);
-
-	free(image_8bpp); image_8bpp = NULL;
+	free(image_8bpp);
+	image_8bpp = NULL;
 	SDL_Color colors[16];
 	for (int i = 0; i < 16; ++i) {
 		colors[i].r = palette->vga[i].r << 2;
 		colors[i].g = palette->vga[i].g << 2;
 		colors[i].b = palette->vga[i].b << 2;
-		colors[i].a = SDL_ALPHA_OPAQUE;   // SDL2's SDL_Color has a fourth alpha component
+		colors[i].a = SDL_ALPHA_OPAQUE;
 	}
 	// Force 0th color to be black for non-transparent blitters. (hitpoints, shadow)
 	// This is needed to remove the colored rectangles around hitpoints and the shadow, when using Brain's SNES graphics for example.
@@ -879,14 +869,148 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 	colors[0].g = 0;
 	colors[0].b = 0;
 	colors[0].a = SDL_ALPHA_TRANSPARENT;
-	// SDL3 does not auto-create a palette for INDEX8 surfaces; create one explicitly.
-	SDL_Palette* img_pal = SDL_CreatePalette(256);
+	SDL_Palette* img_pal = SDL_CreatePalette(16);
 	if (img_pal) {
 		SDL_SetPaletteColors(img_pal, colors, 0, 16);
 		SDL_SetSurfacePalette(image, img_pal);
-		SDL_DestroyPalette(img_pal); // surface now holds the only reference
+		SDL_DestroyPalette(img_pal);
 	}
 	return image;
+}
+
+// Load a PNG file from disk into a 32-bit RGBA surface.
+SDL_Surface* load_png_file_as_surface(const char* path) {
+	int w, h;
+	stbi_uc* pixels = stbi_load(path, &w, &h, NULL, STBI_rgb_alpha);
+	if (pixels == NULL) {
+		return NULL;
+	}
+	SDL_Surface* surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+	if (surface == NULL || !SDL_LockSurface(surface)) {
+		SDL_DestroySurface(surface);
+		stbi_image_free(pixels);
+		return NULL;
+	}
+	for (int y = 0; y < h; ++y) {
+		memcpy((Uint8*)surface->pixels + y * surface->pitch,
+		       pixels + y * w * 4, (size_t)w * 4);
+	}
+	SDL_UnlockSurface(surface);
+	stbi_image_free(pixels);
+	return surface;
+}
+
+// Load a PNG from memory. SDL3 Image was very slow at loading PNGs in batches
+// so we switched to stb_image (and stb_image_write for screenshot.c).
+//
+// Uses the PNG's embedded PLTE for exact palette-index recovery (stb_image expands
+// pixels via PLTE, so matching against PLTE always gives the original indices).
+// Falls back to nearest-match against the pal_ptr VGA palette for non-indexed PNGs.
+// Index 0 is forced to black in the surface palette, matching decode_image behaviour
+// for non-transparent blitters (avoids coloured rectangles around sprites).
+static image_type* load_png_image(const void* png_data, int png_size, dat_pal_type* pal_ptr) {
+	// Extract the PLTE chunk that precedes IDAT in the PNG stream.
+	static const Uint8 png_sig[8] = {137, 'P', 'N', 'G', 13, 10, 26, 10};
+	SDL_Color plte[256];
+	int plte_count = 0;
+	if (png_size > 8 && memcmp(png_data, png_sig, 8) == 0) {
+		const Uint8* chunk = (const Uint8*)png_data + 8;
+		const Uint8* stream_end = (const Uint8*)png_data + png_size;
+		while (chunk + 12 <= stream_end) {
+			Uint32 chunk_len = ((Uint32)chunk[0] << 24) | ((Uint32)chunk[1] << 16) | ((Uint32)chunk[2] << 8) | chunk[3];
+			if (chunk + 12 + chunk_len > stream_end) break;
+			if (memcmp(chunk + 4, "PLTE", 4) == 0 && chunk_len <= 768) {
+				plte_count = (int)(chunk_len / 3);
+				for (int i = 0; i < plte_count; ++i) {
+					plte[i].r = chunk[8 + i * 3];
+					plte[i].g = chunk[8 + i * 3 + 1];
+					plte[i].b = chunk[8 + i * 3 + 2];
+					plte[i].a = SDL_ALPHA_OPAQUE;
+				}
+			} else if (memcmp(chunk + 4, "IDAT", 4) == 0) break;
+			chunk += 12 + chunk_len;
+		}
+	}
+
+	int img_w, img_h;
+	stbi_uc* pixels = stbi_load_from_memory(
+	                      (const stbi_uc*)png_data, png_size, &img_w, &img_h, NULL, STBI_rgb);
+	if (pixels == NULL) return NULL;
+
+	image_type* surface = SDL_CreateSurface(img_w, img_h, SDL_PIXELFORMAT_INDEX8);
+	if (surface == NULL) {
+		stbi_image_free(pixels);
+		return NULL;
+	}
+
+	// Build the surface palette from PLTE when available, else from the VGA palette.
+	// Force index 0 to opaque black so non-transparent blitters don't reveal the
+	// raw transparent colour (which may not be black in custom graphics packs).
+	SDL_Color surface_palette[256] = {0};
+	int surface_palette_count = plte_count ? plte_count : 16;
+	if (plte_count) {
+		memcpy(surface_palette, plte, plte_count * sizeof(SDL_Color));
+	} else if (pal_ptr) {
+		for (int i = 0; i < 16; ++i) {
+			surface_palette[i].r = pal_ptr->vga[i].r << 2;
+			surface_palette[i].g = pal_ptr->vga[i].g << 2;
+			surface_palette[i].b = pal_ptr->vga[i].b << 2;
+			surface_palette[i].a = SDL_ALPHA_OPAQUE;
+		}
+	}
+	surface_palette[0].r = 0;
+	surface_palette[0].g = 0;
+	surface_palette[0].b = 0;
+	surface_palette[0].a = SDL_ALPHA_TRANSPARENT;
+	SDL_Palette* sdl_palette = SDL_CreatePalette(surface_palette_count);
+	if (sdl_palette) {
+		SDL_SetPaletteColors(sdl_palette, surface_palette, 0, surface_palette_count);
+		SDL_SetSurfacePalette(surface, sdl_palette);
+		SDL_DestroyPalette(sdl_palette);
+	}
+
+	// Map each RGB pixel back to its palette index.
+	if (!SDL_LockSurface(surface)) {
+		SDL_DestroySurface(surface);
+		stbi_image_free(pixels);
+		return NULL;
+	}
+	for (int y = 0; y < img_h; ++y) {
+		const stbi_uc* src_row = pixels + y * img_w * 3;
+		Uint8* dst_row = (Uint8*)surface->pixels + y * surface->pitch;
+		for (int x = 0; x < img_w; ++x) {
+			int r = src_row[x * 3], g = src_row[x * 3 + 1], b = src_row[x * 3 + 2];
+			Uint8 index = 0;
+			if (plte_count) {
+				// Exact match: stb_image expanded via this same PLTE.
+				for (int ci = 0; ci < plte_count; ++ci) {
+					if (plte[ci].r == r && plte[ci].g == g && plte[ci].b == b) {
+						index = (Uint8)ci;
+						break;
+					}
+				}
+			} else if (pal_ptr) {
+				// Non-indexed PNG: quantize each 8-bit RGB pixel to the nearest of the
+				// 16 VGA palette colors (6-bit per channel, expanded to 8-bit via <<2).
+				int best_dist = INT_MAX;
+				for (int ci = 0; ci < 16; ++ci) {
+					int dr = r - (pal_ptr->vga[ci].r << 2);
+					int dg = g - (pal_ptr->vga[ci].g << 2);
+					int db = b - (pal_ptr->vga[ci].b << 2);
+					int dist = dr * dr + dg * dg + db * db;
+					if (dist < best_dist) {
+						best_dist = dist;
+						index = (Uint8)ci;
+						if (!dist) break;
+					}
+				}
+			}
+			dst_row[x] = index;
+		}
+	}
+	SDL_UnlockSurface(surface);
+	stbi_image_free(pixels);
+	return surface;
 }
 
 // seg009:121A
@@ -899,55 +1023,25 @@ image_type* load_image(int resource_id, dat_pal_type* palette) {
 	switch (result) {
 		case data_none:
 			return NULL;
-		break;
-		case data_DAT: { // DAT
+		case data_DAT:
 			image = decode_image((image_data_type*) image_data, palette);
-		} break;
-		case data_directory: { // directory
-			SDL_IOStream* rw = SDL_IOFromConstMem(image_data, size);
-			if (rw == NULL) {
-				sdlperror("load_image: SDL_IOFromConstMem");
-				return NULL;
-			}
-			image = IMG_Load_IO(rw, 0);
-			if (image == NULL) {
-				printf("load_image: IMG_Load_IO: %s\n", SDL_GetError());
-			}
-			if (!SDL_CloseIO(rw)) {
-				sdlperror("load_image: SDL_CloseIO");
-			}
-		} break;
+			break;
+		case data_directory:
+			image = load_png_image(image_data, size, palette);
+			break;
 	}
 	if (image_data != NULL) free(image_data);
-
-
 	if (image != NULL) {
-		// should immediately start using the onscreen pixel format, so conversion will not be needed
-
-		if (!SDL_SetSurfaceColorKey(image, true, 0)) { //sdl 1.2: true
+		if (!SDL_SetSurfaceColorKey(image, true, 0)) {
 			sdlperror("load_image: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
-//		printf("bpp = %d\n", SDL_GetPixelFormatDetails(image->format)->bits_per_pixel);
-/*
-		if (!SDL_SetSurfaceAlphaMod(image, 0)) { //sdl 1.2: SDL_SetAlpha removed
-			sdlperror("load_image: SDL_SetAlpha");
-			quit(1);
-		}
-*/
-//		image_type* colored_image = SDL_ConvertSurface(image, SDL_PIXELFORMAT_ARGB8888);
-//		if (!colored_image) {
-//			sdlperror("load_image: SDL_ConvertSurfaceFormat");
-//			quit(1);
-//		}
-//		SDL_DestroySurface(image);
-//		image = colored_image;
 	}
 	return image;
 }
 
 // seg009:13C4
-void draw_image_transp(image_type* image,image_type* mask,int xpos,int ypos) {
+void draw_image_transp(image_type* image, image_type* mask, int xpos, int ypos) {
 	if (graphics_mode == gmMcgaVga) {
 		draw_image_transp_vga(image, xpos, ypos);
 	} else {
@@ -1034,7 +1128,7 @@ void set_hc_pal() {
 }
 
 // seg009:2446
-void flip_not_ega(byte* memory,int height,int stride) {
+void flip_not_ega(byte* memory, int height, int stride) {
 	byte* row_buffer = (byte*) malloc(stride);
 	byte* top_ptr;
 	byte* bottom_ptr;
@@ -1069,7 +1163,7 @@ void flip_screen(surface_type* surface) {
 
 #ifndef USE_FADE
 // seg009:19EF
-void fade_in_2(surface_type* source_surface,int which_rows) {
+void fade_in_2(surface_type* source_surface, int which_rows) {
 	// stub
 	method_1_blit_rect(onscreen_surface_, source_surface, &screen_rect, &screen_rect, 0);
 }
@@ -1081,7 +1175,7 @@ void fade_out_2(int rows) {
 #endif // USE_FADE
 
 // seg009:2288
-void draw_image_transp_vga(image_type* image,int xpos,int ypos) {
+void draw_image_transp_vga(image_type* image, int xpos, int ypos) {
 	// stub
 	method_6_blit_img_to_scr(image, xpos, ypos, blitters_10h_transp);
 }
@@ -1090,102 +1184,102 @@ void draw_image_transp_vga(image_type* image,int xpos,int ypos) {
 
 
 /*const*/ byte hc_font_data[] = {
-0x20,0x83,0x07,0x00,0x02,0x00,0x01,0x00,0x01,0x00,0xD2,0x00,0xD8,0x00,0xE5,0x00,
-0xEE,0x00,0xFA,0x00,0x07,0x01,0x14,0x01,0x21,0x01,0x2A,0x01,0x37,0x01,0x44,0x01,
-0x50,0x01,0x5C,0x01,0x6A,0x01,0x74,0x01,0x81,0x01,0x8E,0x01,0x9B,0x01,0xA8,0x01,
-0xB5,0x01,0xC2,0x01,0xCF,0x01,0xDC,0x01,0xE9,0x01,0xF6,0x01,0x03,0x02,0x10,0x02,
-0x1C,0x02,0x2A,0x02,0x37,0x02,0x42,0x02,0x4F,0x02,0x5C,0x02,0x69,0x02,0x76,0x02,
-0x83,0x02,0x90,0x02,0x9D,0x02,0xAA,0x02,0xB7,0x02,0xC4,0x02,0xD1,0x02,0xDE,0x02,
-0xEB,0x02,0xF8,0x02,0x05,0x03,0x12,0x03,0x1F,0x03,0x2C,0x03,0x39,0x03,0x46,0x03,
-0x53,0x03,0x60,0x03,0x6D,0x03,0x7A,0x03,0x87,0x03,0x94,0x03,0xA1,0x03,0xAE,0x03,
-0xBB,0x03,0xC8,0x03,0xD5,0x03,0xE2,0x03,0xEB,0x03,0xF9,0x03,0x02,0x04,0x0F,0x04,
-0x1C,0x04,0x29,0x04,0x36,0x04,0x43,0x04,0x50,0x04,0x5F,0x04,0x6C,0x04,0x79,0x04,
-0x88,0x04,0x95,0x04,0xA2,0x04,0xAF,0x04,0xBC,0x04,0xC9,0x04,0xD8,0x04,0xE7,0x04,
-0xF4,0x04,0x01,0x05,0x0E,0x05,0x1B,0x05,0x28,0x05,0x35,0x05,0x42,0x05,0x51,0x05,
-0x5E,0x05,0x6B,0x05,0x78,0x05,0x85,0x05,0x8D,0x05,0x9A,0x05,0xA7,0x05,0xBB,0x05,
-0xD9,0x05,0x00,0x00,0x03,0x00,0x00,0x00,0x07,0x00,0x02,0x00,0x01,0x00,0xC0,0xC0,
-0xC0,0xC0,0xC0,0x00,0xC0,0x03,0x00,0x05,0x00,0x01,0x00,0xD8,0xD8,0xD8,0x06,0x00,
-0x07,0x00,0x01,0x00,0x00,0x6C,0xFE,0x6C,0xFE,0x6C,0x07,0x00,0x07,0x00,0x01,0x00,
-0x10,0x7C,0xD0,0x7C,0x16,0x7C,0x10,0x07,0x00,0x08,0x00,0x01,0x00,0xC3,0xC6,0x0C,
-0x18,0x30,0x63,0xC3,0x07,0x00,0x08,0x00,0x01,0x00,0x38,0x6C,0x38,0x7A,0xCC,0xCE,
-0x7B,0x03,0x00,0x03,0x00,0x01,0x00,0x60,0x60,0xC0,0x07,0x00,0x04,0x00,0x01,0x00,
-0x30,0x60,0xC0,0xC0,0xC0,0x60,0x30,0x07,0x00,0x04,0x00,0x01,0x00,0xC0,0x60,0x30,
-0x30,0x30,0x60,0xC0,0x06,0x00,0x07,0x00,0x01,0x00,0x00,0x6C,0x38,0xFE,0x38,0x6C,
-0x06,0x00,0x06,0x00,0x01,0x00,0x00,0x30,0x30,0xFC,0x30,0x30,0x08,0x00,0x03,0x00,
-0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x60,0x60,0xC0,0x04,0x00,0x04,0x00,0x01,0x00,
-0x00,0x00,0x00,0xF0,0x07,0x00,0x02,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0xC0,
-0xC0,0x07,0x00,0x08,0x00,0x01,0x00,0x03,0x06,0x0C,0x18,0x30,0x60,0xC0,0x07,0x00,
-0x06,0x00,0x01,0x00,0x78,0xCC,0xCC,0xCC,0xCC,0xCC,0x78,0x07,0x00,0x06,0x00,0x01,
-0x00,0x30,0x70,0xF0,0x30,0x30,0x30,0xFC,0x07,0x00,0x06,0x00,0x01,0x00,0x78,0xCC,
-0x0C,0x18,0x30,0x60,0xFC,0x07,0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0x0C,0x18,0x0C,
-0xCC,0x78,0x07,0x00,0x07,0x00,0x01,0x00,0x1C,0x3C,0x6C,0xCC,0xFE,0x0C,0x0C,0x07,
-0x00,0x06,0x00,0x01,0x00,0xF8,0xC0,0xC0,0xF8,0x0C,0x0C,0xF8,0x07,0x00,0x06,0x00,
-0x01,0x00,0x78,0xC0,0xC0,0xF8,0xCC,0xCC,0x78,0x07,0x00,0x06,0x00,0x01,0x00,0xFC,
-0x0C,0x18,0x30,0x30,0x30,0x30,0x07,0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0xCC,0x78,
-0xCC,0xCC,0x78,0x07,0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0xCC,0x7C,0x0C,0xCC,0x78,
-0x06,0x00,0x02,0x00,0x01,0x00,0x00,0xC0,0xC0,0x00,0xC0,0xC0,0x08,0x00,0x03,0x00,
-0x01,0x00,0x00,0x60,0x60,0x00,0x00,0x60,0x60,0xC0,0x07,0x00,0x05,0x00,0x01,0x00,
-0x18,0x30,0x60,0xC0,0x60,0x30,0x18,0x05,0x00,0x04,0x00,0x01,0x00,0x00,0x00,0xF0,
-0x00,0xF0,0x07,0x00,0x05,0x00,0x01,0x00,0xC0,0x60,0x30,0x18,0x30,0x60,0xC0,0x07,
-0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0x0C,0x18,0x30,0x00,0x30,0x07,0x00,0x06,0x00,
-0x01,0x00,0x78,0xCC,0xDC,0xDC,0xD8,0xC0,0x78,0x07,0x00,0x06,0x00,0x01,0x00,0x78,
-0xCC,0xCC,0xFC,0xCC,0xCC,0xCC,0x07,0x00,0x06,0x00,0x01,0x00,0xF8,0xCC,0xCC,0xF8,
-0xCC,0xCC,0xF8,0x07,0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0xC0,0xC0,0xC0,0xCC,0x78,
-0x07,0x00,0x06,0x00,0x01,0x00,0xF8,0xCC,0xCC,0xCC,0xCC,0xCC,0xF8,0x07,0x00,0x05,
-0x00,0x01,0x00,0xF8,0xC0,0xC0,0xF0,0xC0,0xC0,0xF8,0x07,0x00,0x05,0x00,0x01,0x00,
-0xF8,0xC0,0xC0,0xF0,0xC0,0xC0,0xC0,0x07,0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0xC0,
-0xDC,0xCC,0xCC,0x78,0x07,0x00,0x06,0x00,0x01,0x00,0xCC,0xCC,0xCC,0xFC,0xCC,0xCC,
-0xCC,0x07,0x00,0x04,0x00,0x01,0x00,0xF0,0x60,0x60,0x60,0x60,0x60,0xF0,0x07,0x00,
-0x06,0x00,0x01,0x00,0x0C,0x0C,0x0C,0x0C,0x0C,0xCC,0x78,0x07,0x00,0x07,0x00,0x01,
-0x00,0xC6,0xCC,0xD8,0xF0,0xD8,0xCC,0xC6,0x07,0x00,0x05,0x00,0x01,0x00,0xC0,0xC0,
-0xC0,0xC0,0xC0,0xC0,0xF8,0x07,0x00,0x08,0x00,0x01,0x00,0xC3,0xE7,0xFF,0xDB,0xC3,
-0xC3,0xC3,0x07,0x00,0x06,0x00,0x01,0x00,0xCC,0xCC,0xEC,0xFC,0xDC,0xCC,0xCC,0x07,
-0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0xCC,0xCC,0xCC,0xCC,0x78,0x07,0x00,0x06,0x00,
-0x01,0x00,0xF8,0xCC,0xCC,0xF8,0xC0,0xC0,0xC0,0x07,0x00,0x06,0x00,0x01,0x00,0x78,
-0xCC,0xCC,0xCC,0xCC,0xD8,0x6C,0x07,0x00,0x06,0x00,0x01,0x00,0xF8,0xCC,0xCC,0xF8,
-0xD8,0xCC,0xCC,0x07,0x00,0x06,0x00,0x01,0x00,0x78,0xCC,0xC0,0x78,0x0C,0xCC,0x78,
-0x07,0x00,0x06,0x00,0x01,0x00,0xFC,0x30,0x30,0x30,0x30,0x30,0x30,0x07,0x00,0x06,
-0x00,0x01,0x00,0xCC,0xCC,0xCC,0xCC,0xCC,0xCC,0x7C,0x07,0x00,0x06,0x00,0x01,0x00,
-0xCC,0xCC,0xCC,0xCC,0xCC,0x78,0x30,0x07,0x00,0x08,0x00,0x01,0x00,0xC3,0xC3,0xC3,
-0xDB,0xFF,0xE7,0xC3,0x07,0x00,0x06,0x00,0x01,0x00,0xCC,0xCC,0x78,0x30,0x78,0xCC,
-0xCC,0x07,0x00,0x06,0x00,0x01,0x00,0xCC,0xCC,0xCC,0x78,0x30,0x30,0x30,0x07,0x00,
-0x08,0x00,0x01,0x00,0xFF,0x06,0x0C,0x18,0x30,0x60,0xFF,0x07,0x00,0x04,0x00,0x01,
-0x00,0xF0,0xC0,0xC0,0xC0,0xC0,0xC0,0xF0,0x07,0x00,0x08,0x00,0x01,0x00,0xC0,0x60,
-0x30,0x18,0x0C,0x06,0x03,0x07,0x00,0x04,0x00,0x01,0x00,0xF0,0x30,0x30,0x30,0x30,
-0x30,0xF0,0x03,0x00,0x06,0x00,0x01,0x00,0x30,0x78,0xCC,0x08,0x00,0x06,0x00,0x01,
-0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFC,0x03,0x00,0x04,0x00,0x01,0x00,0xC0,
-0x60,0x30,0x07,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0x78,0x0C,0x7C,0xCC,0x7C,0x07,
-0x00,0x06,0x00,0x01,0x00,0xC0,0xC0,0xF8,0xCC,0xCC,0xCC,0xF8,0x07,0x00,0x06,0x00,
-0x01,0x00,0x00,0x00,0x78,0xCC,0xC0,0xCC,0x78,0x07,0x00,0x06,0x00,0x01,0x00,0x0C,
-0x0C,0x7C,0xCC,0xCC,0xCC,0x7C,0x07,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0x78,0xCC,
-0xFC,0xC0,0x7C,0x07,0x00,0x05,0x00,0x01,0x00,0x38,0x60,0xF8,0x60,0x60,0x60,0x60,
-0x09,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0x78,0xCC,0xCC,0xCC,0x7C,0x0C,0x78,0x07,
-0x00,0x06,0x00,0x01,0x00,0xC0,0xC0,0xF8,0xCC,0xCC,0xCC,0xCC,0x07,0x00,0x02,0x00,
-0x01,0x00,0xC0,0x00,0xC0,0xC0,0xC0,0xC0,0xC0,0x09,0x00,0x04,0x00,0x01,0x00,0x30,
-0x00,0x30,0x30,0x30,0x30,0x30,0x30,0xE0,0x07,0x00,0x06,0x00,0x01,0x00,0xC0,0xC0,
-0xCC,0xD8,0xF0,0xD8,0xCC,0x07,0x00,0x02,0x00,0x01,0x00,0xC0,0xC0,0xC0,0xC0,0xC0,
-0xC0,0xC0,0x07,0x00,0x08,0x00,0x01,0x00,0x00,0x00,0xFE,0xDB,0xDB,0xDB,0xDB,0x07,
-0x00,0x06,0x00,0x01,0x00,0x00,0x00,0xF8,0xCC,0xCC,0xCC,0xCC,0x07,0x00,0x06,0x00,
-0x01,0x00,0x00,0x00,0x78,0xCC,0xCC,0xCC,0x78,0x09,0x00,0x06,0x00,0x01,0x00,0x00,
-0x00,0xF8,0xCC,0xCC,0xCC,0xF8,0xC0,0xC0,0x09,0x00,0x06,0x00,0x01,0x00,0x00,0x00,
-0x78,0xCC,0xCC,0xCC,0x7C,0x0C,0x0C,0x07,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0x78,
-0xCC,0xC0,0xC0,0xC0,0x07,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0x78,0xC0,0x78,0x0C,
-0xF8,0x07,0x00,0x05,0x00,0x01,0x00,0x60,0x60,0xF8,0x60,0x60,0x60,0x38,0x07,0x00,
-0x06,0x00,0x01,0x00,0x00,0x00,0xCC,0xCC,0xCC,0xCC,0x7C,0x07,0x00,0x06,0x00,0x01,
-0x00,0x00,0x00,0xCC,0xCC,0xCC,0x78,0x30,0x07,0x00,0x08,0x00,0x01,0x00,0x00,0x00,
-0xC3,0xC3,0xDB,0xFF,0x66,0x07,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0xCC,0x78,0x30,
-0x78,0xCC,0x09,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0xCC,0xCC,0xCC,0xCC,0x7C,0x0C,
-0x78,0x07,0x00,0x06,0x00,0x01,0x00,0x00,0x00,0xFC,0x18,0x30,0x60,0xFC,0x07,0x00,
-0x04,0x00,0x01,0x00,0x30,0x60,0x60,0xC0,0x60,0x60,0x30,0x07,0x00,0x02,0x00,0x01,
-0x00,0xC0,0xC0,0xC0,0x00,0xC0,0xC0,0xC0,0x07,0x00,0x04,0x00,0x01,0x00,0xC0,0x60,
-0x60,0x30,0x60,0x60,0xC0,0x02,0x00,0x07,0x00,0x01,0x00,0x76,0xDC,0x07,0x00,0x07,
-0x00,0x01,0x00,0x00,0x00,0x70,0xC4,0xCC,0x8C,0x38,0x07,0x00,0x07,0x00,0x01,0x00,
-0x00,0x06,0x0C,0xD8,0xF0,0xE0,0xC0,0x08,0x00,0x10,0x00,0x02,0x00,0x7F,0xFE,0xCD,
-0xC7,0xB5,0xEF,0xB5,0xEF,0x85,0xEF,0xB5,0xEF,0xB4,0x6F,0x08,0x00,0x13,0x00,0x03,
-0x00,0x7F,0xFF,0xC0,0xCC,0x46,0xE0,0xB6,0xDA,0xE0,0xBE,0xDA,0xE0,0xBE,0xC6,0xE0,
-0xB6,0xDA,0xE0,0xCE,0xDA,0x20,0x7F,0xFF,0xC0,0x08,0x00,0x11,0x00,0x03,0x00,0x7F,
-0xFF,0x00,0xC6,0x73,0x80,0xDD,0xAD,0x80,0xCE,0xEF,0x80,0xDF,0x6F,0x80,0xDD,0xAD,
-0x80,0xC6,0x73,0x80,0x7F,0xFF,0x00
+	0x20, 0x83, 0x07, 0x00, 0x02, 0x00, 0x01, 0x00, 0x01, 0x00, 0xD2, 0x00, 0xD8, 0x00, 0xE5, 0x00,
+	0xEE, 0x00, 0xFA, 0x00, 0x07, 0x01, 0x14, 0x01, 0x21, 0x01, 0x2A, 0x01, 0x37, 0x01, 0x44, 0x01,
+	0x50, 0x01, 0x5C, 0x01, 0x6A, 0x01, 0x74, 0x01, 0x81, 0x01, 0x8E, 0x01, 0x9B, 0x01, 0xA8, 0x01,
+	0xB5, 0x01, 0xC2, 0x01, 0xCF, 0x01, 0xDC, 0x01, 0xE9, 0x01, 0xF6, 0x01, 0x03, 0x02, 0x10, 0x02,
+	0x1C, 0x02, 0x2A, 0x02, 0x37, 0x02, 0x42, 0x02, 0x4F, 0x02, 0x5C, 0x02, 0x69, 0x02, 0x76, 0x02,
+	0x83, 0x02, 0x90, 0x02, 0x9D, 0x02, 0xAA, 0x02, 0xB7, 0x02, 0xC4, 0x02, 0xD1, 0x02, 0xDE, 0x02,
+	0xEB, 0x02, 0xF8, 0x02, 0x05, 0x03, 0x12, 0x03, 0x1F, 0x03, 0x2C, 0x03, 0x39, 0x03, 0x46, 0x03,
+	0x53, 0x03, 0x60, 0x03, 0x6D, 0x03, 0x7A, 0x03, 0x87, 0x03, 0x94, 0x03, 0xA1, 0x03, 0xAE, 0x03,
+	0xBB, 0x03, 0xC8, 0x03, 0xD5, 0x03, 0xE2, 0x03, 0xEB, 0x03, 0xF9, 0x03, 0x02, 0x04, 0x0F, 0x04,
+	0x1C, 0x04, 0x29, 0x04, 0x36, 0x04, 0x43, 0x04, 0x50, 0x04, 0x5F, 0x04, 0x6C, 0x04, 0x79, 0x04,
+	0x88, 0x04, 0x95, 0x04, 0xA2, 0x04, 0xAF, 0x04, 0xBC, 0x04, 0xC9, 0x04, 0xD8, 0x04, 0xE7, 0x04,
+	0xF4, 0x04, 0x01, 0x05, 0x0E, 0x05, 0x1B, 0x05, 0x28, 0x05, 0x35, 0x05, 0x42, 0x05, 0x51, 0x05,
+	0x5E, 0x05, 0x6B, 0x05, 0x78, 0x05, 0x85, 0x05, 0x8D, 0x05, 0x9A, 0x05, 0xA7, 0x05, 0xBB, 0x05,
+	0xD9, 0x05, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x07, 0x00, 0x02, 0x00, 0x01, 0x00, 0xC0, 0xC0,
+	0xC0, 0xC0, 0xC0, 0x00, 0xC0, 0x03, 0x00, 0x05, 0x00, 0x01, 0x00, 0xD8, 0xD8, 0xD8, 0x06, 0x00,
+	0x07, 0x00, 0x01, 0x00, 0x00, 0x6C, 0xFE, 0x6C, 0xFE, 0x6C, 0x07, 0x00, 0x07, 0x00, 0x01, 0x00,
+	0x10, 0x7C, 0xD0, 0x7C, 0x16, 0x7C, 0x10, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0xC3, 0xC6, 0x0C,
+	0x18, 0x30, 0x63, 0xC3, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0x38, 0x6C, 0x38, 0x7A, 0xCC, 0xCE,
+	0x7B, 0x03, 0x00, 0x03, 0x00, 0x01, 0x00, 0x60, 0x60, 0xC0, 0x07, 0x00, 0x04, 0x00, 0x01, 0x00,
+	0x30, 0x60, 0xC0, 0xC0, 0xC0, 0x60, 0x30, 0x07, 0x00, 0x04, 0x00, 0x01, 0x00, 0xC0, 0x60, 0x30,
+	0x30, 0x30, 0x60, 0xC0, 0x06, 0x00, 0x07, 0x00, 0x01, 0x00, 0x00, 0x6C, 0x38, 0xFE, 0x38, 0x6C,
+	0x06, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x30, 0x30, 0xFC, 0x30, 0x30, 0x08, 0x00, 0x03, 0x00,
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x60, 0x60, 0xC0, 0x04, 0x00, 0x04, 0x00, 0x01, 0x00,
+	0x00, 0x00, 0x00, 0xF0, 0x07, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0,
+	0xC0, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xC0, 0x07, 0x00,
+	0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0x78, 0x07, 0x00, 0x06, 0x00, 0x01,
+	0x00, 0x30, 0x70, 0xF0, 0x30, 0x30, 0x30, 0xFC, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC,
+	0x0C, 0x18, 0x30, 0x60, 0xFC, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0x0C, 0x18, 0x0C,
+	0xCC, 0x78, 0x07, 0x00, 0x07, 0x00, 0x01, 0x00, 0x1C, 0x3C, 0x6C, 0xCC, 0xFE, 0x0C, 0x0C, 0x07,
+	0x00, 0x06, 0x00, 0x01, 0x00, 0xF8, 0xC0, 0xC0, 0xF8, 0x0C, 0x0C, 0xF8, 0x07, 0x00, 0x06, 0x00,
+	0x01, 0x00, 0x78, 0xC0, 0xC0, 0xF8, 0xCC, 0xCC, 0x78, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xFC,
+	0x0C, 0x18, 0x30, 0x30, 0x30, 0x30, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0xCC, 0x78,
+	0xCC, 0xCC, 0x78, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0xCC, 0x7C, 0x0C, 0xCC, 0x78,
+	0x06, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0xC0, 0xC0, 0x00, 0xC0, 0xC0, 0x08, 0x00, 0x03, 0x00,
+	0x01, 0x00, 0x00, 0x60, 0x60, 0x00, 0x00, 0x60, 0x60, 0xC0, 0x07, 0x00, 0x05, 0x00, 0x01, 0x00,
+	0x18, 0x30, 0x60, 0xC0, 0x60, 0x30, 0x18, 0x05, 0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0xF0,
+	0x00, 0xF0, 0x07, 0x00, 0x05, 0x00, 0x01, 0x00, 0xC0, 0x60, 0x30, 0x18, 0x30, 0x60, 0xC0, 0x07,
+	0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0x0C, 0x18, 0x30, 0x00, 0x30, 0x07, 0x00, 0x06, 0x00,
+	0x01, 0x00, 0x78, 0xCC, 0xDC, 0xDC, 0xD8, 0xC0, 0x78, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78,
+	0xCC, 0xCC, 0xFC, 0xCC, 0xCC, 0xCC, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xF8, 0xCC, 0xCC, 0xF8,
+	0xCC, 0xCC, 0xF8, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0xC0, 0xC0, 0xC0, 0xCC, 0x78,
+	0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xF8, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xF8, 0x07, 0x00, 0x05,
+	0x00, 0x01, 0x00, 0xF8, 0xC0, 0xC0, 0xF0, 0xC0, 0xC0, 0xF8, 0x07, 0x00, 0x05, 0x00, 0x01, 0x00,
+	0xF8, 0xC0, 0xC0, 0xF0, 0xC0, 0xC0, 0xC0, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0xC0,
+	0xDC, 0xCC, 0xCC, 0x78, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xCC, 0xCC, 0xCC, 0xFC, 0xCC, 0xCC,
+	0xCC, 0x07, 0x00, 0x04, 0x00, 0x01, 0x00, 0xF0, 0x60, 0x60, 0x60, 0x60, 0x60, 0xF0, 0x07, 0x00,
+	0x06, 0x00, 0x01, 0x00, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0xCC, 0x78, 0x07, 0x00, 0x07, 0x00, 0x01,
+	0x00, 0xC6, 0xCC, 0xD8, 0xF0, 0xD8, 0xCC, 0xC6, 0x07, 0x00, 0x05, 0x00, 0x01, 0x00, 0xC0, 0xC0,
+	0xC0, 0xC0, 0xC0, 0xC0, 0xF8, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0xC3, 0xE7, 0xFF, 0xDB, 0xC3,
+	0xC3, 0xC3, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xCC, 0xCC, 0xEC, 0xFC, 0xDC, 0xCC, 0xCC, 0x07,
+	0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0x78, 0x07, 0x00, 0x06, 0x00,
+	0x01, 0x00, 0xF8, 0xCC, 0xCC, 0xF8, 0xC0, 0xC0, 0xC0, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78,
+	0xCC, 0xCC, 0xCC, 0xCC, 0xD8, 0x6C, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xF8, 0xCC, 0xCC, 0xF8,
+	0xD8, 0xCC, 0xCC, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x78, 0xCC, 0xC0, 0x78, 0x0C, 0xCC, 0x78,
+	0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xFC, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x07, 0x00, 0x06,
+	0x00, 0x01, 0x00, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0x7C, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00,
+	0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0x78, 0x30, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0xC3, 0xC3, 0xC3,
+	0xDB, 0xFF, 0xE7, 0xC3, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xCC, 0xCC, 0x78, 0x30, 0x78, 0xCC,
+	0xCC, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xCC, 0xCC, 0xCC, 0x78, 0x30, 0x30, 0x30, 0x07, 0x00,
+	0x08, 0x00, 0x01, 0x00, 0xFF, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xFF, 0x07, 0x00, 0x04, 0x00, 0x01,
+	0x00, 0xF0, 0xC0, 0xC0, 0xC0, 0xC0, 0xC0, 0xF0, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0xC0, 0x60,
+	0x30, 0x18, 0x0C, 0x06, 0x03, 0x07, 0x00, 0x04, 0x00, 0x01, 0x00, 0xF0, 0x30, 0x30, 0x30, 0x30,
+	0x30, 0xF0, 0x03, 0x00, 0x06, 0x00, 0x01, 0x00, 0x30, 0x78, 0xCC, 0x08, 0x00, 0x06, 0x00, 0x01,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFC, 0x03, 0x00, 0x04, 0x00, 0x01, 0x00, 0xC0,
+	0x60, 0x30, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0x78, 0x0C, 0x7C, 0xCC, 0x7C, 0x07,
+	0x00, 0x06, 0x00, 0x01, 0x00, 0xC0, 0xC0, 0xF8, 0xCC, 0xCC, 0xCC, 0xF8, 0x07, 0x00, 0x06, 0x00,
+	0x01, 0x00, 0x00, 0x00, 0x78, 0xCC, 0xC0, 0xCC, 0x78, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x0C,
+	0x0C, 0x7C, 0xCC, 0xCC, 0xCC, 0x7C, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0x78, 0xCC,
+	0xFC, 0xC0, 0x7C, 0x07, 0x00, 0x05, 0x00, 0x01, 0x00, 0x38, 0x60, 0xF8, 0x60, 0x60, 0x60, 0x60,
+	0x09, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0x78, 0xCC, 0xCC, 0xCC, 0x7C, 0x0C, 0x78, 0x07,
+	0x00, 0x06, 0x00, 0x01, 0x00, 0xC0, 0xC0, 0xF8, 0xCC, 0xCC, 0xCC, 0xCC, 0x07, 0x00, 0x02, 0x00,
+	0x01, 0x00, 0xC0, 0x00, 0xC0, 0xC0, 0xC0, 0xC0, 0xC0, 0x09, 0x00, 0x04, 0x00, 0x01, 0x00, 0x30,
+	0x00, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0xE0, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0xC0, 0xC0,
+	0xCC, 0xD8, 0xF0, 0xD8, 0xCC, 0x07, 0x00, 0x02, 0x00, 0x01, 0x00, 0xC0, 0xC0, 0xC0, 0xC0, 0xC0,
+	0xC0, 0xC0, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0xFE, 0xDB, 0xDB, 0xDB, 0xDB, 0x07,
+	0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0xF8, 0xCC, 0xCC, 0xCC, 0xCC, 0x07, 0x00, 0x06, 0x00,
+	0x01, 0x00, 0x00, 0x00, 0x78, 0xCC, 0xCC, 0xCC, 0x78, 0x09, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00,
+	0x00, 0xF8, 0xCC, 0xCC, 0xCC, 0xF8, 0xC0, 0xC0, 0x09, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00,
+	0x78, 0xCC, 0xCC, 0xCC, 0x7C, 0x0C, 0x0C, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0x78,
+	0xCC, 0xC0, 0xC0, 0xC0, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0x78, 0xC0, 0x78, 0x0C,
+	0xF8, 0x07, 0x00, 0x05, 0x00, 0x01, 0x00, 0x60, 0x60, 0xF8, 0x60, 0x60, 0x60, 0x38, 0x07, 0x00,
+	0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0xCC, 0xCC, 0xCC, 0xCC, 0x7C, 0x07, 0x00, 0x06, 0x00, 0x01,
+	0x00, 0x00, 0x00, 0xCC, 0xCC, 0xCC, 0x78, 0x30, 0x07, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00,
+	0xC3, 0xC3, 0xDB, 0xFF, 0x66, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0xCC, 0x78, 0x30,
+	0x78, 0xCC, 0x09, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0xCC, 0xCC, 0xCC, 0xCC, 0x7C, 0x0C,
+	0x78, 0x07, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0xFC, 0x18, 0x30, 0x60, 0xFC, 0x07, 0x00,
+	0x04, 0x00, 0x01, 0x00, 0x30, 0x60, 0x60, 0xC0, 0x60, 0x60, 0x30, 0x07, 0x00, 0x02, 0x00, 0x01,
+	0x00, 0xC0, 0xC0, 0xC0, 0x00, 0xC0, 0xC0, 0xC0, 0x07, 0x00, 0x04, 0x00, 0x01, 0x00, 0xC0, 0x60,
+	0x60, 0x30, 0x60, 0x60, 0xC0, 0x02, 0x00, 0x07, 0x00, 0x01, 0x00, 0x76, 0xDC, 0x07, 0x00, 0x07,
+	0x00, 0x01, 0x00, 0x00, 0x00, 0x70, 0xC4, 0xCC, 0x8C, 0x38, 0x07, 0x00, 0x07, 0x00, 0x01, 0x00,
+	0x00, 0x06, 0x0C, 0xD8, 0xF0, 0xE0, 0xC0, 0x08, 0x00, 0x10, 0x00, 0x02, 0x00, 0x7F, 0xFE, 0xCD,
+	0xC7, 0xB5, 0xEF, 0xB5, 0xEF, 0x85, 0xEF, 0xB5, 0xEF, 0xB4, 0x6F, 0x08, 0x00, 0x13, 0x00, 0x03,
+	0x00, 0x7F, 0xFF, 0xC0, 0xCC, 0x46, 0xE0, 0xB6, 0xDA, 0xE0, 0xBE, 0xDA, 0xE0, 0xBE, 0xC6, 0xE0,
+	0xB6, 0xDA, 0xE0, 0xCE, 0xDA, 0x20, 0x7F, 0xFF, 0xC0, 0x08, 0x00, 0x11, 0x00, 0x03, 0x00, 0x7F,
+	0xFF, 0x00, 0xC6, 0x73, 0x80, 0xDD, 0xAD, 0x80, 0xCE, 0xEF, 0x80, 0xDF, 0x6F, 0x80, 0xDD, 0xAD,
+	0x80, 0xC6, 0x73, 0x80, 0x7F, 0xFF, 0x00
 };
 
 static void load_font_character_offsets(rawfont_type* data) {
@@ -1238,7 +1332,7 @@ extern byte hc_small_font_data[];
 void load_font(void) {
 	// Try to load font from a file.
 	dat_type* dathandle = open_dat("font", 1);
-	hc_font.chtab = load_sprites_from_file(1000, 1<<1, 0);
+	hc_font.chtab = load_sprites_from_file(1000, 1 << 1, 0);
 	close_dat(dathandle);
 	if (hc_font.chtab == NULL) {
 		// Use built-in font.
@@ -1266,7 +1360,7 @@ int get_char_width(byte character) {
 }
 
 // seg009:3E99
-int find_linebreak(const char* text,int length,int break_width,int x_align) {
+int find_linebreak(const char* text, int length, int break_width, int x_align) {
 	int curr_char_pos = 0;
 	short last_break_pos = 0; // in characters
 	short curr_line_width = 0; // in pixels
@@ -1281,9 +1375,9 @@ int find_linebreak(const char* text,int length,int break_width,int x_align) {
 				return curr_char_pos;
 			}
 			if (curr_char == '-' ||
-				(x_align <= 0 && (curr_char == ' ' || *text_pos == ' ')) ||
-				(*text_pos == ' ' && curr_char == ' ')
-			) {
+			        (x_align <= 0 && (curr_char == ' ' || *text_pos == ' ')) ||
+			        (*text_pos == ' ' && curr_char == ' ')
+			   ) {
 				// May break here.
 				last_break_pos = curr_char_pos;
 			}
@@ -1301,7 +1395,7 @@ int find_linebreak(const char* text,int length,int break_width,int x_align) {
 }
 
 // seg009:403F
-int get_line_width(const char* text,int length) {
+int get_line_width(const char* text, int length) {
 	int width = 0;
 	const char* text_pos = text;
 	while (--length >= 0) {
@@ -1328,7 +1422,7 @@ int draw_text_character(byte character) {
 }
 
 // seg009:377F
-int draw_text_line(const char* text,int length) {
+int draw_text_line(const char* text, int length) {
 	//hide_cursor();
 	int width = 0;
 	const char* text_pos = text;
@@ -1354,7 +1448,7 @@ int draw_cstring(const char* string) {
 }
 
 // seg009:3F01
-const rect_type* draw_text(const rect_type* rect_ptr,int x_align,int y_align,const char* text,int length) {
+const rect_type* draw_text(const rect_type* rect_ptr, int x_align, int y_align, const char* text, int length) {
 	//printf("going to do draw_text()...\n");
 	short rect_top;
 	short rect_height;
@@ -1371,7 +1465,7 @@ const rect_type* draw_text(const rect_type* rect_ptr,int x_align,int y_align,con
 	num_lines = 0;
 	int rem_length = length;
 	const char* line_start = text;
-	#define MAX_LINES 100
+#define MAX_LINES 100
 	const char* line_starts[MAX_LINES];
 	int line_lengths[MAX_LINES];
 	do {
@@ -1396,7 +1490,7 @@ const rect_type* draw_text(const rect_type* rect_ptr,int x_align,int y_align,con
 		if (y_align <= 0) {
 			// middle
 			// The +1 is for simulating SHR + ADC/SBB.
-			text_top += (rect_height+1)/2 - (text_height+1)/2;
+			text_top += (rect_height + 1) / 2 - (text_height + 1) / 2;
 		} else {
 			// bottom
 			text_top += rect_height - text_height;
@@ -1407,28 +1501,28 @@ const rect_type* draw_text(const rect_type* rect_ptr,int x_align,int y_align,con
 		const char* line_pos = line_starts[i];
 		int line_length = line_lengths[i];
 		if (x_align < 0 &&
-			*line_pos == ' ' &&
-			i != 0 &&
-			*(line_pos-1) != '\n'
-		) {
+		        *line_pos == ' ' &&
+		        i != 0 &&
+		        *(line_pos - 1) != '\n'
+		   ) {
 			// Skip over space if it's not at the beginning of a line.
 			++line_pos;
 			--line_length;
 			if (line_length != 0 &&
-				*line_pos == ' ' &&
-				*(line_pos-2) == '.'
-			) {
+			        *line_pos == ' ' &&
+			        *(line_pos - 2) == '.'
+			   ) {
 				// Skip over second space after point.
 				++line_pos;
 				--line_length;
 			}
 		}
-		int line_width = get_line_width(line_pos,line_length);
+		int line_width = get_line_width(line_pos, line_length);
 		int text_left = rect_ptr->left;
 		if (x_align >= 0) {
 			if (x_align <= 0) {
 				// center
-				text_left += rect_width/2 - line_width/2;
+				text_left += rect_width / 2 - line_width / 2;
 			} else {
 				// right
 				text_left += rect_width - line_width;
@@ -1436,7 +1530,7 @@ const rect_type* draw_text(const rect_type* rect_ptr,int x_align,int y_align,con
 		}
 		textstate.current_x = text_left;
 		//printf("going to draw text line...\n");
-		draw_text_line(line_pos,line_length);
+		draw_text_line(line_pos, line_length);
 		textstate.current_y += font_line_distance;
 	}
 	reset_clip_rect();
@@ -1446,14 +1540,14 @@ const rect_type* draw_text(const rect_type* rect_ptr,int x_align,int y_align,con
 }
 
 // seg009:3E4F
-void show_text(const rect_type* rect_ptr,int x_align,int y_align,const char* text) {
+void show_text(const rect_type* rect_ptr, int x_align, int y_align, const char* text) {
 	// stub
 	//printf("show_text: %s\n",text);
 	draw_text(rect_ptr, x_align, y_align, text, (int)strlen(text));
 }
 
 // seg009:04FF
-void show_text_with_color(const rect_type* rect_ptr,int x_align,int y_align, const char* text,int color) {
+void show_text_with_color(const rect_type* rect_ptr, int x_align, int y_align, const char* text, int color) {
 	short saved_textcolor;
 	saved_textcolor = textstate.textcolor;
 	textstate.textcolor = color;
@@ -1462,7 +1556,7 @@ void show_text_with_color(const rect_type* rect_ptr,int x_align,int y_align, con
 }
 
 // seg009:3A91
-void set_curr_pos(int xpos,int ypos) {
+void set_curr_pos(int xpos, int ypos) {
 	textstate.current_x = xpos;
 	textstate.current_y = ypos;
 }
@@ -1474,7 +1568,7 @@ void init_copyprot_dialog() {
 }
 
 // seg009:0838
-int showmessage(char* text,int arg_4,void *arg_0) {
+int showmessage(char* text, int arg_4, void* arg_0) {
 	word key;
 	rect_type rect;
 	//font_type* saved_font_ptr;
@@ -1506,7 +1600,7 @@ int showmessage(char* text,int arg_4,void *arg_0) {
 
 // seg009:08FB
 dialog_type* make_dialog_info(dialog_settings_type* settings, rect_type* dialog_rect,
-                                            rect_type* text_rect, peel_type* dialog_peel) {
+                              rect_type* text_rect, peel_type* dialog_peel) {
 	dialog_type* dialog_info;
 	dialog_info = malloc(sizeof(dialog_type));
 	dialog_info->settings = settings;
@@ -1570,19 +1664,29 @@ void dialog_method_2_frame(dialog_type* dialog) {
 	short text_bottom = dialog->text_rect.bottom;
 	short text_right = dialog->text_rect.right;
 	// Draw outer border
-	rect = (rect_type) { peel_top, peel_left, peel_bottom - shadow_bottom, peel_right - shadow_right };
+	rect = (rect_type) {
+		peel_top, peel_left, peel_bottom - shadow_bottom, peel_right - shadow_right
+	};
 	draw_rect(&rect, color_0_black);
 	// Draw shadow (right)
-	rect = (rect_type) { text_top, peel_right - shadow_right, peel_bottom, peel_right };
+	rect = (rect_type) {
+		text_top, peel_right - shadow_right, peel_bottom, peel_right
+	};
 	draw_rect(&rect, get_text_color(0, color_8_darkgray /*dialog's shadow*/, 0));
 	// Draw shadow (bottom)
-	rect = (rect_type) { peel_bottom - shadow_bottom, text_left, peel_bottom, peel_right };
+	rect = (rect_type) {
+		peel_bottom - shadow_bottom, text_left, peel_bottom, peel_right
+	};
 	draw_rect(&rect, get_text_color(0, color_8_darkgray /*dialog's shadow*/, 0));
 	// Draw inner border (left)
-	rect = (rect_type) { peel_top + outer_border, peel_left + outer_border, text_bottom, text_left };
+	rect = (rect_type) {
+		peel_top + outer_border, peel_left + outer_border, text_bottom, text_left
+	};
 	draw_rect(&rect, color_15_brightwhite);
 	// Draw inner border (top)
-	rect = (rect_type) { peel_top + outer_border, text_left, text_top, text_right + dialog->settings->right_border - outer_border };
+	rect = (rect_type) {
+		peel_top + outer_border, text_left, text_top, text_right + dialog->settings->right_border - outer_border
+	};
 	draw_rect(&rect, color_15_brightwhite);
 	// Draw inner border (right)
 	rect.top = text_top;
@@ -1590,7 +1694,9 @@ void dialog_method_2_frame(dialog_type* dialog) {
 	rect.bottom = text_bottom + bottom_border - outer_border;           // (rect.right stays the same)
 	draw_rect(&rect, color_15_brightwhite);
 	// Draw inner border (bottom)
-	rect = (rect_type) { text_bottom, peel_left + outer_border, text_bottom + bottom_border - outer_border, text_right };
+	rect = (rect_type) {
+		text_bottom, peel_left + outer_border, text_bottom + bottom_border - outer_border, text_right
+	};
 	draw_rect(&rect, color_15_brightwhite);
 }
 
@@ -1623,7 +1729,7 @@ int get_cstring_width(const char* text) {
 }
 
 // seg009:0767
-void draw_text_cursor(int xpos,int ypos,int color) {
+void draw_text_cursor(int xpos, int ypos, int color) {
 	set_curr_pos(xpos, ypos);
 	/*current_target_surface->*/textstate.textcolor = color;
 	draw_text_character('_');
@@ -1632,7 +1738,7 @@ void draw_text_cursor(int xpos,int ypos,int color) {
 }
 
 // seg009:053C
-int input_str(const rect_type* rect,char* buffer,int max_length,const char *initial,int has_initial,int arg_4,int color,int bgcolor) {
+int input_str(const rect_type* rect, char* buffer, int max_length, const char* initial, int has_initial, int arg_4, int color, int bgcolor) {
 	// Display the screen keyboard if supported.
 	//SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
 	SDL_Rect sdlrect;
@@ -1691,7 +1797,7 @@ int input_str(const rect_type* rect,char* buffer,int max_length,const char *init
 			return -1;
 		}
 		if (length != 0 && (key == SDL_SCANCODE_BACKSPACE ||
-				key == SDL_SCANCODE_DELETE)) { // Backspace, Delete
+		                    key == SDL_SCANCODE_DELETE)) { // Backspace, Delete
 			--length;
 			draw_text_cursor(current_xpos, ypos, bgcolor);
 			current_xpos -= get_char_width(buffer[length]);
@@ -1700,8 +1806,7 @@ int input_str(const rect_type* rect,char* buffer,int max_length,const char *init
 			draw_text_character(buffer[length]);
 			//restore_curr_pos?();
 			draw_text_cursor(current_xpos, ypos, color);
-		}
-		else if (entered_char >= 0x20 && entered_char <= 0x7E && length < max_length) {
+		} else if (entered_char >= 0x20 && entered_char <= 0x7E && length < max_length) {
 			// Would the new character make the cursor go past the right side of the rect?
 			if (get_char_width('_') + get_char_width(entered_char) + current_xpos < rect->right) {
 				draw_text_cursor(current_xpos, ypos, bgcolor);
@@ -1720,18 +1825,18 @@ int input_str(const rect_type* rect,char* buffer,int max_length,const char *init
 // seg009:3706
 int draw_text_character(byte character) {
 	// stub
-	printf("draw_text_character: %c\n",character);
+	printf("draw_text_character: %c\n", character);
 	return 0;
 }
 
 // seg009:3E4F
-void show_text(const rect_type* rect_ptr,int x_align,int y_align,const char *text) {
+void show_text(const rect_type* rect_ptr, int x_align, int y_align, const char* text) {
 	// stub
-	printf("show_text: %s\n",text);
+	printf("show_text: %s\n", text);
 }
 
 // seg009:04FF
-void show_text_with_color(const rect_type* rect_ptr,int x_align,int y_align,const char* text,int color) {
+void show_text_with_color(const rect_type* rect_ptr, int x_align, int y_align, const char* text, int color) {
 	//short saved_textcolor;
 	//saved_textcolor = textstate.textcolor;
 	//textstate.textcolor = color;
@@ -1740,24 +1845,24 @@ void show_text_with_color(const rect_type* rect_ptr,int x_align,int y_align,cons
 }
 
 // seg009:3A91
-void set_curr_pos(int xpos,int ypos) {
+void set_curr_pos(int xpos, int ypos) {
 	// stub
 }
 
 // seg009:0C44
-void show_dialog(const char *text) {
+void show_dialog(const char* text) {
 	// stub
 	puts(text);
 }
 
 // seg009:053C
-int input_str(const rect_type* rect,char* buffer,int max_length,const char* initial,int has_initial,int arg_4,int color,int bgcolor) {
+int input_str(const rect_type* rect, char* buffer, int max_length, const char* initial, int has_initial, int arg_4, int color, int bgcolor) {
 	// stub
 	strncpy(buffer, "dummy input text", max_length);
 	return strlen(buffer);
 }
 
-int showmessage(char* text,int arg_4,void *arg_0) {
+int showmessage(char* text, int arg_4, void* arg_0) {
 	// stub
 	puts(text);
 	return 0;
@@ -1767,33 +1872,33 @@ void init_copyprot_dialog() {
 	// stub
 }
 
-void draw_dialog_frame(dialog_type *dialog) {
+void draw_dialog_frame(dialog_type* dialog) {
 	// stub
 }
 
-void add_dialog_rect(dialog_type *dialog) {
+void add_dialog_rect(dialog_type* dialog) {
 	// stub
 }
 
-void dialog_method_2_frame(dialog_type *dialog) {
+void dialog_method_2_frame(dialog_type* dialog) {
 	// stub
 }
 
 #endif // USE_TEXT
 
 // seg009:37E8
-void draw_rect(const rect_type* rect,int color) {
+void draw_rect(const rect_type* rect, int color) {
 	method_5_rect(rect, blitters_0_no_transp, color);
 }
 
 // seg009:3985
-surface_type *rect_sthg(surface_type* surface,const rect_type* rect) {
+surface_type* rect_sthg(surface_type* surface, const rect_type* rect) {
 	// stub
 	return surface;
 }
 
 // seg009:39CE
-rect_type *shrink2_rect(rect_type* target_rect,const rect_type* source_rect,int delta_x,int delta_y) {
+rect_type* shrink2_rect(rect_type* target_rect, const rect_type* source_rect, int delta_x, int delta_y) {
 	target_rect->top    = source_rect->top    + delta_y;
 	target_rect->left   = source_rect->left   + delta_x;
 	target_rect->bottom = source_rect->bottom - delta_y;
@@ -1831,7 +1936,7 @@ peel_type* read_peel_from_screen(const rect_type* rect) {
 }
 
 // seg009:3D95
-int intersect_rect(rect_type* output,const rect_type* input1,const rect_type* input2) {
+int intersect_rect(rect_type* output, const rect_type* input1, const rect_type* input2) {
 	short left = MAX(input1->left, input2->left);
 	short right = MIN(input1->right, input2->right);
 	if (left < right) {
@@ -1850,7 +1955,7 @@ int intersect_rect(rect_type* output,const rect_type* input1,const rect_type* in
 }
 
 // seg009:4063
-rect_type* union_rect(rect_type* output,const rect_type* input1,const rect_type* input2) {
+rect_type* union_rect(rect_type* output, const rect_type* input1, const rect_type* input2) {
 	short top = MIN(input1->top, input2->top);
 	short left = MIN(input1->left, input2->left);
 	short bottom = MAX(input1->bottom, input2->bottom);
@@ -1910,10 +2015,10 @@ void stop_digi(void) {
 	SDL_LockAudioStream(digi_audio_stream);
 	digi_playing = 0;
 	/*
-//	if (SDL_GetAudioStatus() == SDL_AUDIO_PLAYING) {
+	//	if (SDL_GetAudioStatus() == SDL_AUDIO_PLAYING) {
 		SDL_PauseAudio(1);
 		SDL_CloseAudio();
-//	}
+	//	}
 	if (digi_audiospec != NULL) {
 		free(digi_audiospec);
 		digi_audiospec = NULL;
@@ -1977,7 +2082,7 @@ void generate_square_wave(byte* stream, float note_freq, int samples) {
 	}
 }
 
-void speaker_callback(void *userdata, Uint8 *stream, int len) {
+void speaker_callback(void* userdata, Uint8* stream, int len) {
 	int output_channels = digi_audiospec->channels;
 	int bytes_per_sample = sizeof(short) * output_channels;
 	int samples_requested = len / bytes_per_sample;
@@ -2031,7 +2136,7 @@ void play_speaker_sound(sound_buffer_type* buffer) {
 	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }
 
-void digi_callback(void *userdata, Uint8 *stream, int len) {
+void digi_callback(void* userdata, Uint8* stream, int len) {
 	// Don't go over the end of either the input or the output buffer.
 	size_t copy_len = MIN(len, digi_remaining_length);
 	//printf("digi_callback(): copy_len = %d\n", copy_len);
@@ -2060,7 +2165,7 @@ void digi_callback(void *userdata, Uint8 *stream, int len) {
 	digi_remaining_pos += copy_len;
 }
 
-void ogg_callback(void *userdata, Uint8 *stream, int len) {
+void ogg_callback(void* userdata, Uint8* stream, int len) {
 	int output_channels = digi_audiospec->channels;
 	int bytes_per_sample = sizeof(short) * output_channels;
 	int samples_requested = len / bytes_per_sample;
@@ -2068,7 +2173,7 @@ void ogg_callback(void *userdata, Uint8 *stream, int len) {
 	int samples_filled;
 	if (is_sound_on) {
 		samples_filled = stb_vorbis_get_samples_short_interleaved(ogg_decoder, output_channels,
-                                                                      (short*) stream, len / sizeof(short));
+		                 (short*) stream, len / sizeof(short));
 		if (samples_filled < samples_requested) {
 			// In case the sound does not fill the buffer: fill the rest of the buffer with silence.
 			int bytes_filled = samples_filled * bytes_per_sample;
@@ -2081,7 +2186,7 @@ void ogg_callback(void *userdata, Uint8 *stream, int len) {
 		// Let the decoder run normally (to advance the position), but discard the result.
 		byte* discarded_samples = alloca(len);
 		samples_filled = stb_vorbis_get_samples_short_interleaved(ogg_decoder, output_channels,
-																  (short*) discarded_samples, len / sizeof(short));
+		                 (short*) discarded_samples, len / sizeof(short));
 	}
 	// Push an event if the sound has ended.
 	if (samples_filled == 0) {
@@ -2137,7 +2242,8 @@ void audio_callback(void* userdata, Uint8* stream_orig, int len_orig) {
 #ifdef FAST_FORWARD_RESAMPLE_SOUND
 		SDL_AudioSpec src_spec = { .format = digi_audiospec->format, .channels = digi_audiospec->channels, .freq = digi_audiospec->freq * audio_speed };
 		SDL_AudioSpec dst_spec = { .format = digi_audiospec->format, .channels = digi_audiospec->channels, .freq = digi_audiospec->freq };
-		Uint8* converted = NULL; int converted_len = 0;
+		Uint8* converted = NULL;
+		int converted_len = 0;
 		if (SDL_ConvertAudioSamples(&src_spec, stream, len, &dst_spec, &converted, &converted_len)) {
 			memcpy(stream_orig, converted, MIN(converted_len, len_orig));
 			SDL_free(converted);
@@ -2175,8 +2281,8 @@ void init_digi() {
 	digi_audiospec = &spec;
 
 	digi_audio_stream = SDL_OpenAudioDeviceStream(
-		SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, digi_audiospec,
-		audio_callback_sdl3, NULL);
+	                        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, digi_audiospec,
+	                        audio_callback_sdl3, NULL);
 	if (digi_audio_stream == NULL) {
 		sdlperror("init_digi: SDL_OpenAudioDeviceStream");
 		digi_unavailable = 1;
@@ -2192,8 +2298,8 @@ const int max_sound_id = 58;
 void load_sound_names() {
 	const char* names_path = locate_file("data/music/names.txt");
 	if (sound_names != NULL) return;
-	FILE* fp = fopen(names_path,"rt");
-	if (fp==NULL) return;
+	FILE* fp = fopen(names_path, "rt");
+	if (fp == NULL) return;
 	sound_names = (char**) calloc(sizeof(char*) * max_sound_id, 1);
 	while (!feof(fp)) {
 		int index;
@@ -2295,7 +2401,7 @@ sound_buffer_type* load_sound(int index) {
 	return result;
 }
 
-void play_ogg_sound(sound_buffer_type *buffer) {
+void play_ogg_sound(sound_buffer_type* buffer) {
 	init_digi();
 	if (digi_unavailable) return;
 	stop_sounds();
@@ -2318,7 +2424,7 @@ typedef struct waveinfo_type {
 	byte* samples;
 } waveinfo_type;
 
-bool determine_wave_version(sound_buffer_type *buffer, waveinfo_type* waveinfo) {
+bool determine_wave_version(sound_buffer_type* buffer, waveinfo_type* waveinfo) {
 	int version = wave_version;
 	if (version == -1) {
 		// Determine the version of the wave data.
@@ -2370,7 +2476,7 @@ sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
 	byte* source = waveinfo.samples;
 	//short* dest = converted_buffer->converted.samples;
 	short* dest = malloc(sizeof(short) * converted_buffer->converted.length);
-        converted_buffer->converted.samples = dest;
+	converted_buffer->converted.samples = dest;
 
 	for (int i = 0; i < expanded_frames; ++i) {
 		float src_frame_float = i * freq_ratio;
@@ -2378,7 +2484,7 @@ sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
 
 		int sample_0 = (source[src_frame_0] | (source[src_frame_0] << 8)) - 32768;
 		short interpolated_sample;
-		if (src_frame_0 >= waveinfo.sample_count-1) {
+		if (src_frame_0 >= waveinfo.sample_count - 1) {
 			interpolated_sample = (short)sample_0;
 		} else {
 			int src_frame_1 = src_frame_0 + 1;
@@ -2440,21 +2546,21 @@ void play_sound_from_buffer(sound_buffer_type* buffer) {
 	switch (buffer->type & 7) {
 		case sound_speaker:
 			play_speaker_sound(buffer);
-		break;
+			break;
 		case sound_digi_converted:
 		case sound_digi:
 			play_digi_sound(buffer);
-		break;
+			break;
 		case sound_midi:
 			play_midi_sound(buffer);
-		break;
+			break;
 		case sound_ogg:
 			play_ogg_sound(buffer);
-		break;
+			break;
 		default:
 			printf("Tried to play unimplemented sound type %d.\n", buffer->type);
 			quit(1);
-		break;
+			break;
 	}
 }
 
@@ -2519,14 +2625,14 @@ void init_scaling(void) {
 	if (scaling_type == 1) {
 		if (!is_renderer_targettexture_supported && onscreen_surface_2x == NULL) {
 #ifdef __amigaos4__
-			overlay_surface = SDL_CreateSurface(320*2, 200*2, SURFACE_FORMAT_24BPP);
+			overlay_surface = SDL_CreateSurface(320 * 2, 200 * 2, SURFACE_FORMAT_24BPP);
 #else
-			onscreen_surface_2x = SDL_CreateSurface(320*2, 200*2, SURFACE_FORMAT_24BPP);
+			onscreen_surface_2x = SDL_CreateSurface(320 * 2, 200 * 2, SURFACE_FORMAT_24BPP);
 #endif
 		}
 		if (texture_fuzzy == NULL) {
 			int access = is_renderer_targettexture_supported ? SDL_TEXTUREACCESS_TARGET : SDL_TEXTUREACCESS_STREAMING;
-			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, access, 320*2, 200*2);
+			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, access, 320 * 2, 200 * 2);
 			SDL_SetTextureScaleMode(texture_fuzzy, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_fuzzy;
@@ -2554,6 +2660,7 @@ void set_gr_mode(byte grmode) {
 		sdlperror("set_gr_mode: SDL_Init");
 		quit(1);
 	}
+
 	if (enable_controller_rumble) {
 		if (!SDL_InitSubSystem(SDL_INIT_HAPTIC)) {
 			printf("Warning: Haptic subsystem unavailable, ignoring enable_controller_rumble = true\n");
@@ -2575,7 +2682,7 @@ void set_gr_mode(byte grmode) {
 #if _WIN32
 	// Tell Windows that the application is DPI aware, to prevent unwanted bitmap stretching.
 	// SetProcessDPIAware() is only available on Windows Vista and later, so we need to load it dynamically.
-	typedef BOOL (WINAPI *dpiaware)(void);
+	typedef BOOL (WINAPI * dpiaware)(void);
 	HMODULE user32dll = LoadLibraryA("User32.dll");
 	if (user32dll) {
 		dpiaware SetProcessDPIAware = (dpiaware)GetProcAddress(user32dll, "SetProcessDPIAware");
@@ -2589,7 +2696,7 @@ void set_gr_mode(byte grmode) {
 #ifdef USE_REPLAY
 	if (!is_validate_mode) // run without a window if validating a replay
 #endif
-	window_ = SDL_CreateWindow(WINDOW_TITLE, pop_window_width, pop_window_height, flags);
+		window_ = SDL_CreateWindow(WINDOW_TITLE, pop_window_width, pop_window_height, flags);
 	// Make absolutely sure that VSync will be off, to prevent timer issues.
 	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
 	{
@@ -2602,7 +2709,7 @@ void set_gr_mode(byte grmode) {
 	// SDL3: all renderers support render targets.
 	is_renderer_targettexture_supported = true;
 
-	SDL_Surface* icon = IMG_Load(locate_file("data/icon.png"));
+	SDL_Surface* icon = load_png_file_as_surface(locate_file("data/icon.png"));
 	if (icon == NULL) {
 		sdlperror("set_gr_mode: Could not load icon");
 	} else {
@@ -2655,9 +2762,9 @@ void draw_overlay(void) {
 #ifdef USE_DEBUG_CHEATS
 	if (is_timer_displayed && start_level > 0) overlay = 1; // Timer overlay
 	else if (fixes->fix_quicksave_during_feather &&
-				is_feather_timer_displayed &&
-				start_level > 0 &&
-				is_feather_fall > 0) {
+	         is_feather_timer_displayed &&
+	         start_level > 0 &&
+	         is_feather_fall > 0) {
 		overlay = 3; // Feather timer overlay
 	}
 #endif
@@ -2765,7 +2872,7 @@ void update_screen() {
 }
 
 // seg009:9289
-void set_pal_arr(int start,int count,const rgb_type* array) {
+void set_pal_arr(int start, int count, const rgb_type* array) {
 	// stub
 	for (int i = 0; i < count; ++i) {
 		if (array) {
@@ -2779,7 +2886,7 @@ void set_pal_arr(int start,int count,const rgb_type* array) {
 rgb_type palette[256];
 
 // seg009:92DF
-void set_pal(int index,int red,int green,int blue) {
+void set_pal(int index, int red, int green, int blue) {
 	// stub
 	//palette[index] = ((red&0x3F)<<2)|((green&0x3F)<<2<<8)|((blue&0x3F)<<2<<16);
 	palette[index].r = red;
@@ -2808,7 +2915,7 @@ int find_first_pal_row(int which_rows_mask) {
 }
 
 // seg009:9C6C
-int get_text_color(int cga_color,int low_half,int high_half_mask) {
+int get_text_color(int cga_color, int low_half, int high_half_mask) {
 	if (graphics_mode == gmCga || graphics_mode == gmHgaHerc) {
 		return cga_color;
 	} else if (graphics_mode == gmMcgaVga && high_half_mask != 0) {
@@ -2839,16 +2946,15 @@ void load_from_opendats_metadata(int resource_id, const char* extension, FILE** 
 				// found
 				*result = data_DAT;
 				*size = SDL_Swap16LE(dat_table->entries[i].size);
-				if (strcmp(extension,"png") == 0 && *size <= 2) {
+				if (strcmp(extension, "png") == 0 && *size <= 2) {
 					// Skip empty images in DATs, so we can fall back to directories.
 					// This is useful for teleport graphics for example.
 					fp = NULL;
 					*result = data_none;
 					*size = 0;
-				} else
-				if (fseek(fp, SDL_Swap32LE(dat_table->entries[i].offset), SEEK_SET) ||
-				    fread(checksum, 1, 1, fp) != 1
-				) {
+				} else if (fseek(fp, SDL_Swap32LE(dat_table->entries[i].offset), SEEK_SET) ||
+				           fread(checksum, 1, 1, fp) != 1
+				          ) {
 					printf("Cannot seek or cannot read checksum: ");
 					perror(pointer->filename);
 					fp = NULL;
@@ -2865,15 +2971,14 @@ void load_from_opendats_metadata(int resource_id, const char* extension, FILE** 
 			// strip the .DAT file extension from the filename (use folders simply named TITLE, KID, VPALACE, etc.)
 			strncpy(filename_no_ext, pointer->filename, sizeof(filename_no_ext));
 			size_t len = strlen(filename_no_ext);
-			if (len >= 5 && filename_no_ext[len-4] == '.') {
-				filename_no_ext[len-4] = '\0'; // terminate, so ".DAT" is deleted from the filename
+			if (len >= 5 && filename_no_ext[len - 4] == '.') {
+				filename_no_ext[len - 4] = '\0'; // terminate, so ".DAT" is deleted from the filename
 			}
-			snprintf_check(image_filename,sizeof(image_filename),"data/%s/res%d.%s",filename_no_ext, resource_id, extension);
+			snprintf_check(image_filename, sizeof(image_filename), "data/%s/res%d.%s", filename_no_ext, resource_id, extension);
 			if (!use_custom_levelset) {
 				//printf("loading (binary) %s",image_filename);
 				fp = fopen(locate_file(image_filename), "rb");
-			}
-			else {
+			} else {
 				if (!skip_mod_data_files) {
 					char image_filename_mod[POP_MAX_PATH];
 					// before checking data/, first try mods/MODNAME/data/
@@ -2928,7 +3033,7 @@ void close_dat(dat_type* pointer) {
 }
 
 // seg009:9F80
-void *load_from_opendats_alloc(int resource, const char* extension, data_location* out_result, int* out_size) {
+void* load_from_opendats_alloc(int resource, const char* extension, data_location* out_result, int* out_size) {
 	// stub
 	//printf("id = %d\n",resource);
 	dat_type* pointer;
@@ -2944,8 +3049,8 @@ void *load_from_opendats_alloc(int resource, const char* extension, data_locatio
 	//read(fd, area, size);
 	if (fread(area, size, 1, fp) != 1) {
 		fprintf(stderr, "%s: %s, resource %d, size %d, failed: %s\n",
-			__func__, pointer->filename, resource,
-			size, strerror(errno));
+		        __func__, pointer->filename, resource,
+		        size, strerror(errno));
 		free(area);
 		area = NULL;
 	}
@@ -2955,7 +3060,7 @@ void *load_from_opendats_alloc(int resource, const char* extension, data_locatio
 }
 
 // seg009:A172
-int load_from_opendats_to_area(int resource,void* area,int length, const char* extension) {
+int load_from_opendats_to_area(int resource, void* area, int length, const char* extension) {
 	// stub
 	//return 0;
 	dat_type* pointer;
@@ -2967,8 +3072,8 @@ int load_from_opendats_to_area(int resource,void* area,int length, const char* e
 	if (result == data_none) return 0;
 	if (fread(area, MIN(size, length), 1, fp) != 1) {
 		fprintf(stderr, "%s: %s, resource %d, size %d, failed: %s\n",
-			__func__, pointer->filename, resource,
-			size, strerror(errno));
+		        __func__, pointer->filename, resource,
+		        size, strerror(errno));
 		memset(area, 0, MIN(size, length));
 	}
 	if (result == data_directory) fclose(fp);
@@ -2985,7 +3090,7 @@ void rect_to_sdlrect(const rect_type* rect, SDL_Rect* sdlrect) {
 	sdlrect->h = rect->bottom - rect->top;
 }
 
-void method_1_blit_rect(surface_type* target_surface,surface_type* source_surface,const rect_type* target_rect, const rect_type* source_rect,int blit) {
+void method_1_blit_rect(surface_type* target_surface, surface_type* source_surface, const rect_type* target_rect, const rect_type* source_rect, int blit) {
 	SDL_Rect src_rect;
 	rect_to_sdlrect(source_rect, &src_rect);
 	SDL_Rect dest_rect;
@@ -3010,7 +3115,7 @@ void method_1_blit_rect(surface_type* target_surface,surface_type* source_surfac
 	}
 }
 
-image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,byte color) {
+image_type* method_3_blit_mono(image_type* image, int xpos, int ypos, int blitter, byte color) {
 	int w = image->w;
 	int h = image->h;
 	// SDL3: SDL_ConvertSurface from INDEX8 can fail; build the ARGB surface manually.
@@ -3021,7 +3126,7 @@ image_type* method_3_blit_mono(image_type* image,int xpos,int ypos,int blitter,b
 	}
 
 	rgb_type palette_color = palette[color];
-	uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(colored_image->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) & 0xFFFFFF;
+	uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(colored_image->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2) & 0xFFFFFF;
 
 	if (!SDL_LockSurface(image)) {
 		SDL_DestroySurface(colored_image);
@@ -3066,14 +3171,14 @@ int safe_SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 colo
 	return SDL_FillSurfaceRect(dst, rect, color);
 }
 
-const rect_type* method_5_rect(const rect_type* rect,int blit,byte color) {
+const rect_type* method_5_rect(const rect_type* rect, int blit, byte color) {
 	SDL_Rect dest_rect;
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
 #ifndef USE_ALPHA
-	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, 0xFF);
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2, 0xFF);
 #else
-	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, color == 0 ? SDL_ALPHA_TRANSPARENT : SDL_ALPHA_OPAQUE);
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2, color == 0 ? SDL_ALPHA_TRANSPARENT : SDL_ALPHA_OPAQUE);
 #endif
 	if (!safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color)) {
 		sdlperror("method_5_rect: SDL_FillSurfaceRect");
@@ -3086,7 +3191,7 @@ void draw_rect_with_alpha(const rect_type* rect, byte color, byte alpha) {
 	SDL_Rect dest_rect;
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
-	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, alpha);
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2, alpha);
 	if (!safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color)) {
 		sdlperror("draw_rect_with_alpha: SDL_FillSurfaceRect");
 		quit(1);
@@ -3102,7 +3207,7 @@ void draw_rect_contours(const rect_type* rect, byte color) {
 	SDL_Rect dest_rect;
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
-	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2, 0xFF);
+	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2, 0xFF);
 	if (!SDL_LockSurface(current_target_surface)) {
 		sdlperror("draw_rect_contours: SDL_LockSurface");
 		quit(1);
@@ -3114,17 +3219,17 @@ void draw_rect_contours(const rect_type* rect, byte color) {
 	int xmax = MIN(dest_rect.x + dest_rect.w, current_target_surface->w);
 	int ymin = MIN(dest_rect.y,               current_target_surface->h);
 	int ymax = MIN(dest_rect.y + dest_rect.h, current_target_surface->h);
-	byte* row = pixels + ymin*pitch;
-	uint32_t* pixel =  (uint32_t*) (row + xmin*bytes_per_pixel);
+	byte* row = pixels + ymin * pitch;
+	uint32_t* pixel =  (uint32_t*) (row + xmin * bytes_per_pixel);
 	for (int x = xmin; x < xmax; ++x) {
 		*pixel++ = rgb_color;
 	}
-	for (int y = ymin+1; y < ymax-1; ++y) {
+	for (int y = ymin + 1; y < ymax - 1; ++y) {
 		row += pitch;
-		*(uint32_t*)(row + xmin*bytes_per_pixel) = rgb_color;
-		*(uint32_t*)(row + (xmax-1)*bytes_per_pixel) = rgb_color;
+		*(uint32_t*)(row + xmin * bytes_per_pixel) = rgb_color;
+		*(uint32_t*)(row + (xmax - 1)*bytes_per_pixel) = rgb_color;
 	}
-	pixel = (uint32_t*) (pixels + (ymax-1)*pitch + xmin*bytes_per_pixel);
+	pixel = (uint32_t*) (pixels + (ymax - 1) * pitch + xmin * bytes_per_pixel);
 	for (int x = xmin; x < xmax; ++x) {
 		*pixel++ = rgb_color;
 	}
@@ -3163,13 +3268,14 @@ void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* ima
 		quit(1);
 	}
 	int size = helper_surface->h * helper_surface->pitch;
-	byte *p_src = (byte*) image_24->pixels;
-	byte *p_dest = (byte*) helper_surface->pixels;
+	byte* p_src = (byte*) image_24->pixels;
+	byte* p_dest = (byte*) helper_surface->pixels;
 
 	// Xor the old area with the image.
 	for (int i = 0; i < size; ++i) {
 		*p_dest ^= *p_src;
-		++p_src; ++p_dest;
+		++p_src;
+		++p_dest;
 	}
 	SDL_UnlockSurface(image_24);
 	SDL_UnlockSurface(helper_surface);
@@ -3226,7 +3332,7 @@ void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
 }
 #endif
 
-image_type* method_6_blit_img_to_scr(image_type* image,int xpos,int ypos,int blit) {
+image_type* method_6_blit_img_to_scr(image_type* image, int xpos, int ypos, int blit) {
 	if (image == NULL) {
 		printf("method_6_blit_img_to_scr: image == NULL\n");
 		//quit(1);
@@ -3257,50 +3363,38 @@ image_type* method_6_blit_img_to_scr(image_type* image,int xpos,int ypos,int bli
 	SDL_SetSurfaceColorKey(image, false, 0);
 	SDL_SetSurfaceAlphaMod(image, 255);
 
-	//printf("format = %s\n", SDL_GetPixelFormatName(image->format));
-	// Fix the background color of teleport images on SDL_image 2.6.2, where they are loaded as RGBA.
-	// For transparency, paletted images need colorkeying, RGB(A) images need blending.
 	if (blit == blitters_0_no_transp) {
-		if (SDL_ISPIXELFORMAT_INDEXED(image->format)) {
-			SDL_SetSurfaceColorKey(image, false, 0);
-			//printf("colorkey = false\n");
-		} else {
-			SDL_SetSurfaceBlendMode(image, SDL_BLENDMODE_NONE);
-			//printf("SDL_BLENDMODE_NONE\n");
-		}
-	}
-	else {
-		if (SDL_ISPIXELFORMAT_INDEXED(image->format)) {
-			SDL_SetSurfaceColorKey(image, true, 0);
-			//printf("colorkey = true\n");
-		} else {
-			SDL_SetSurfaceBlendMode(image, SDL_BLENDMODE_BLEND);
-			//printf("SDL_BLENDMODE_BLEND\n");
-		}
+		SDL_SetSurfaceColorKey(image, false, 0);
+	} else {
+		SDL_SetSurfaceColorKey(image, true, 0);
 	}
 	if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
 		sdlperror("method_6_blit_img_to_scr: SDL_BlitSurface 2247");
+		printf("[DBG] src fmt=%u w=%d h=%d pal=%p dst fmt=%u\n",
+		       image->format, image->w, image->h,
+		       (void*)SDL_GetSurfacePalette(image),
+		       current_target_surface->format);
 		//quit(1);
 	}
-/*
-	if (!SDL_SetSurfaceAlphaMod(image, 0)) {
-		sdlperror("method_6_blit_img_to_scr: SDL_SetAlpha");
-		quit(1);
-	}
-*/
+	/*
+		if (!SDL_SetSurfaceAlphaMod(image, 0)) {
+			sdlperror("method_6_blit_img_to_scr: SDL_SetAlpha");
+			quit(1);
+		}
+	*/
 	return image;
 }
 
 #ifndef USE_COMPAT_TIMER
 int fps = BASE_FPS;
-float milliseconds_per_tick = (1000.0f / (BASE_FPS*1.0f));
+float milliseconds_per_tick = (1000.0f / (BASE_FPS * 1.0f));
 Uint64 timer_last_counter[NUM_TIMERS];
 #endif
 int wait_time[NUM_TIMERS];
 
 
 #ifdef USE_COMPAT_TIMER
-Uint32 timer_callback(void *param, SDL_TimerID id, Uint32 interval) {
+Uint32 timer_callback(void* param, SDL_TimerID id, Uint32 interval) {
 	SDL_Event event;
 	memset(&event, 0, sizeof(event));
 	event.type = SDL_EVENT_USER;
@@ -3323,7 +3417,7 @@ double get_ticks_per_sec(int timer_index) {
 
 void recalculate_feather_fall_timer(double previous_ticks_per_second, double ticks_per_second) {
 	if (is_feather_fall <= MAX(previous_ticks_per_second, ticks_per_second) ||
-			previous_ticks_per_second == ticks_per_second) {
+	        previous_ticks_per_second == ticks_per_second) {
 		return;
 	}
 	// there are more ticks per second in base mode vs fight mode so
@@ -3337,8 +3431,8 @@ void set_timer_length(int timer_index, int length) {
 		return;
 	}
 	if (is_feather_fall == 0 ||
-			wait_time[timer_index] < custom->base_speed ||
-			wait_time[timer_index] > custom->fight_speed) {
+	        wait_time[timer_index] < custom->base_speed ||
+	        wait_time[timer_index] > custom->fight_speed) {
 		wait_time[timer_index] = length;
 		return;
 	}
@@ -3364,8 +3458,7 @@ void toggle_fullscreen(void) {
 	if (flags & SDL_WINDOW_FULLSCREEN) {
 		SDL_SetWindowFullscreen(window_, false);
 		SDL_ShowCursor();
-	}
-	else {
+	} else {
 		SDL_SetWindowFullscreen(window_, true);
 		SDL_HideCursor();
 	}
@@ -3382,8 +3475,7 @@ void process_events() {
 	SDL_Event event;
 	while (SDL_PollEvent(&event) == 1) { // while there are still events to be processed
 		switch (event.type) {
-			case SDL_EVENT_KEY_DOWN:
-			{
+			case SDL_EVENT_KEY_DOWN: {
 				int modifier = event.key.mod;
 				int scancode = event.key.scancode;
 
@@ -3405,81 +3497,80 @@ void process_events() {
 				} else
 #endif
 #ifdef USE_MENU
-				if (escape_key_suppressed &&
-						(scancode == SDL_SCANCODE_BACKSPACE || (enable_pause_menu && scancode == SDL_SCANCODE_ESCAPE))
-				) {
-					break; // Prevent repeated keystrokes opening/closing the menu as long as the key is held down.
-				} else
+					if (escape_key_suppressed &&
+					        (scancode == SDL_SCANCODE_BACKSPACE || (enable_pause_menu && scancode == SDL_SCANCODE_ESCAPE))
+					   ) {
+						break; // Prevent repeated keystrokes opening/closing the menu as long as the key is held down.
+					} else
 #endif
-				if ((modifier & SDL_KMOD_ALT) &&
-				    scancode == SDL_SCANCODE_RETURN)
-				{
-					// Only if the Enter key was pressed down right now.
-					if ((key_states[scancode] & KEYSTATE_HELD) == 0) {
-						// Alt+Enter: toggle fullscreen mode
-						toggle_fullscreen();
-						key_states[scancode] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
-					}
-				} else {
-					last_any_key_scancode = scancode; // for showmessage_any_key
-					key_states[scancode] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
-					switch (scancode) {
-						// Keys that are ignored by themselves:
-						case SDL_SCANCODE_LCTRL:
-						case SDL_SCANCODE_LSHIFT:
-						case SDL_SCANCODE_LALT:
-						case SDL_SCANCODE_LGUI:
-						case SDL_SCANCODE_RCTRL:
-						case SDL_SCANCODE_RSHIFT:
-						case SDL_SCANCODE_RALT:
-						case SDL_SCANCODE_RGUI:
-						case SDL_SCANCODE_CAPSLOCK:
-						case SDL_SCANCODE_SCROLLLOCK:
-						case SDL_SCANCODE_NUMLOCKCLEAR:
-						case SDL_SCANCODE_APPLICATION:
-						case SDL_SCANCODE_PRINTSCREEN:
-						case SDL_SCANCODE_VOLUMEUP:
-						case SDL_SCANCODE_VOLUMEDOWN:
-						case SDL_SCANCODE_MUTE:
-						case SDL_SCANCODE_PAUSE:
-							break;
+						if ((modifier & SDL_KMOD_ALT) &&
+						        scancode == SDL_SCANCODE_RETURN) {
+							// Only if the Enter key was pressed down right now.
+							if ((key_states[scancode] & KEYSTATE_HELD) == 0) {
+								// Alt+Enter: toggle fullscreen mode
+								toggle_fullscreen();
+								key_states[scancode] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+							}
+						} else {
+							last_any_key_scancode = scancode; // for showmessage_any_key
+							key_states[scancode] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+							switch (scancode) {
+								// Keys that are ignored by themselves:
+								case SDL_SCANCODE_LCTRL:
+								case SDL_SCANCODE_LSHIFT:
+								case SDL_SCANCODE_LALT:
+								case SDL_SCANCODE_LGUI:
+								case SDL_SCANCODE_RCTRL:
+								case SDL_SCANCODE_RSHIFT:
+								case SDL_SCANCODE_RALT:
+								case SDL_SCANCODE_RGUI:
+								case SDL_SCANCODE_CAPSLOCK:
+								case SDL_SCANCODE_SCROLLLOCK:
+								case SDL_SCANCODE_NUMLOCKCLEAR:
+								case SDL_SCANCODE_APPLICATION:
+								case SDL_SCANCODE_PRINTSCREEN:
+								case SDL_SCANCODE_VOLUMEUP:
+								case SDL_SCANCODE_VOLUMEDOWN:
+								case SDL_SCANCODE_MUTE:
+								case SDL_SCANCODE_PAUSE:
+									break;
 
-						default:
-							// If Alt is held down from Alt+Tab: ignore it until it's released.
-							if (scancode == SDL_SCANCODE_TAB && ignore_tab) break;
+								default:
+									// If Alt is held down from Alt+Tab: ignore it until it's released.
+									if (scancode == SDL_SCANCODE_TAB && ignore_tab) break;
 
-							last_key_scancode = scancode;
-							if (modifier & SDL_KMOD_SHIFT) last_key_scancode |= WITH_SHIFT;
-							if (modifier & SDL_KMOD_CTRL ) last_key_scancode |= WITH_CTRL ;
-							if (modifier & SDL_KMOD_ALT  ) last_key_scancode |= WITH_ALT  ;
-					}
+									last_key_scancode = scancode;
+									if (modifier & SDL_KMOD_SHIFT) last_key_scancode |= WITH_SHIFT;
+									if (modifier & SDL_KMOD_CTRL ) last_key_scancode |= WITH_CTRL ;
+									if (modifier & SDL_KMOD_ALT  ) last_key_scancode |= WITH_ALT  ;
+							}
 
 #ifdef USE_AUTO_INPUT_MODE
-					switch (scancode) {
-						// Keys that are used for keyboard control:
-						case SDL_SCANCODE_LSHIFT:
-						case SDL_SCANCODE_RSHIFT:
-						case SDL_SCANCODE_LEFT:
-						case SDL_SCANCODE_RIGHT:
-						case SDL_SCANCODE_UP:
-						case SDL_SCANCODE_DOWN:
-						case SDL_SCANCODE_CLEAR:
-						case SDL_SCANCODE_HOME:
-						case SDL_SCANCODE_PAGEUP:
-						case SDL_SCANCODE_KP_2:
-						case SDL_SCANCODE_KP_4:
-						case SDL_SCANCODE_KP_5:
-						case SDL_SCANCODE_KP_6:
-						case SDL_SCANCODE_KP_7:
-						case SDL_SCANCODE_KP_8:
-						case SDL_SCANCODE_KP_9:
-							if (!is_keyboard_mode) {
-								is_keyboard_mode = 1;
-								is_joyst_mode = 0;
+							switch (scancode) {
+								// Keys that are used for keyboard control:
+								case SDL_SCANCODE_LSHIFT:
+								case SDL_SCANCODE_RSHIFT:
+								case SDL_SCANCODE_LEFT:
+								case SDL_SCANCODE_RIGHT:
+								case SDL_SCANCODE_UP:
+								case SDL_SCANCODE_DOWN:
+								case SDL_SCANCODE_CLEAR:
+								case SDL_SCANCODE_HOME:
+								case SDL_SCANCODE_PAGEUP:
+								case SDL_SCANCODE_KP_2:
+								case SDL_SCANCODE_KP_4:
+								case SDL_SCANCODE_KP_5:
+								case SDL_SCANCODE_KP_6:
+								case SDL_SCANCODE_KP_7:
+								case SDL_SCANCODE_KP_8:
+								case SDL_SCANCODE_KP_9:
+									if (!is_keyboard_mode) {
+										is_keyboard_mode = 1;
+										is_joyst_mode = 0;
+									}
 							}
-					}
 #endif
-				}
+						}
 				break;
 			}
 			case SDL_EVENT_KEY_UP:
@@ -3541,17 +3632,32 @@ void process_events() {
 					is_keyboard_mode = 0;
 				}
 #endif
-				switch (event.gbutton.button)
-				{
-					case SDL_GAMEPAD_BUTTON_DPAD_LEFT:  joy_button_states[JOYINPUT_DPAD_LEFT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // left
-					case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: joy_button_states[JOYINPUT_DPAD_RIGHT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // right
-					case SDL_GAMEPAD_BUTTON_DPAD_UP:    joy_button_states[JOYINPUT_DPAD_UP] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // up
-					case SDL_GAMEPAD_BUTTON_DPAD_DOWN:  joy_button_states[JOYINPUT_DPAD_DOWN] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; // down
+				switch (event.gbutton.button) {
+					case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
+						joy_button_states[JOYINPUT_DPAD_LEFT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; // left
+					case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
+						joy_button_states[JOYINPUT_DPAD_RIGHT] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; // right
+					case SDL_GAMEPAD_BUTTON_DPAD_UP:
+						joy_button_states[JOYINPUT_DPAD_UP] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; // up
+					case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+						joy_button_states[JOYINPUT_DPAD_DOWN] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; // down
 
-					case SDL_GAMEPAD_BUTTON_SOUTH:          joy_button_states[JOYINPUT_A] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** A (down) ***/
-					case SDL_GAMEPAD_BUTTON_NORTH:          joy_button_states[JOYINPUT_Y] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** Y (up) ***/
-					case SDL_GAMEPAD_BUTTON_WEST:          joy_button_states[JOYINPUT_X] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** X (Shift) ***/
-					case SDL_GAMEPAD_BUTTON_EAST:          joy_button_states[JOYINPUT_B] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; break; /*** B (unused) ***/
+					case SDL_GAMEPAD_BUTTON_SOUTH:
+						joy_button_states[JOYINPUT_A] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; /*** A (down) ***/
+					case SDL_GAMEPAD_BUTTON_NORTH:
+						joy_button_states[JOYINPUT_Y] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; /*** Y (up) ***/
+					case SDL_GAMEPAD_BUTTON_WEST:
+						joy_button_states[JOYINPUT_X] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; /*** X (Shift) ***/
+					case SDL_GAMEPAD_BUTTON_EAST:
+						joy_button_states[JOYINPUT_B] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;
+						break; /*** B (unused) ***/
 
 					case SDL_GAMEPAD_BUTTON_START:
 					case SDL_GAMEPAD_BUTTON_BACK:
@@ -3566,26 +3672,47 @@ void process_events() {
 #endif
 						break;
 
-					default: break;
+					default:
+						break;
 				}
 				break;
 			case SDL_EVENT_GAMEPAD_BUTTON_UP:
-				switch (event.gbutton.button)
-				{
-					case SDL_GAMEPAD_BUTTON_DPAD_LEFT:  joy_button_states[JOYINPUT_DPAD_LEFT] &= ~KEYSTATE_HELD; break; // left
-					case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: joy_button_states[JOYINPUT_DPAD_RIGHT] &= ~KEYSTATE_HELD; break; // right
-					case SDL_GAMEPAD_BUTTON_DPAD_UP:    joy_button_states[JOYINPUT_DPAD_UP] &= ~KEYSTATE_HELD; break; // up
-					case SDL_GAMEPAD_BUTTON_DPAD_DOWN:  joy_button_states[JOYINPUT_DPAD_DOWN] &= ~KEYSTATE_HELD; break; // down
+				switch (event.gbutton.button) {
+					case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
+						joy_button_states[JOYINPUT_DPAD_LEFT] &= ~KEYSTATE_HELD;
+						break; // left
+					case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
+						joy_button_states[JOYINPUT_DPAD_RIGHT] &= ~KEYSTATE_HELD;
+						break; // right
+					case SDL_GAMEPAD_BUTTON_DPAD_UP:
+						joy_button_states[JOYINPUT_DPAD_UP] &= ~KEYSTATE_HELD;
+						break; // up
+					case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+						joy_button_states[JOYINPUT_DPAD_DOWN] &= ~KEYSTATE_HELD;
+						break; // down
 
-					case SDL_GAMEPAD_BUTTON_SOUTH:          joy_button_states[JOYINPUT_A] &= ~KEYSTATE_HELD; break; /*** A (down) ***/
-					case SDL_GAMEPAD_BUTTON_NORTH:          joy_button_states[JOYINPUT_Y] &= ~KEYSTATE_HELD; break; /*** Y (up) ***/
-					case SDL_GAMEPAD_BUTTON_WEST:          joy_button_states[JOYINPUT_X] &= ~KEYSTATE_HELD; break; /*** X (Shift) ***/
-					case SDL_GAMEPAD_BUTTON_EAST:          joy_button_states[JOYINPUT_B] &= ~KEYSTATE_HELD; break; /*** B (unused) ***/
+					case SDL_GAMEPAD_BUTTON_SOUTH:
+						joy_button_states[JOYINPUT_A] &= ~KEYSTATE_HELD;
+						break; /*** A (down) ***/
+					case SDL_GAMEPAD_BUTTON_NORTH:
+						joy_button_states[JOYINPUT_Y] &= ~KEYSTATE_HELD;
+						break; /*** Y (up) ***/
+					case SDL_GAMEPAD_BUTTON_WEST:
+						joy_button_states[JOYINPUT_X] &= ~KEYSTATE_HELD;
+						break; /*** X (Shift) ***/
+					case SDL_GAMEPAD_BUTTON_EAST:
+						joy_button_states[JOYINPUT_B] &= ~KEYSTATE_HELD;
+						break; /*** B (unused) ***/
 
-					case SDL_GAMEPAD_BUTTON_START:      joy_button_states[JOYINPUT_START] &= ~KEYSTATE_HELD; break;
-					case SDL_GAMEPAD_BUTTON_BACK:       joy_button_states[JOYINPUT_BACK] &= ~KEYSTATE_HELD; break;
+					case SDL_GAMEPAD_BUTTON_START:
+						joy_button_states[JOYINPUT_START] &= ~KEYSTATE_HELD;
+						break;
+					case SDL_GAMEPAD_BUTTON_BACK:
+						joy_button_states[JOYINPUT_BACK] &= ~KEYSTATE_HELD;
+						break;
 
-					default: break;
+					default:
+						break;
 				}
 				break;
 			case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
@@ -3600,8 +3727,7 @@ void process_events() {
 					int axis = -1;
 					if (event.jaxis.axis == SDL_JOYSTICK_X_AXIS) {
 						axis = SDL_GAMEPAD_AXIS_LEFTX;
-					}
-					else if (event.jaxis.axis == SDL_JOYSTICK_Y_AXIS) {
+					} else if (event.jaxis.axis == SDL_JOYSTICK_Y_AXIS) {
 						axis = SDL_GAMEPAD_AXIS_LEFTY;
 					}
 					if (axis == -1)
@@ -3613,7 +3739,7 @@ void process_events() {
 					// Disregard SDL_EVENT_JOYSTICK_AXIS_MOTION events within joystick 'dead zone'
 					int joy_x = joy_axis[SDL_GAMEPAD_AXIS_LEFTX];
 					int joy_y = joy_axis[SDL_GAMEPAD_AXIS_LEFTY];
-					if ((dword)(joy_x*joy_x) + (dword)(joy_y*joy_y) < (dword)(joystick_threshold*joystick_threshold)) {
+					if ((dword)(joy_x * joy_x) + (dword)(joy_y * joy_y) < (dword)(joystick_threshold * joystick_threshold)) {
 						break;
 					}
 				}
@@ -3626,8 +3752,7 @@ void process_events() {
 				if (event.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN) {
 					if      (event.jbutton.button == SDL_JOYSTICK_BUTTON_Y)   joy_button_states[JOYINPUT_Y] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW; // Y (up)
 					else if (event.jbutton.button == SDL_JOYSTICK_BUTTON_X)   joy_button_states[JOYINPUT_X] |= KEYSTATE_HELD | KEYSTATE_HELD_NEW;    // X (Shift)
-				}
-				else if (event.type == SDL_EVENT_JOYSTICK_BUTTON_UP) {
+				} else if (event.type == SDL_EVENT_JOYSTICK_BUTTON_UP) {
 					if      (event.jbutton.button == SDL_JOYSTICK_BUTTON_Y)   joy_button_states[JOYINPUT_Y] &= ~KEYSTATE_HELD;  // Y (up)
 					else if (event.jbutton.button == SDL_JOYSTICK_BUTTON_X)   joy_button_states[JOYINPUT_X] &= ~KEYSTATE_HELD;    // X (Shift)
 				}
@@ -3641,8 +3766,12 @@ void process_events() {
 				// If '+' is on Shift+something then we can't detect it in SDL_EVENT_KEY_DOWN,
 				// because event.key.key only tells us what character would the key type without shift.
 				switch (last_text_input) {
-					case '-': last_key_scancode = SDL_SCANCODE_KP_MINUS; break;
-					case '+': last_key_scancode = SDL_SCANCODE_KP_PLUS;  break;
+					case '-':
+						last_key_scancode = SDL_SCANCODE_KP_MINUS;
+						break;
+					case '+':
+						last_key_scancode = SDL_SCANCODE_KP_PLUS;
+						break;
 				}
 
 				break;
@@ -3658,15 +3787,15 @@ void process_events() {
 #endif
 			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 				window_resized();
-				// fallthrough!
+			// fallthrough!
 			//case SDL_EVENT_WINDOW_MOVED:
 			//case SDL_EVENT_WINDOW_RESTORED:
 			case SDL_EVENT_WINDOW_EXPOSED:
 				update_screen();
 				break;
-			case SDL_EVENT_WINDOW_FOCUS_GAINED:
-			{ // If Alt is held down from Alt+Tab: ignore it until it's released.
-				const bool *state = SDL_GetKeyboardState(NULL);
+			case SDL_EVENT_WINDOW_FOCUS_GAINED: {
+				// If Alt is held down from Alt+Tab: ignore it until it's released.
+				const bool* state = SDL_GetKeyboardState(NULL);
 				if (state[SDL_SCANCODE_TAB]) ignore_tab = true;
 			}
 			break;
@@ -3696,7 +3825,8 @@ void process_events() {
 					case SDL_BUTTON_X1: // 'Back' button (on mice that have these extra buttons).
 						mouse_button_clicked_right = true;
 						break;
-					default: break;
+					default:
+						break;
 				}
 
 				break;
@@ -3761,7 +3891,7 @@ void init_timer(int frequency) {
 	perf_counters_per_tick = perf_frequency / fps;
 	milliseconds_per_counter = 1000.0f / perf_frequency;
 #else
-	global_timer = SDL_AddTimer(1000/frequency, timer_callback, NULL);
+	global_timer = SDL_AddTimer(1000 / frequency, timer_callback, NULL);
 	if (global_timer != 0) {
 		if (!SDL_RemoveTimer(global_timer)) {
 			sdlperror("init_timer: SDL_RemoveTimer");
@@ -3787,7 +3917,7 @@ void reset_clip_rect() {
 }
 
 // seg009:1983
-void set_bg_attr(int vga_pal_index,int hc_pal_index) {
+void set_bg_attr(int vga_pal_index, int hc_pal_index) {
 	// stub
 #ifdef USE_FLASH
 	//palette[vga_pal_index] = vga_palette[hc_pal_index];
@@ -3804,11 +3934,11 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 			sdlperror("set_bg_attr: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
-		SDL_Rect rect = {0,0,0,0};
+		SDL_Rect rect = {0, 0, 0, 0};
 		rect.w = offscreen_surface->w;
 		rect.h = offscreen_surface->h;
 		rgb_type palette_color = palette[hc_pal_index];
-		uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(onscreen_surface_->format), NULL, palette_color.r<<2, palette_color.g<<2, palette_color.b<<2) /*& 0xFFFFFF*/;
+		uint32_t rgb_color = SDL_MapRGB(SDL_GetPixelFormatDetails(onscreen_surface_->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2) /*& 0xFFFFFF*/;
 		//SDL_UpdateRect(onscreen_surface_, 0, 0, 0, 0);
 		// First clear the screen with the color of the flash.
 		if (!safe_SDL_FillSurfaceRect(onscreen_surface_, &rect, rgb_color)) {
@@ -3831,7 +3961,7 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 			flip_screen(offscreen_surface);
 		}
 		// And show it!
-//		update_screen();
+		update_screen();
 		// Give some time to show the flash.
 		//SDL_Flip(onscreen_surface_);
 //		if (hc_pal_index != 0) SDL_Delay(2*(1000/60));
@@ -3851,7 +3981,7 @@ void set_bg_attr(int vga_pal_index,int hc_pal_index) {
 }
 
 // seg009:07EB
-rect_type* offset4_rect_add(rect_type* dest,const rect_type* source,int d_left,int d_top,int d_right,int d_bottom) {
+rect_type* offset4_rect_add(rect_type* dest, const rect_type* source, int d_left, int d_top, int d_right, int d_bottom) {
 	*dest = *source;
 	dest->left += d_left;
 	dest->top += d_top;
@@ -3861,7 +3991,7 @@ rect_type* offset4_rect_add(rect_type* dest,const rect_type* source,int d_left,i
 }
 
 // seg009:3AA5
-rect_type* offset2_rect(rect_type* dest,const rect_type *source,int delta_x,int delta_y) {
+rect_type* offset2_rect(rect_type* dest, const rect_type* source, int delta_x, int delta_y) {
 	dest->top    = source->top    + delta_y;
 	dest->left   = source->left   + delta_x;
 	dest->bottom = source->bottom + delta_y;
@@ -3871,7 +4001,7 @@ rect_type* offset2_rect(rect_type* dest,const rect_type *source,int delta_x,int 
 
 #ifdef USE_FADE
 // seg009:19EF
-void fade_in_2(surface_type* source_surface,int which_rows) {
+void fade_in_2(surface_type* source_surface, int which_rows) {
 	palette_fade_type* palette_buffer;
 	if (graphics_mode == gmMcgaVga) {
 		palette_buffer = make_pal_buffer_fadein(source_surface, which_rows, 2);
@@ -3886,7 +4016,7 @@ void fade_in_2(surface_type* source_surface,int which_rows) {
 }
 
 // seg009:1A51
-palette_fade_type* make_pal_buffer_fadein(surface_type* source_surface,int which_rows,int wait_time) {
+palette_fade_type* make_pal_buffer_fadein(surface_type* source_surface, int which_rows, int wait_time) {
 	palette_fade_type* palette_buffer;
 	palette_buffer = (palette_fade_type*) malloc(sizeof(palette_fade_type));
 	palette_buffer->which_rows = which_rows;
@@ -3896,10 +4026,10 @@ palette_fade_type* make_pal_buffer_fadein(surface_type* source_surface,int which
 	palette_buffer->proc_fade_frame = &fade_in_frame;
 	read_palette_256(palette_buffer->original_pal);
 	memcpy(palette_buffer->faded_pal, palette_buffer->original_pal, sizeof(palette_buffer->faded_pal));
-	for (word curr_row = 0, curr_row_mask = 1; curr_row < 0x10; ++curr_row, curr_row_mask<<=1) {
+	for (word curr_row = 0, curr_row_mask = 1; curr_row < 0x10; ++curr_row, curr_row_mask <<= 1) {
 		if (which_rows & curr_row_mask) {
-			memset(palette_buffer->faded_pal + (curr_row<<4), 0, sizeof(rgb_type[0x10]));
-			set_pal_arr(curr_row<<4, 0x10, NULL);
+			memset(palette_buffer->faded_pal + (curr_row << 4), 0, sizeof(rgb_type[0x10]));
+			set_pal_arr(curr_row << 4, 0x10, NULL);
 		}
 	}
 	//method_1_blit_rect(onscreen_surface_, source_surface, &screen_rect, &screen_rect, 0);
@@ -3923,12 +4053,12 @@ int fade_in_frame(palette_fade_type* palette_buffer) {
 
 	//printf("start ticks = %u\n",SDL_GetTicks());
 	--palette_buffer->fade_pos;
-	for (word start=0,current_row_mask=1; start<0x100; start+=0x10, current_row_mask<<=1) {
+	for (word start = 0, current_row_mask = 1; start < 0x100; start += 0x10, current_row_mask <<= 1) {
 		if (palette_buffer->which_rows & current_row_mask) {
 			//var_12 = palette_buffer->
 			rgb_type* original_pal_ptr = palette_buffer->original_pal + start;
 			rgb_type* faded_pal_ptr = palette_buffer->faded_pal + start;
-			for (word column = 0; column<0x10; ++column) {
+			for (word column = 0; column < 0x10; ++column) {
 				if (original_pal_ptr[column].r > palette_buffer->fade_pos) {
 					++faded_pal_ptr[column].r;
 				}
@@ -3941,7 +4071,7 @@ int fade_in_frame(palette_fade_type* palette_buffer) {
 			}
 		}
 	}
-	for (word start = 0, current_row_mask = 1; start<0x100; start+=0x10, current_row_mask<<=1) {
+	for (word start = 0, current_row_mask = 1; start < 0x100; start += 0x10, current_row_mask <<= 1) {
 		if (palette_buffer->which_rows & current_row_mask) {
 			set_pal_arr(start, 0x10, palette_buffer->faded_pal + start);
 		}
@@ -3964,10 +4094,11 @@ int fade_in_frame(palette_fade_type* palette_buffer) {
 		byte* off_pixel_ptr = (byte*)offscreen_surface->pixels + off_stride * y;
 		for (int x = 0; x < on_stride; ++x) {
 			//if (*off_pixel_ptr > palette_buffer->fade_pos) *pixel_ptr += 4;
-			int v = *off_pixel_ptr - fade_pos*4;
-			if (v<0) v=0;
+			int v = *off_pixel_ptr - fade_pos * 4;
+			if (v < 0) v = 0;
 			*on_pixel_ptr = v;
-			++on_pixel_ptr; ++off_pixel_ptr;
+			++on_pixel_ptr;
+			++off_pixel_ptr;
 		}
 	}
 	SDL_UnlockSurface(onscreen_surface_);
@@ -3997,7 +4128,7 @@ void fade_out_2(int rows) {
 }
 
 // seg009:1D28
-palette_fade_type* make_pal_buffer_fadeout(int which_rows,int wait_time) {
+palette_fade_type* make_pal_buffer_fadeout(int which_rows, int wait_time) {
 	palette_fade_type* palette_buffer;
 	palette_buffer = (palette_fade_type*) malloc(sizeof(palette_fade_type));
 	palette_buffer->which_rows = which_rows;
@@ -4030,12 +4161,12 @@ int fade_out_frame(palette_fade_type* palette_buffer) {
 	word finished_fading = 1;
 	++palette_buffer->fade_pos; // modified
 	/**/start_timer(timer_1, palette_buffer->wait_time); // too slow?
-	for (word start=0,current_row_mask=1; start<0x100; start+=0x10, current_row_mask<<=1) {
+	for (word start = 0, current_row_mask = 1; start < 0x100; start += 0x10, current_row_mask <<= 1) {
 		if (palette_buffer->which_rows & current_row_mask) {
 			//var_12 = palette_buffer->
 			//original_pal_ptr = palette_buffer->original_pal + start;
 			rgb_type* faded_pal_ptr = palette_buffer->faded_pal + start;
-			for (word column = 0; column<0x10; ++column) {
+			for (word column = 0; column < 0x10; ++column) {
 				byte* curr_color_ptr = &faded_pal_ptr[column].r;
 				if (*curr_color_ptr != 0) {
 					--*curr_color_ptr;
@@ -4054,7 +4185,7 @@ int fade_out_frame(palette_fade_type* palette_buffer) {
 			}
 		}
 	}
-	for (word start = 0, current_row_mask = 1; start<0x100; start+=0x10, current_row_mask<<=1) {
+	for (word start = 0, current_row_mask = 1; start < 0x100; start += 0x10, current_row_mask <<= 1) {
 		if (palette_buffer->which_rows & current_row_mask) {
 			set_pal_arr(start, 0x10, palette_buffer->faded_pal + start);
 		}
@@ -4077,10 +4208,11 @@ int fade_out_frame(palette_fade_type* palette_buffer) {
 		byte* off_pixel_ptr = (byte*)offscreen_surface->pixels + off_stride * y;
 		for (int x = 0; x < on_stride; ++x) {
 			//if (*pixel_ptr >= 4) *pixel_ptr -= 4;
-			int v = *off_pixel_ptr - fade_pos*4;
-			if (v<0) v=0;
+			int v = *off_pixel_ptr - fade_pos * 4;
+			if (v < 0) v = 0;
 			*on_pixel_ptr = v;
-			++on_pixel_ptr; ++off_pixel_ptr;
+			++on_pixel_ptr;
+			++off_pixel_ptr;
 		}
 	}
 	SDL_UnlockSurface(onscreen_surface_);
@@ -4107,13 +4239,16 @@ void set_pal_256(rgb_type* source) {
 
 void set_chtab_palette(chtab_type* chtab, byte* colors, int n_colors) {
 	if (chtab != NULL) {
-		SDL_Color* scolors = (SDL_Color*) malloc(n_colors*sizeof(SDL_Color));
+		SDL_Color* scolors = (SDL_Color*) malloc(n_colors * sizeof(SDL_Color));
 		//printf("scolors\n",i);
 		for (int i = 0; i < n_colors; ++i) {
 			//printf("i=%d\n",i);
-			scolors[i].r = *colors << 2; ++colors;
-			scolors[i].g = *colors << 2; ++colors;
-			scolors[i].b = *colors << 2; ++colors;
+			scolors[i].r = *colors << 2;
+			++colors;
+			scolors[i].g = *colors << 2;
+			++colors;
+			scolors[i].b = *colors << 2;
+			++colors;
 			scolors[i].a = SDL_ALPHA_OPAQUE; // the SDL2 SDL_Color struct has an alpha component
 		}
 
