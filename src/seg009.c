@@ -3930,7 +3930,10 @@ void set_bg_attr(int vga_pal_index, int hc_pal_index) {
 		}
 		*/
 		// Make the black pixels transparent.
-		if (!SDL_SetSurfaceColorKey(offscreen_surface, true, 0)) {	// true old
+		// SDL3 colorkey matching is exact (includes alpha); hardcoded 0 won't match opaque black.
+		// This is only relevant to 32-bit surfaces.
+		Uint32 black_key = SDL_MapRGB(SDL_GetPixelFormatDetails(offscreen_surface->format), NULL, 0, 0, 0);
+		if (!SDL_SetSurfaceColorKey(offscreen_surface, true, black_key)) {
 			sdlperror("set_bg_attr: SDL_SetSurfaceColorKey");
 			quit(1);
 		}
@@ -3961,7 +3964,10 @@ void set_bg_attr(int vga_pal_index, int hc_pal_index) {
 			flip_screen(offscreen_surface);
 		}
 		// And show it!
+		// Enable vsync for this one call to avoid a torn scanline during the flash with SDL3.
+		SDL_SetRenderVSync(renderer_, 1);
 		update_screen();
+		SDL_SetRenderVSync(renderer_, 0);
 		// Give some time to show the flash.
 		//SDL_Flip(onscreen_surface_);
 //		if (hc_pal_index != 0) SDL_Delay(2*(1000/60));
