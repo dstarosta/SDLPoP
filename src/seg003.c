@@ -239,7 +239,11 @@ void draw_level_first() {
 // seg003:037B
 void redraw_screen(int drawing_different_room) {
 	//remove_flash();
-	if (drawing_different_room) {
+	if (drawing_different_room
+#ifdef USE_SCREENSHOT
+	    && !saving_level_screenshot
+#endif
+	) {
 		draw_rect(&rect_top, color_0_black);
 #ifdef USE_DARK_TRANSITION
 		// Briefly show a dark screen when changing rooms, like in the original game.

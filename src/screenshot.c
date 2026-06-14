@@ -683,6 +683,7 @@ again:
 	*/
 
 	int old_room = drawn_room;
+	saving_level_screenshot = true;
 	for (int y=0; y<map_height; y++) {
 		for (int x=0; x<map_width; x++) {
 			int room = map[y][x];
@@ -701,6 +702,8 @@ again:
 		}
 	}
 	switch_to_room(old_room);
+	saving_level_screenshot = false;
+	update_screen(); // Restore the visible frame before the slow PNG write.
 
 	make_screenshot_filename();
 	int result = save_surface_as_png(map_surface, screenshot_filename);
@@ -714,6 +717,7 @@ again:
 bool want_auto = false;
 bool want_auto_whole_level = false;
 bool want_auto_extras = false;
+bool saving_level_screenshot = false;
 
 void init_screenshot() {
 	// Command-line options to automatically save a screenshot at startup.

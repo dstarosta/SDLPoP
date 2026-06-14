@@ -711,6 +711,7 @@ void auto_screenshot(void);
 bool want_auto_screenshot(void);
 void init_screenshot(void);
 void save_level_screenshot(bool want_extras);
+extern bool saving_level_screenshot;
 #endif
 
 // menu.c
