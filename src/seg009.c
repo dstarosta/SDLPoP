@@ -904,36 +904,77 @@ SDL_Surface* load_png_file_as_surface(const char* path) {
 //
 // Uses the PNG's embedded PLTE for exact palette-index recovery (stb_image expands
 // pixels via PLTE, so matching against PLTE always gives the original indices).
-// Falls back to nearest-match against the pal_ptr VGA palette for non-indexed PNGs.
-// Index 0 is forced to black in the surface palette, matching decode_image behaviour
-// for non-transparent blitters (avoids coloured rectangles around sprites).
+//
+// Index 0 is forced transparent, matching decode_image() behaviour.
 static image_type* load_png_image(const void* png_data, int png_size, dat_pal_type* pal_ptr) {
-	// Extract the PLTE chunk that precedes IDAT in the PNG stream.
 	static const Uint8 png_sig[8] = {137, 'P', 'N', 'G', 13, 10, 26, 10};
-	SDL_Color plte[256];
+	SDL_Color plte[256];      // original PLTE colours — used for surface palette
+	SDL_Color lut[256];       // lookup colours — patched to be unique for reverse mapping
 	int plte_count = 0;
+	int plte_data_offset = 0; // byte offset of PLTE RGB data within png_data
+
 	if (png_size > 8 && memcmp(png_data, png_sig, 8) == 0) {
 		const Uint8* chunk = (const Uint8*)png_data + 8;
 		const Uint8* stream_end = (const Uint8*)png_data + png_size;
 		while (chunk + 12 <= stream_end) {
 			Uint32 chunk_len = ((Uint32)chunk[0] << 24) | ((Uint32)chunk[1] << 16) | ((Uint32)chunk[2] << 8) | chunk[3];
-			if (chunk + 12 + chunk_len > stream_end) break;
+			if (chunk + 12 + chunk_len > stream_end) {
+				break;
+			}
 			if (memcmp(chunk + 4, "PLTE", 4) == 0 && chunk_len <= 768) {
 				plte_count = (int)(chunk_len / 3);
+				plte_data_offset = (int)((chunk + 8) - (const Uint8*)png_data);
 				for (int i = 0; i < plte_count; ++i) {
-					plte[i].r = chunk[8 + i * 3];
-					plte[i].g = chunk[8 + i * 3 + 1];
-					plte[i].b = chunk[8 + i * 3 + 2];
-					plte[i].a = SDL_ALPHA_OPAQUE;
+					plte[i].r = lut[i].r = chunk[8 + i * 3];
+					plte[i].g = lut[i].g = chunk[8 + i * 3 + 1];
+					plte[i].b = lut[i].b = chunk[8 + i * 3 + 2];
+					plte[i].a = lut[i].a = SDL_ALPHA_OPAQUE;
 				}
-			} else if (memcmp(chunk + 4, "IDAT", 4) == 0) break;
+				break;
+			} else if (memcmp(chunk + 4, "IDAT", 4) == 0) {
+				break;
+			}
 			chunk += 12 + chunk_len;
+		}
+	}
+
+	// For each PLTE entry that duplicates an earlier entry's colour, assign a unique
+	// placeholder so the RGB round-trip is predictable. The title text background
+	// changes one of the indexed colors at runtime which matches other colors in the
+	// palette.
+	void* png_copy = NULL;
+	if (plte_count > 0) {
+		bool changed = false;
+		for (int i = 1; i < plte_count; ++i) {
+			for (int j = 0; j < i; ++j) {
+				if (lut[i].r == lut[j].r && lut[i].g == lut[j].g && lut[i].b == lut[j].b) {
+					lut[i].r = 1;
+					lut[i].g = 0;
+					lut[i].b = (Uint8)i;
+					changed = true;
+					break;
+				}
+			}
+		}
+		if (changed) {
+			png_copy = malloc(png_size);
+			if (png_copy) {
+				memcpy(png_copy, png_data, png_size);
+				Uint8* p = (Uint8*)png_copy + plte_data_offset;
+				for (int i = 0; i < plte_count; ++i) {
+					p[i * 3 + 0] = lut[i].r;
+					p[i * 3 + 1] = lut[i].g;
+					p[i * 3 + 2] = lut[i].b;
+				}
+			}
 		}
 	}
 
 	int img_w, img_h;
 	stbi_uc* pixels = stbi_load_from_memory(
-	                      (const stbi_uc*)png_data, png_size, &img_w, &img_h, NULL, STBI_rgb);
+	                      (const stbi_uc*)(png_copy ? png_copy : png_data),
+	                      png_size, &img_w, &img_h, NULL, STBI_rgb);
+	free(png_copy);
 	if (pixels == NULL) return NULL;
 
 	image_type* surface = SDL_CreateSurface(img_w, img_h, SDL_PIXELFORMAT_INDEX8);
@@ -942,9 +983,8 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 		return NULL;
 	}
 
-	// Build the surface palette from PLTE when available, else from the VGA palette.
-	// Force index 0 to opaque black so non-transparent blitters don't reveal the
-	// raw transparent colour (which may not be black in custom graphics packs).
+	// Build the surface palette from the original PLTE when available, else from the VGA palette.
+	// Force index 0 to transparent black.
 	SDL_Color surface_palette[256] = {0};
 	int surface_palette_count = plte_count ? plte_count : 16;
 	if (plte_count) {
@@ -957,40 +997,43 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 			surface_palette[i].a = SDL_ALPHA_OPAQUE;
 		}
 	}
-	surface_palette[0].r = 0;
-	surface_palette[0].g = 0;
-	surface_palette[0].b = 0;
 	surface_palette[0].a = SDL_ALPHA_TRANSPARENT;
-	SDL_Palette* sdl_palette = SDL_CreatePalette(surface_palette_count);
+	int pal_size = SDL_max(surface_palette_count, 16);
+	SDL_Palette* sdl_palette = SDL_CreatePalette(pal_size);
+
 	if (sdl_palette) {
-		SDL_SetPaletteColors(sdl_palette, surface_palette, 0, surface_palette_count);
+		SDL_SetPaletteColors(sdl_palette, surface_palette, 0, pal_size);
 		SDL_SetSurfacePalette(surface, sdl_palette);
 		SDL_DestroyPalette(sdl_palette);
 	}
 
-	// Map each RGB pixel back to its palette index.
 	if (!SDL_LockSurface(surface)) {
 		SDL_DestroySurface(surface);
 		stbi_image_free(pixels);
 		return NULL;
 	}
+
+	// Map each RGB pixel back to its palette index.
+	Uint32 lut_keys[256];
+	for (int ci = 0; ci < plte_count; ++ci)
+		lut_keys[ci] = ((Uint32)lut[ci].r << 16) | ((Uint32)lut[ci].g << 8) | lut[ci].b;
+
 	for (int y = 0; y < img_h; ++y) {
 		const stbi_uc* src_row = pixels + y * img_w * 3;
 		Uint8* dst_row = (Uint8*)surface->pixels + y * surface->pitch;
 		for (int x = 0; x < img_w; ++x) {
-			int r = src_row[x * 3], g = src_row[x * 3 + 1], b = src_row[x * 3 + 2];
+			Uint32 pix = ((Uint32)src_row[x * 3] << 16) | ((Uint32)src_row[x * 3 + 1] << 8) | src_row[x * 3 + 2];
 			Uint8 index = 0;
 			if (plte_count) {
-				// Exact match: stb_image expanded via this same PLTE.
 				for (int ci = 0; ci < plte_count; ++ci) {
-					if (plte[ci].r == r && plte[ci].g == g && plte[ci].b == b) {
+					if (lut_keys[ci] == pix) {
 						index = (Uint8)ci;
 						break;
 					}
 				}
 			} else if (pal_ptr) {
-				// Non-indexed PNG: quantize each 8-bit RGB pixel to the nearest of the
-				// 16 VGA palette colors (6-bit per channel, expanded to 8-bit via <<2).
+				// Nearest of the 16 VGA palette colors (6-bit per channel).
+				int r = (int)(pix >> 16), g = (int)((pix >> 8) & 0xFF), b = (int)(pix & 0xFF);
 				int best_dist = INT_MAX;
 				for (int ci = 0; ci < 16; ++ci) {
 					int dr = r - (pal_ptr->vga[ci].r << 2);
@@ -1007,8 +1050,10 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 			dst_row[x] = index;
 		}
 	}
+
 	SDL_UnlockSurface(surface);
 	stbi_image_free(pixels);
+
 	return surface;
 }
 
