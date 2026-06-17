@@ -2359,24 +2359,32 @@ bool determine_wave_version(sound_buffer_type *buffer, waveinfo_type* waveinfo) 
 sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
 	init_digi();
 	if (digi_unavailable) return NULL;
+
 	waveinfo_type waveinfo;
 	if (false == determine_wave_version(digi_buffer, &waveinfo)) return NULL;
 
-	float freq_ratio = (float)waveinfo.sample_rate /  (float)digi_audiospec->freq;
+	float freq_ratio = (float)waveinfo.sample_rate / (float)digi_audiospec->freq;
 
 	int source_length = waveinfo.sample_count;
-	// Using a 64-bit int - source_length (up to 65535) * freq (44100) overflows int32.
 	int expanded_frames = (int)((int64_t)source_length * digi_audiospec->freq / waveinfo.sample_rate);
-	int expanded_length = expanded_frames * 2 * sizeof(short);
-	sound_buffer_type* converted_buffer = malloc(sizeof(sound_buffer_type) + expanded_length);
+	int expanded_length = expanded_frames * digi_audiospec->channels * sizeof(short);
+
+	// Allocate struct.
+	sound_buffer_type* converted_buffer = malloc(sizeof(sound_buffer_type));
+	if (!converted_buffer) return NULL;
 
 	converted_buffer->type = sound_digi_converted;
 	converted_buffer->converted.length = expanded_length;
 
+	// Allocate sample data.
+	short* dest = malloc(expanded_length);
+	if (!dest) {
+		free(converted_buffer);
+		return NULL;
+	}
+	converted_buffer->converted.samples = dest;
+
 	byte* source = waveinfo.samples;
-	//short* dest = converted_buffer->converted.samples;
-	short* dest = malloc(sizeof(short) * converted_buffer->converted.length);
-        converted_buffer->converted.samples = dest;
 
 	for (int i = 0; i < expanded_frames; ++i) {
 		float src_frame_float = i * freq_ratio;
@@ -2384,7 +2392,8 @@ sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
 
 		int sample_0 = (source[src_frame_0] | (source[src_frame_0] << 8)) - 32768;
 		short interpolated_sample;
-		if (src_frame_0 >= waveinfo.sample_count-1) {
+
+		if (src_frame_0 >= waveinfo.sample_count - 1) {
 			interpolated_sample = (short)sample_0;
 		} else {
 			int src_frame_1 = src_frame_0 + 1;
@@ -2392,6 +2401,7 @@ sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
 			int sample_1 = (source[src_frame_1] | (source[src_frame_1] << 8)) - 32768;
 			interpolated_sample = (short)((1.0f - alpha) * sample_0 + alpha * sample_1);
 		}
+
 		for (int channel = 0; channel < digi_audiospec->channels; ++channel) {
 			*dest++ = interpolated_sample;
 		}
@@ -2426,7 +2436,11 @@ void free_sound(sound_buffer_type* buffer) {
 	if (buffer->type == sound_ogg) {
 		stb_vorbis_close(buffer->ogg.decoder);
 		free(buffer->ogg.file_contents);
+	} else if ((buffer->type & 7) == sound_digi_converted) {
+		free(buffer->converted.samples);
+		buffer->converted.samples = NULL;
 	}
+
 	free(buffer);
 }
 
