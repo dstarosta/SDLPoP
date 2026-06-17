@@ -84,11 +84,11 @@ extern word cplevel_entr[14];
 extern dialog_type* copyprot_dialog;
 // data:2944
 extern dialog_settings_type dialog_settings
-	INIT(= {
-		add_dialog_rect,
-		dialog_method_2_frame,
-		4, 4, 4, 4, 3, 4, 1
-	});
+INIT(= {
+	add_dialog_rect,
+	dialog_method_2_frame,
+	4, 4, 4, 4, 3, 4, 1
+});
 // data:2B76
 extern rect_type dialog_rect_1 INIT(= {60, 56, 124, 264});
 // data:2B7E
@@ -125,22 +125,22 @@ extern word current_level INIT(= -1);
 extern byte graphics_mode INIT(= 0);
 // data:2BA6
 #define VGA_PALETTE_DEFAULT { \
-	{0x00, 0x00, 0x00},\
-	{0x00, 0x00, 0x2A},\
-	{0x00, 0x2A, 0x00},\
-	{0x00, 0x2A, 0x2A},\
-	{0x2A, 0x00, 0x00},\
-	{0x2A, 0x00, 0x2A},\
-	{0x2A, 0x15, 0x00},\
-	{0x2A, 0x2A, 0x2A},\
-	{0x15, 0x15, 0x15},\
-	{0x15, 0x15, 0x3F},\
-	{0x15, 0x3F, 0x15},\
-	{0x15, 0x3F, 0x3F},\
-	{0x3F, 0x15, 0x15},\
-	{0x3F, 0x15, 0x3F},\
-	{0x3F, 0x3F, 0x15},\
-	{0x3F, 0x3F, 0x3F},}
+		{0x00, 0x00, 0x00},\
+		{0x00, 0x00, 0x2A},\
+		{0x00, 0x2A, 0x00},\
+		{0x00, 0x2A, 0x2A},\
+		{0x2A, 0x00, 0x00},\
+		{0x2A, 0x00, 0x2A},\
+		{0x2A, 0x15, 0x00},\
+		{0x2A, 0x2A, 0x2A},\
+		{0x15, 0x15, 0x15},\
+		{0x15, 0x15, 0x3F},\
+		{0x15, 0x3F, 0x15},\
+		{0x15, 0x3F, 0x3F},\
+		{0x3F, 0x15, 0x15},\
+		{0x3F, 0x15, 0x3F},\
+		{0x3F, 0x3F, 0x15},\
+		{0x3F, 0x3F, 0x3F},}
 // data:4CC0
 extern word room_L;
 // data:4CCE
@@ -747,6 +747,7 @@ extern byte use_hardware_acceleration INIT(= 2);
 extern byte use_correct_aspect_ratio INIT(= 0);
 extern byte use_integer_scaling INIT(= 0);
 extern byte scaling_type INIT(= 0);
+extern char mt32_rom_path[POP_MAX_PATH] INIT(= "roms");
 extern int mt32_dac INIT(= 2);
 extern int mt32_quality INIT(= 2);
 extern byte mt32_reverb INIT(= 1);
@@ -760,156 +761,178 @@ extern fixes_options_type* fixes INIT(= &fixes_disabled_state);
 extern byte use_custom_options;
 extern custom_options_type custom_saved;
 extern custom_options_type custom_defaults INIT(= {
-		.start_minutes_left = 60,
-		.start_ticks_left = 719,
-		.start_hitp = 3,
-		.max_hitp_allowed = 10,
-		.saving_allowed_first_level = 3,
-		.saving_allowed_last_level = 13,
-		.start_upside_down = 0,
-		.start_in_blind_mode = 0,
-		// data:009E
-		.copyprot_level = 2,
-		.drawn_tile_top_level_edge = tiles_1_floor,
-		.drawn_tile_left_level_edge = tiles_20_wall,
-		.level_edge_hit_tile = tiles_20_wall,
-		.allow_triggering_any_tile = 0,
-		.enable_wda_in_palace = 0,
-		.vga_palette = VGA_PALETTE_DEFAULT,
-		.first_level = 1,
-		.skip_title = 0,
-		.shift_L_allowed_until_level = 4,
-		.shift_L_reduced_minutes = 15,
-		.shift_L_reduced_ticks  = 719,
-		.demo_hitp = 4,
-		.demo_end_room = 24,
-		.intro_music_level = 1,
-		.have_sword_from_level = 2,
-		.checkpoint_level = 3,
-		.checkpoint_respawn_dir = dir_FF_left,
-		.checkpoint_respawn_room = 2,
-		.checkpoint_respawn_tilepos = 6,
-		.checkpoint_clear_tile_room = 7,
-		.checkpoint_clear_tile_col = 4,
-		.checkpoint_clear_tile_row = 0,
-		.skeleton_level = 3,
-		.skeleton_room = 1,
-		.skeleton_trigger_column_1 = 2,
-		.skeleton_trigger_column_2 = 3,
-		.skeleton_column = 5,
-		.skeleton_row = 1,
-		.skeleton_require_open_level_door = 1,
-		.skeleton_skill = 2,
-		.skeleton_reappear_room = 3,
-		.skeleton_reappear_x = 133,
-		.skeleton_reappear_row = 1,
-		.skeleton_reappear_dir = dir_0_right,
-		.mirror_level = 4,
-		.mirror_room = 4,
-		.mirror_column = 4,
-		.mirror_row = 0,
-		.mirror_tile = tiles_13_mirror,
-		.show_mirror_image = 1,
+	.start_minutes_left = 60,
+	.start_ticks_left = 719,
+	.start_hitp = 3,
+	.max_hitp_allowed = 10,
+	.saving_allowed_first_level = 3,
+	.saving_allowed_last_level = 13,
+	.start_upside_down = 0,
+	.start_in_blind_mode = 0,
+	// data:009E
+	.copyprot_level = 2,
+	.drawn_tile_top_level_edge = tiles_1_floor,
+	.drawn_tile_left_level_edge = tiles_20_wall,
+	.level_edge_hit_tile = tiles_20_wall,
+	.allow_triggering_any_tile = 0,
+	.enable_wda_in_palace = 0,
+	.vga_palette = VGA_PALETTE_DEFAULT,
+	.first_level = 1,
+	.skip_title = 0,
+	.shift_L_allowed_until_level = 4,
+	.shift_L_reduced_minutes = 15,
+	.shift_L_reduced_ticks  = 719,
+	.demo_hitp = 4,
+	.demo_end_room = 24,
+	.intro_music_level = 1,
+	.have_sword_from_level = 2,
+	.checkpoint_level = 3,
+	.checkpoint_respawn_dir = dir_FF_left,
+	.checkpoint_respawn_room = 2,
+	.checkpoint_respawn_tilepos = 6,
+	.checkpoint_clear_tile_room = 7,
+	.checkpoint_clear_tile_col = 4,
+	.checkpoint_clear_tile_row = 0,
+	.skeleton_level = 3,
+	.skeleton_room = 1,
+	.skeleton_trigger_column_1 = 2,
+	.skeleton_trigger_column_2 = 3,
+	.skeleton_column = 5,
+	.skeleton_row = 1,
+	.skeleton_require_open_level_door = 1,
+	.skeleton_skill = 2,
+	.skeleton_reappear_room = 3,
+	.skeleton_reappear_x = 133,
+	.skeleton_reappear_row = 1,
+	.skeleton_reappear_dir = dir_0_right,
+	.mirror_level = 4,
+	.mirror_room = 4,
+	.mirror_column = 4,
+	.mirror_row = 0,
+	.mirror_tile = tiles_13_mirror,
+	.show_mirror_image = 1,
 
-		.shadow_steal_level = 5,
-		.shadow_steal_room = 24,
-		.shadow_step_level = 6,
-		.shadow_step_room = 1,
+	.shadow_steal_level = 5,
+	.shadow_steal_room = 24,
+	.shadow_step_level = 6,
+	.shadow_step_room = 1,
 
-		.falling_exit_level = 6,
-		.falling_exit_room = 1,
-		.falling_entry_level = 7,
-		.falling_entry_room = 17,
-		.mouse_level = 8,
-		.mouse_room = 16,
-		.mouse_delay = 150,
-		.mouse_object = 24,
-		.mouse_start_x = 200,
-		.loose_tiles_level = 13,
-		.loose_tiles_room_1 = 23,
-		.loose_tiles_room_2 = 16,
-		.loose_tiles_first_tile = 22,
-		.loose_tiles_last_tile = 27,
-		.jaffar_victory_level = 13,
-		.jaffar_victory_flash_time = 18,
-		.hide_level_number_from_level = 14,
-		.level_13_level_number = 12,
-		.victory_stops_time_level = 13,
-		.win_level = 14,
-		.win_room = 5,
-		.loose_floor_delay = 11,
-		// data:02B2
-		.tbl_level_type = {0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0},
-		// 1.3
-		.tbl_level_color = {0, 0, 0, 1, 0, 0, 0, 1, 2, 2, 0, 0, 3, 3, 4, 0},
-		// data:03D4
-		.tbl_guard_type = {0, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 4, 3, -1, -1},
-		// data:0EDA
-		.tbl_guard_hp = {4, 3, 3, 3, 3, 4, 5, 4, 4, 5, 5, 5, 4, 6, 0, 0},
-		.tbl_cutscenes_by_index = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-		.tbl_entry_pose = {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0},
-		.tbl_seamless_exit = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 23, -1, -1, -1},
+	.falling_exit_level = 6,
+	.falling_exit_room = 1,
+	.falling_entry_level = 7,
+	.falling_entry_room = 17,
+	.mouse_level = 8,
+	.mouse_room = 16,
+	.mouse_delay = 150,
+	.mouse_object = 24,
+	.mouse_start_x = 200,
+	.loose_tiles_level = 13,
+	.loose_tiles_room_1 = 23,
+	.loose_tiles_room_2 = 16,
+	.loose_tiles_first_tile = 22,
+	.loose_tiles_last_tile = 27,
+	.jaffar_victory_level = 13,
+	.jaffar_victory_flash_time = 18,
+	.hide_level_number_from_level = 14,
+	.level_13_level_number = 12,
+	.victory_stops_time_level = 13,
+	.win_level = 14,
+	.win_room = 5,
+	.loose_floor_delay = 11,
+	// data:02B2
+	.tbl_level_type = {0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0},
+	// 1.3
+	.tbl_level_color = {0, 0, 0, 1, 0, 0, 0, 1, 2, 2, 0, 0, 3, 3, 4, 0},
+	// data:03D4
+	.tbl_guard_type = {0, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 4, 3, -1, -1},
+	// data:0EDA
+	.tbl_guard_hp = {4, 3, 3, 3, 3, 4, 5, 4, 4, 5, 5, 5, 4, 6, 0, 0},
+	.tbl_cutscenes_by_index = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+	.tbl_entry_pose = {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0},
+	.tbl_seamless_exit = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 23, -1, -1, -1},
 
-		// guard skills
-		.strikeprob    = { 61,100, 61, 61, 61, 40,100,220,  0, 48, 32, 48},
-		.restrikeprob  = {  0,  0,  0,  5,  5,175, 16,  8,  0,255,255,150},
-		.blockprob     = {  0,150,150,200,200,255,200,250,  0,255,255,255},
-		.impblockprob  = {  0, 61, 61,100,100,145,100,250,  0,145,255,175},
-		.advprob       = {255,200,200,200,255,255,200,  0,  0,255,100,100},
-		.refractimer   = { 16, 16, 16, 16,  8,  8,  8,  8,  0,  8,  0,  0},
-		.extrastrength = {  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0},
+	// guard skills
+	.strikeprob    = { 61,100, 61, 61, 61, 40,100,220,  0, 48, 32, 48},
+	.restrikeprob  = {  0,  0,  0,  5,  5,175, 16,  8,  0,255,255,150},
+	.blockprob     = {  0,150,150,200,200,255,200,250,  0,255,255,255},
+	.impblockprob  = {  0, 61, 61,100,100,145,100,250,  0,145,255,175},
+	.advprob       = {255,200,200,200,255,255,200,  0,  0,255,100,100},
+	.refractimer   = { 16, 16, 16, 16,  8,  8,  8,  8,  0,  8,  0,  0},
+	.extrastrength = {  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0},
 
-		// shadow's starting positions
-		.init_shad_6 = {0x0F, 0x51, 0x76, 0, 0, 1, 0, 0},
-		.init_shad_5  = {0x0F, 0x37, 0x37, 0, 0xFF, 0, 0, 0},
-		.init_shad_12 = {0x0F, 0x51, 0xE8, 0, 0, 0, 0, 0},
-		// automatic moves
-		.demo_moves = {{0x00, 0}, {0x01, 1}, {0x0D, 0}, {0x1E, 1}, {0x25, 5}, {0x2F, 0}, {0x30, 1}, {0x41, 0}, {0x49, 2}, {0x4B, 0}, {0x63, 2}, {0x64, 0}, {0x73, 5}, {0x80, 6}, {0x88, 3}, {0x9D, 7}, {0x9E, 0}, {0x9F, 1}, {0xAB, 4}, {0xB1, 0}, {0xB2, 1}, {0xBC, 0}, {0xC1, 1}, {0xCD, 0}, {0xE9,-1}},
-		.shad_drink_move = {{0x00, 0}, {0x01, 1}, {0x0E, 0}, {0x12, 6}, {0x1D, 7}, {0x2D, 2}, {0x31, 1}, {0xFF,-2}},
+	// shadow's starting positions
+	.init_shad_6 = {0x0F, 0x51, 0x76, 0, 0, 1, 0, 0},
+	.init_shad_5  = {0x0F, 0x37, 0x37, 0, 0xFF, 0, 0, 0},
+	.init_shad_12 = {0x0F, 0x51, 0xE8, 0, 0, 0, 0, 0},
+	// automatic moves
+	.demo_moves = {{0x00, 0}, {0x01, 1}, {0x0D, 0}, {0x1E, 1}, {0x25, 5}, {0x2F, 0}, {0x30, 1}, {0x41, 0}, {0x49, 2}, {0x4B, 0}, {0x63, 2}, {0x64, 0}, {0x73, 5}, {0x80, 6}, {0x88, 3}, {0x9D, 7}, {0x9E, 0}, {0x9F, 1}, {0xAB, 4}, {0xB1, 0}, {0xB2, 1}, {0xBC, 0}, {0xC1, 1}, {0xCD, 0}, {0xE9,-1}},
+	.shad_drink_move = {{0x00, 0}, {0x01, 1}, {0x0E, 0}, {0x12, 6}, {0x1D, 7}, {0x2D, 2}, {0x31, 1}, {0xFF,-2}},
 
-		// speeds
-		.base_speed = 5,
-		.fight_speed = 6,
-		.chomper_speed = 15,
+	// speeds
+	.base_speed = 5,
+	.fight_speed = 6,
+	.chomper_speed = 15,
 
-		.no_mouse_in_ending = 0,
+	.no_mouse_in_ending = 0,
 });
 extern custom_options_type* custom INIT(= &custom_defaults);
 
 extern full_image_type full_image[MAX_FULL_IMAGES] INIT(= {
-        [TITLE_MAIN] =     { .id = 0, .chtab = &chtab_title50,
-                             .blitter = blitters_0_no_transp,
-                             .xpos = 0, .ypos = 0 },
-        [TITLE_PRESENTS] = { .id = 1, .chtab = &chtab_title50,
-                             .blitter = blitters_0_no_transp,
-                             .xpos = 96, .ypos = 106 },
-        [TITLE_GAME] =     { .id = 2, .chtab = &chtab_title50,
-                             .blitter = blitters_0_no_transp,
-                             .xpos = 96, .ypos = 122 },
-        [TITLE_POP] =      { .id = 3, .chtab = &chtab_title50,
-                             .blitter = blitters_10h_transp,
-                             .xpos = 24, .ypos = 107 },
-        [TITLE_MECHNER] =  { .id = 4, .chtab = &chtab_title50,
-                             .blitter = blitters_0_no_transp,
-                             .xpos = 48, .ypos = 184 },
-        [HOF_POP] =        { .id = 3, .chtab = &chtab_title50,
-                             .blitter = blitters_10h_transp,
-                             .xpos = 24, .ypos = 24 },
-        [STORY_FRAME] =    { .id = 0, .chtab = &chtab_title40,
-                             .blitter = blitters_0_no_transp,
-                             .xpos = 0, .ypos = 0 },
-        [STORY_ABSENCE] =  { .id = 1, .chtab = &chtab_title40,
-                             .blitter = blitters_white,
-                             .xpos = 24, .ypos = 25 },
-        [STORY_MARRY] =    { .id = 2, .chtab = &chtab_title40,
-                             .blitter = blitters_white,
-                             .xpos = 24, .ypos = 25 },
-        [STORY_HAIL] =     { .id = 3, .chtab = &chtab_title40,
-                             .blitter = blitters_white,
-                             .xpos = 24, .ypos = 25 },
-        [STORY_CREDITS] =  { .id = 4, .chtab = &chtab_title40,
-                             .blitter = blitters_white,
-                             .xpos = 24, .ypos = 26 },
+	[TITLE_MAIN] =     {
+		.id = 0, .chtab = &chtab_title50,
+		.blitter = blitters_0_no_transp,
+		.xpos = 0, .ypos = 0
+	},
+	[TITLE_PRESENTS] = {
+		.id = 1, .chtab = &chtab_title50,
+		.blitter = blitters_0_no_transp,
+		.xpos = 96, .ypos = 106
+	},
+	[TITLE_GAME] =     {
+		.id = 2, .chtab = &chtab_title50,
+		.blitter = blitters_0_no_transp,
+		.xpos = 96, .ypos = 122
+	},
+	[TITLE_POP] =      {
+		.id = 3, .chtab = &chtab_title50,
+		.blitter = blitters_10h_transp,
+		.xpos = 24, .ypos = 107
+	},
+	[TITLE_MECHNER] =  {
+		.id = 4, .chtab = &chtab_title50,
+		.blitter = blitters_0_no_transp,
+		.xpos = 48, .ypos = 184
+	},
+	[HOF_POP] =        {
+		.id = 3, .chtab = &chtab_title50,
+		.blitter = blitters_10h_transp,
+		.xpos = 24, .ypos = 24
+	},
+	[STORY_FRAME] =    {
+		.id = 0, .chtab = &chtab_title40,
+		.blitter = blitters_0_no_transp,
+		.xpos = 0, .ypos = 0
+	},
+	[STORY_ABSENCE] =  {
+		.id = 1, .chtab = &chtab_title40,
+		.blitter = blitters_white,
+		.xpos = 24, .ypos = 25
+	},
+	[STORY_MARRY] =    {
+		.id = 2, .chtab = &chtab_title40,
+		.blitter = blitters_white,
+		.xpos = 24, .ypos = 25
+	},
+	[STORY_HAIL] =     {
+		.id = 3, .chtab = &chtab_title40,
+		.blitter = blitters_white,
+		.xpos = 24, .ypos = 25
+	},
+	[STORY_CREDITS] =  {
+		.id = 4, .chtab = &chtab_title40,
+		.blitter = blitters_white,
+		.xpos = 24, .ypos = 26
+	},
 });
 
 // data:009C

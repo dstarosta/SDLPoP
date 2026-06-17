@@ -14,8 +14,8 @@ straight to the emulator, so it sounds exactly like the original Roland hardware
 instruments. No sample bank, no pitch-shifting.
 
 The MT-32/CM-32L ROMs are NOT shipped (they are copyrighted). The user drops their own
-licensed ROM files into SDLPoP's "data/roms" folder (see MT32_ROM_DIR in config.h),
-DOSBox-style. Both a CM-32L pair and an MT-32 pair are accepted; the emulator identifies
+licensed ROM files into the folder set by "mt32_rom_path" in SDLPoP.ini (default "roms",
+relative to the executable).
 
 */
 

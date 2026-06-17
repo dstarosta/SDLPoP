@@ -21,9 +21,9 @@ The authors of this program may be contacted at https://forum.princed.org
 #include "common.h"
 #include <ctype.h>
 #ifdef __amigaos4__
-	#define strtoimax(a,b,c) strtoll(a,b,c)
+#define strtoimax(a,b,c) strtoll(a,b,c)
 #else
-	#include <inttypes.h>
+#include <inttypes.h>
 #endif
 
 
@@ -45,8 +45,7 @@ void turn_custom_options_on_off(byte new_state) {
  * return - return 0 on success
  */
 int ini_load(const char *filename,
-             int (*report)(const char *section, const char *name, const char *value))
-{
+             int (*report)(const char *section, const char *name, const char *value)) {
 	char name[64];
 	char value[256];
 	char section[128] = "";
@@ -71,7 +70,7 @@ int ini_load(const char *filename,
 			report(section, name, value);
 		}
 		if (fscanf(f, " ;%*[^\n]") != 0 ||
-		    fscanf(f, " \n") != 0) {
+		        fscanf(f, " \n") != 0) {
 			fprintf(stderr, "short read from %s!?\n", filename);
 			fclose(f);
 			return -1;
@@ -88,13 +87,13 @@ NAMES_LIST(level_type_names, {"dungeon", "palace"});
 // NAMES_LIST must start from 0, so I need KEY_VALUE_LIST if I want to assign a name to -1.
 KEY_VALUE_LIST(guard_type_names, {{"none", -1}, {"guard", 0}, {"fat", 1}, {"skel", 2}, {"vizier", 3}, {"shadow", 4}});
 NAMES_LIST(tile_type_names, {
-				"empty", "floor", "spike", "pillar", "gate",                                        // 0..4
-				"stuck", "closer", "doortop_with_floor", "bigpillar_bottom", "bigpillar_top",       // 5..9
-				"potion", "loose", "doortop", "mirror", "debris",                                   // 10..14
-				"opener", "level_door_left", "level_door_right", "chomper", "torch",                // 15..19
-				"wall", "skeleton", "sword", "balcony_left", "balcony_right",                       // 20..24
-				"lattice_pillar", "lattice_down", "lattice_small", "lattice_left", "lattice_right", // 25..29
-				"torch_with_debris", // 30
+	"empty", "floor", "spike", "pillar", "gate",                                        // 0..4
+	"stuck", "closer", "doortop_with_floor", "bigpillar_bottom", "bigpillar_top",       // 5..9
+	"potion", "loose", "doortop", "mirror", "debris",                                   // 10..14
+	"opener", "level_door_left", "level_door_right", "chomper", "torch",                // 15..19
+	"wall", "skeleton", "sword", "balcony_left", "balcony_right",                       // 20..24
+	"lattice_pillar", "lattice_down", "lattice_small", "lattice_left", "lattice_right", // 25..29
+	"torch_with_debris", // 30
 });
 NAMES_LIST(scaling_type_names, {"sharp", "fuzzy", "blurry"});
 NAMES_LIST(row_names, {"top", "middle", "bottom"});
@@ -133,45 +132,44 @@ static int ini_process_boolean(const char* curr_name, const char* value, const c
 }
 
 #define ini_process_numeric_func(data_type) \
-static int ini_process_##data_type(const char* curr_name, const char* value, const char* option_name, data_type* target, names_list_type* value_names) { \
-	if(strcasecmp(curr_name, option_name) == 0) { \
-		if (strcasecmp(value, "default") != 0) { \
-			int named_value = ini_get_named_value(value, value_names); \
-			*target = (named_value == INI_NO_VALID_NAME) ? ((data_type) strtoimax(value, NULL, 0)) : ((data_type) named_value); \
+	static int ini_process_##data_type(const char* curr_name, const char* value, const char* option_name, data_type* target, names_list_type* value_names) { \
+		if(strcasecmp(curr_name, option_name) == 0) { \
+			if (strcasecmp(value, "default") != 0) { \
+				int named_value = ini_get_named_value(value, value_names); \
+				*target = (named_value == INI_NO_VALID_NAME) ? ((data_type) strtoimax(value, NULL, 0)) : ((data_type) named_value); \
+			} \
+			return 1; /* finished; don't look for more possible options that curr_name can be */ \
 		} \
-		return 1; /* finished; don't look for more possible options that curr_name can be */ \
-	} \
-	return 0; /* not the right option; should check another option_name */ \
-}
+		return 0; /* not the right option; should check another option_name */ \
+	}
 ini_process_numeric_func(word)
 ini_process_numeric_func(short)
 ini_process_numeric_func(byte)
 ini_process_numeric_func(sbyte)
 ini_process_numeric_func(int)
 
-static int global_ini_callback(const char *section, const char *name, const char *value)
-{
+static int global_ini_callback(const char *section, const char *name, const char *value) {
 	//fprintf(stdout, "[%s] '%s'='%s'\n", section, name, value);
 
-	#define check_ini_section(section_name)    (strcasecmp(section, section_name) == 0)
+#define check_ini_section(section_name)    (strcasecmp(section, section_name) == 0)
 
 	// Make sure that we return successfully as soon as name matches the correct option_name
-	#define process_word(option_name, target, value_names)                           \
+#define process_word(option_name, target, value_names)                           \
 	if (ini_process_word(name, value, option_name, target, value_names)) return 1;
 
-	#define process_short(option_name, target, value_names)                           \
+#define process_short(option_name, target, value_names)                           \
 	if (ini_process_short(name, value, option_name, target, value_names)) return 1;
 
-	#define process_byte(option_name, target, value_names)                           \
+#define process_byte(option_name, target, value_names)                           \
 	if (ini_process_byte(name, value, option_name, target, value_names)) return 1;
 
-	#define process_sbyte(option_name, target, value_names)                           \
+#define process_sbyte(option_name, target, value_names)                           \
 	if (ini_process_sbyte(name, value, option_name, target, value_names)) return 1;
 
-	#define process_int(option_name, target, value_names)                           \
+#define process_int(option_name, target, value_names)                           \
 	if (ini_process_int(name, value, option_name, target, value_names)) return 1;
 
-	#define process_boolean(option_name, target)                        \
+#define process_boolean(option_name, target)                        \
 	if (ini_process_boolean(name, value, option_name, target)) return 1;
 
 	if (check_ini_section("General")) {
@@ -197,9 +195,35 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_boolean("use_correct_aspect_ratio", &use_correct_aspect_ratio);
 		process_boolean("use_integer_scaling", &use_integer_scaling);
 		process_byte("scaling_type", &scaling_type, &scaling_type_names_list);
-        process_int("mt32_dac", &mt32_dac, NULL);
-        process_int("mt32_quality", &mt32_quality, NULL);
-        process_boolean("mt32_reverb", &mt32_reverb);
+		process_int("mt32_dac", &mt32_dac, NULL);
+		process_int("mt32_quality", &mt32_quality, NULL);
+		process_boolean("mt32_reverb", &mt32_reverb);
+
+		if (strcasecmp(name, "mt32_rom_path") == 0) {
+			// Supports both, relative (to the executable) and absolute, paths.
+			// The value may be wrapped in double quotes (so paths with spaces work).
+			// - No value (empty or "default"): keep the default ("roms").
+			// - A path that resolves to an existing directory: use it.
+			char path[POP_MAX_PATH];
+			snprintf_check(path, sizeof(path), "%s", value);
+			size_t len = strlen(path);
+			if (len >= 2 && path[0] == '"' && path[len - 1] == '"') {
+				memmove(path, path + 1, len - 2);
+				path[len - 2] = '\0';
+			}
+			if (path[0] != '\0' && strcasecmp(path, "default") != 0) {
+				const char* located = locate_file(path);
+				struct stat info;
+				if (stat(located, &info) == 0 && S_ISDIR(info.st_mode)) {
+					snprintf_check(mt32_rom_path, sizeof(mt32_rom_path), "%s", located);
+				} else {
+					// Configured path does not resolve to a folder -> force OPL.
+					mt32_rom_path[0] = '\0';
+				}
+			}
+			return 1;
+		}
+
 		process_boolean("enable_controller_rumble", &enable_controller_rumble);
 		process_boolean("joystick_only_horizontal", &joystick_only_horizontal);
 		process_int("joystick_threshold", &joystick_threshold, NULL);
@@ -461,11 +485,11 @@ static int global_ini_callback(const char *section, const char *name, const char
 // Callback for a mod-specific INI configuration (that may overrule SDLPoP.ini for SOME but not all options):
 static int mod_ini_callback(const char *section, const char *name, const char *value) {
 	if (check_ini_section("Enhancements") || check_ini_section("CustomGameplay") ||
-		strncasecmp(section, "Level ", 6) == 0 ||
-		strcasecmp(name, "enable_copyprot") == 0 ||
-		strcasecmp(name, "enable_quicksave") == 0 ||
-		strcasecmp(name, "enable_quicksave_penalty") == 0
-	) {
+	        strncasecmp(section, "Level ", 6) == 0 ||
+	        strcasecmp(name, "enable_copyprot") == 0 ||
+	        strcasecmp(name, "enable_quicksave") == 0 ||
+	        strcasecmp(name, "enable_quicksave_penalty") == 0
+	   ) {
 		global_ini_callback(section, name, value);
 	}
 	return 0;
@@ -486,9 +510,9 @@ void set_options_to_default() {
 	use_correct_aspect_ratio = 0;
 	use_integer_scaling = 0;
 	scaling_type = 0;
-    mt32_dac = 2;
-    mt32_quality = 2;
-    mt32_reverb = 1;
+	mt32_dac = 2;
+	mt32_quality = 2;
+	mt32_reverb = 1;
 	enable_controller_rumble = 1;
 	joystick_only_horizontal = 1;
 	joystick_threshold = 8000;
@@ -544,13 +568,26 @@ bool read_exe_bytes(void* dest, size_t nbytes, byte* exe_memory, int exe_offset,
 int identify_dos_exe_version(int filesize) {
 	int dos_version = -1;
 	switch (filesize) {
-		case 123335: dos_version = dos_10_packed; break;
-		case 125115: dos_version = dos_13_packed; break;
-		case 110855: dos_version = dos_14_packed; break;
-		case 129504: dos_version = dos_10_unpacked; break;
-		case 129472: dos_version = dos_13_unpacked; break;
-		case 115008: dos_version = dos_14_unpacked; break;
-		default: break;
+		case 123335:
+			dos_version = dos_10_packed;
+			break;
+		case 125115:
+			dos_version = dos_13_packed;
+			break;
+		case 110855:
+			dos_version = dos_14_packed;
+			break;
+		case 129504:
+			dos_version = dos_10_unpacked;
+			break;
+		case 129472:
+			dos_version = dos_13_unpacked;
+			break;
+		case 115008:
+			dos_version = dos_14_unpacked;
+			break;
+		default:
+			break;
 	}
 	return dos_version;
 }
@@ -600,11 +637,11 @@ void load_dos_exe_modifications(const char* folder_name) {
 		bool read_ok;
 
 #define process(x, nbytes, ...) \
-		do { \
-			static const int offsets[6] = __VA_ARGS__; \
-			int offset = offsets[dos_version]; \
-			read_ok = read_exe_bytes(x, nbytes, exe_memory, offset, (int)info.st_size); \
-		} while(0)
+	do { \
+		static const int offsets[6] = __VA_ARGS__; \
+		int offset = offsets[dos_version]; \
+		read_ok = read_exe_bytes(x, nbytes, exe_memory, offset, (int)info.st_size); \
+	} while(0)
 
 		// Offsets and comparisons are derived from princehack.xml
 		process(&custom_saved.start_minutes_left, 2, {0x04a23, 0x060d3, 0x04ea3, 0x055e3, 0x0495f, 0x05a8f});
@@ -618,7 +655,8 @@ void load_dos_exe_modifications(const char* folder_name) {
 		if (read_ok) custom_saved.saving_allowed_last_level -= 1;
 		if (dos_version == dos_10_packed || dos_version == dos_10_unpacked) {
 			static const byte comparison[] = {0xa3, 0x92, 0x4e, 0xa3, 0x5c, 0x40, 0xa3, 0x8e, 0x4e, 0xa2, 0x2a,
-			                                  0x3d, 0xa2, 0x29, 0x3d, 0xa3, 0xee, 0x42, 0xa2, 0x2e, 0x3d, 0x98};
+			                                  0x3d, 0xa2, 0x29, 0x3d, 0xa3, 0xee, 0x42, 0xa2, 0x2e, 0x3d, 0x98
+			                                 };
 			process(temp_bytes, COUNT(comparison), {0x04c9b, 0x0634b, -1, -1, -1, -1});
 			custom_saved.start_upside_down = (memcmp(temp_bytes, comparison, COUNT(comparison)) != 0);
 		}
@@ -629,9 +667,9 @@ void load_dos_exe_modifications(const char* folder_name) {
 		process(&custom_saved.level_edge_hit_tile, 1, {0x06f02, 0x085b2, -1, -1, -1, -1});
 		process(temp_bytes, 2, {0x9111, 0xA7C1, 0x95BE, 0x9CFE, 0x907A, 0xA1AA}); // allow triggering any tile
 		if (read_ok) {
-			custom_saved.allow_triggering_any_tile = 
-				(temp_bytes[0] == 0x75 && temp_bytes[1] == 0x13) ||
-				(temp_bytes[0] == 0x90 && temp_bytes[1] == 0x90); // used in Micro Palace
+			custom_saved.allow_triggering_any_tile =
+			    (temp_bytes[0] == 0x75 && temp_bytes[1] == 0x13) ||
+			    (temp_bytes[0] == 0x90 && temp_bytes[1] == 0x90); // used in Micro Palace
 		}
 		process(temp_bytes, 1, {0x0a7bb, 0x0be6b, 0x0ac67, 0x0b3a7, 0x0a723, 0x0b853}); // enable WDA in palace
 		if (read_ok) custom_saved.enable_wda_in_palace = (temp_bytes[0] != 116);
@@ -750,30 +788,30 @@ void load_dos_exe_modifications(const char* folder_name) {
 		process(&custom_saved.loose_floor_delay, 1, {0x9536, 0xABE6, -1, -1, -1, -1});
 
 		// guard skills
-		process(&custom_saved.strikeprob   , 2*NUM_GUARD_SKILLS, {-1, 0x1D3C2, -1, 0x1D2B4, -1, 0x19C5E});
-		process(&custom_saved.restrikeprob , 2*NUM_GUARD_SKILLS, {-1, 0x1D3DA, -1, 0x1D2CC, -1, 0x19C76});
-		process(&custom_saved.blockprob    , 2*NUM_GUARD_SKILLS, {-1, 0x1D3F2, -1, 0x1D2E4, -1, 0x19C8E});
-		process(&custom_saved.impblockprob , 2*NUM_GUARD_SKILLS, {-1, 0x1D40A, -1, 0x1D2FC, -1, 0x19CA6});
-		process(&custom_saved.advprob      , 2*NUM_GUARD_SKILLS, {-1, 0x1D422, -1, 0x1D314, -1, 0x19CBE});
-		process(&custom_saved.refractimer  , 2*NUM_GUARD_SKILLS, {-1, 0x1D43A, -1, 0x1D32C, -1, 0x19CD6});
+		process(&custom_saved.strikeprob, 2*NUM_GUARD_SKILLS, {-1, 0x1D3C2, -1, 0x1D2B4, -1, 0x19C5E});
+		process(&custom_saved.restrikeprob, 2*NUM_GUARD_SKILLS, {-1, 0x1D3DA, -1, 0x1D2CC, -1, 0x19C76});
+		process(&custom_saved.blockprob, 2*NUM_GUARD_SKILLS, {-1, 0x1D3F2, -1, 0x1D2E4, -1, 0x19C8E});
+		process(&custom_saved.impblockprob, 2*NUM_GUARD_SKILLS, {-1, 0x1D40A, -1, 0x1D2FC, -1, 0x19CA6});
+		process(&custom_saved.advprob, 2*NUM_GUARD_SKILLS, {-1, 0x1D422, -1, 0x1D314, -1, 0x19CBE});
+		process(&custom_saved.refractimer, 2*NUM_GUARD_SKILLS, {-1, 0x1D43A, -1, 0x1D32C, -1, 0x19CD6});
 		process(&custom_saved.extrastrength, 2*NUM_GUARD_SKILLS, {-1, 0x1D452, -1, 0x1D344, -1, 0x19CEE});
 
 		// shadow's starting positions
-		process(&custom_saved.init_shad_6    , 8, {0x1B8B8, 0x1D47A, 0x1C6D5, 0x1D36C, 0x18AA7, 0x19D16});
-		process(&custom_saved.init_shad_5    , 8, {0x1B8C0, 0x1D482, 0x1C6DD, 0x1D374, 0x18AAF, 0x19D1E});
-		process(&custom_saved.init_shad_12   , 8, {     -1, 0x1D48A,      -1, 0x1D37C,      -1, 0x19D26}); // in the packed versions, the five zero bytes at the end are compressed
+		process(&custom_saved.init_shad_6, 8, {0x1B8B8, 0x1D47A, 0x1C6D5, 0x1D36C, 0x18AA7, 0x19D16});
+		process(&custom_saved.init_shad_5, 8, {0x1B8C0, 0x1D482, 0x1C6DD, 0x1D374, 0x18AAF, 0x19D1E});
+		process(&custom_saved.init_shad_12, 8, {     -1, 0x1D48A,      -1, 0x1D37C,      -1, 0x19D26});    // in the packed versions, the five zero bytes at the end are compressed
 		// automatic moves
 		process(&custom_saved.shad_drink_move,  8*4, {     -1, 0x1D492,      -1, 0x1D384,      -1, 0x19D2E}); // in the packed versions, the four zero bytes at the start are compressed
-		process(&custom_saved.demo_moves     , 25*4, {0x1B8EE, 0x1D4B2, 0x1C70B, 0x1D3A4, 0x18ADD, 0x19D4E});
+		process(&custom_saved.demo_moves, 25*4, {0x1B8EE, 0x1D4B2, 0x1C70B, 0x1D3A4, 0x18ADD, 0x19D4E});
 
 		// speeds
-		process(&custom_saved.base_speed   , 1, { 0x4F01, 0x65B1, 0x5389, 0x5AC9, 0x4E45, 0x5F75 });
-		process(&custom_saved.fight_speed  , 1, { 0x4EF9, 0x65A9, 0x5381, 0x5AC1, 0x4E3D, 0x5F6D });
+		process(&custom_saved.base_speed, 1, { 0x4F01, 0x65B1, 0x5389, 0x5AC9, 0x4E45, 0x5F75 });
+		process(&custom_saved.fight_speed, 1, { 0x4EF9, 0x65A9, 0x5381, 0x5AC1, 0x4E3D, 0x5F6D });
 		process(&custom_saved.chomper_speed, 1, { 0x8BBD, 0xA26D, 0x906D, 0x97AD, 0x8B29, 0x9C59 });
 
 		// Skip the mouse in the ending scene. Used in Christmas of Persia.
 		// Details: https://forum.princed.org/viewtopic.php?p=34897#p34897
-		process(&temp_bytes                , 2, { 0x2B8C, 0x423C, 0x2FE4, 0x3724, 0x2B28, 0x3C58 });
+		process(&temp_bytes, 2, { 0x2B8C, 0x423C, 0x2FE4, 0x3724, 0x2B28, 0x3C58 });
 		custom_saved.no_mouse_in_ending = temp_bytes[0] == 0xEB && temp_bytes[1] == 0x27;
 
 		// The order of offsets is: dos_10_packed, dos_10_unpacked, dos_13_packed, dos_13_unpacked, dos_14_packed, dos_14_unpacked

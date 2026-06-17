@@ -392,7 +392,4 @@ The authors of this program may be contacted at https://forum.princed.org
 #define SDL_JOYSTICK_X_AXIS 0
 #define SDL_JOYSTICK_Y_AXIS 1
 
-// Real Roland MT-32 / CM-32L ROM files relative path.
-#define MT32_ROM_DIR "roms"
-
 #endif
