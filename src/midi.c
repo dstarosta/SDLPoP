@@ -880,7 +880,7 @@ void init_mt32(void) {
         }
         init_digi();
         init_midi();
-        if (!digi_unavailable && mt32synth_init(digi_audiospec->freq, MT32_ROM_DIR)) {
+        if (!digi_unavailable && mt32synth_init(digi_audiospec->freq, mt32_rom_path)) {
             mt32_ok = 1;
             if (mt32_init_parsed_ok) {
                 mt32_send_init();
