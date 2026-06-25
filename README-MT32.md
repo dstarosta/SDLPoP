@@ -29,6 +29,9 @@ Nothing to do -- the library is included with the game. Just keep the `libmt32em
 (64-bit build) and/or `libmt32emu.dll` (32-bit build) file next to `prince.exe`, or in the `roms`
 folder. The game loads the one matching its build automatically.
 
+Alternatively, you can keep a single `libmt32emu.dll` that matches the build of the `prince.exe`
+file.
+
 ### Linux
 
 Install `libmt32emu` (version 2.8+). It may not be in your distribution's package repositories, in
