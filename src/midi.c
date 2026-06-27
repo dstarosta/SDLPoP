@@ -709,7 +709,7 @@ void free_midi_resources(void) {
 }
 
 // Reads Prince of Persia's MT-32 init resource (id -1) directly from PRINCE.DAT handle, as a
-// fallback when the decomposed data/PRINCE/res-1.bin file is not present.
+// fallback when the decomposed data/PRINCE/res65535.bin file is not present.
 //
 // We cannot use "load_from_opendats_alloc". It searches every open DAT (others also carry a -1 entry)
 // and compares the index id — stored as the 16-bit value 0xFFFF — against the int -1, which never
@@ -773,11 +773,11 @@ void init_midi() {
 	}
 
 	// Load PoP's MT-32 custom-timbre init and parse it once.
-	// We read it directly from the decomposed resource file data/PRINCE/res-1.bin.
+	// We read it directly from the decomposed resource file data/PRINCE/res65535.bin.
 	// The file is the raw resource: a sound tag byte (0x02 = MIDI) followed by the MThd
 	// MIDI data.
 	{
-		const char* init_path = locate_file("data/PRINCE/res-1.bin");
+		const char* init_path = locate_file("data/PRINCE/res65535.bin");
 		FILE* initf = fopen(init_path, "rb");
 		if (initf != NULL) {
 			struct stat st;
@@ -802,7 +802,7 @@ void init_midi() {
 		sound_buffer_type* initbuf = (sound_buffer_type*) mt32_init_data;
 		mt32_init_parsed_ok = parse_midi((midi_raw_chunk_type*) &initbuf->midi, &mt32_init_parsed);
 		if (!mt32_init_parsed_ok) {
-			printf("MT-32: could not parse init sequence (res-1.bin)\n");
+			printf("MT-32: could not parse init sequence (res65535.bin)\n");
 		}
 	}
 
