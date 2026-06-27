@@ -68,7 +68,7 @@ next to the game instead of installing it system-wide).
 
 ## 2. Prince of Persia's MT-32 instruments (resource -1)
 
-Nothing to do -- the **`data/PRINCE/res-1.bin`** file is included.
+Nothing to do -- the **`data/PRINCE/res65535.bin`** file is included.
 
 On real hardware the game uploads its own custom instrument set to the MT-32 at startup -- that is
 why the display reads **"The Princess awaits."** when you launch the game. Without this upload the
@@ -80,7 +80,7 @@ In Prince of Persia's data files, these instruments are stored under a slightly 
 labels them resource number `-1`. You don't have to find or rename anything -- SDLPoP knows where
 to look. It checks two places, in order:
 
-1. A ready-made file at **`data/PRINCE/res-1.bin`** (the `res-1` is just that resource number `-1`).
+1. A ready-made file at **`data/PRINCE/res65535.bin`**.
 2. If that file isn't there, it reads the instruments straight out of **`PRINCE.DAT`**.
 
     Note: these MT-32 instruments were only added in Prince of Persia 1.3
