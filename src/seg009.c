@@ -2049,6 +2049,8 @@ byte* digi_buffer = NULL;
 byte* digi_remaining_pos = NULL;
 // The remaining length.
 int digi_remaining_length = 0;
+// The full length of digi_buffer, used to rewind for seamless looping (see digi_callback()).
+int digi_buffer_length = 0;
 
 // The desired samplerate. Everything will be resampled to this.
 const int digi_samplerate = 44100;
@@ -2180,33 +2182,104 @@ void play_speaker_sound(sound_buffer_type* buffer) {
 	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }
 
+// Looping sounds break up due to added silence and amplitude mismatch
+// between the start and the end of the sound.
+byte sound_looping[] = {
+	0, // sound_0_fell_to_death
+	0, // sound_1_falling
+	0, // sound_2_tile_crashing
+	0, // sound_3_button_pressed
+	0, // sound_4_gate_closing
+	0, // sound_5_gate_opening
+	0, // sound_6_gate_closing_fast
+	0, // sound_7_gate_stop
+	0, // sound_8_bumped
+	0, // sound_9_grab
+	0, // sound_10_sword_vs_sword
+	0, // sound_11_sword_moving
+	0, // sound_12_guard_hurt
+	0, // sound_13_kid_hurt
+	0, // sound_14_leveldoor_closing
+	1, // sound_15_leveldoor_sliding
+	0, // sound_16_medium_land
+	0, // sound_17_soft_land
+	0, // sound_18_drink
+	0, // sound_19_draw_sword
+	0, // sound_20_loose_shake_1
+	0, // sound_21_loose_shake_2
+	0, // sound_22_loose_shake_3
+	0, // sound_23_footstep
+	0, // sound_24_death_regular
+	0, // sound_25_presentation
+	0, // sound_26_embrace
+	0, // sound_27_cutscene_2_4_6_12
+	0, // sound_28_death_in_fight
+	0, // sound_29_meet_Jaffar
+	0, // sound_30_big_potion
+	0, // sound_31
+	0, // sound_32_shadow_music
+	0, // sound_33_small_potion
+	0, // sound_34
+	0, // sound_35_cutscene_8_9
+	0, // sound_36_out_of_time
+	0, // sound_37_victory
+	0, // sound_38_blink
+	0, // sound_39_low_weight
+	0, // sound_40_cutscene_12_short_time
+	0, // sound_41_end_level_music
+	0, // sound_42
+	0, // sound_43_victory_Jaffar
+	0, // sound_44_skel_alive
+	0, // sound_45_jump_through_mirror
+	0, // sound_46_chomped
+	0, // sound_47_chomper
+	0, // sound_48_spiked
+	0, // sound_49_spikes
+	0, // sound_50_story_2_princess
+	0, // sound_51_princess_door_opening
+	0, // sound_52_story_4_Jaffar_leaves
+	0, // sound_53_story_3_Jaffar_comes
+	0, // sound_54_intro_music
+	0, // sound_55_story_1_absence
+	0, // sound_56_ending_music
+	0
+};
+
 void digi_callback(void* userdata, Uint8* stream, int len) {
-	// Don't go over the end of either the input or the output buffer.
-	size_t copy_len = MIN(len, digi_remaining_length);
-	//printf("digi_callback(): copy_len = %d\n", copy_len);
-	//printf("digi_callback(): len = %d\n", len);
-	if (is_sound_on) {
-		// Copy the next part of the input of the output.
-		memcpy(stream, digi_remaining_pos, copy_len);
-		// In case the sound does not fill the buffer: fill the rest of the buffer with silence.
-		memset(stream + copy_len, 0, len - copy_len);
-	} else {
-		// If sound is off: Mute the sound but keep track of where we are.
-		memset(stream, 0, len);
+	int bytes_written = 0;
+	// Loop in case the rewind below wraps the buffer more than once within a single callback.
+	while (bytes_written < len) {
+		// Don't go over the end of either the input or the output buffer.
+		size_t copy_len = MIN(len - bytes_written, digi_remaining_length);
+		if (is_sound_on) {
+			memcpy(stream + bytes_written, digi_remaining_pos, copy_len);
+		} else {
+			// If sound is off: Mute the sound but keep track of where we are.
+			memset(stream + bytes_written, 0, copy_len);
+		}
+		digi_remaining_length -= copy_len;
+		digi_remaining_pos += copy_len;
+		bytes_written += copy_len;
+
+		if (digi_remaining_length == 0) {
+			if (digi_playing && !sound_interruptible[current_sound] && sound_looping[current_sound]) {
+				digi_remaining_pos = digi_buffer;
+				digi_remaining_length = digi_buffer_length;
+				continue;
+			}
+			// The sound ended (and isn't looping): pad the rest with silence, push an event.
+			memset(stream + bytes_written, 0, len - bytes_written);
+			if (digi_playing) {
+				SDL_Event event;
+				memset(&event, 0, sizeof(event));
+				event.type = SDL_EVENT_USER;
+				event.user.code = userevent_SOUND;
+				digi_playing = 0;
+				SDL_PushEvent(&event);
+			}
+			break;
+		}
 	}
-	// If the sound ended, push an event.
-	if (digi_playing && digi_remaining_length == 0) {
-		//printf("digi_callback(): sound ended\n");
-		SDL_Event event;
-		memset(&event, 0, sizeof(event));
-		event.type = SDL_EVENT_USER;
-		event.user.code = userevent_SOUND;
-		digi_playing = 0;
-		SDL_PushEvent(&event);
-	}
-	// Advance the pointer.
-	digi_remaining_length -= copy_len;
-	digi_remaining_pos += copy_len;
 }
 
 void ogg_callback(void* userdata, Uint8* stream, int len) {
@@ -2369,7 +2442,7 @@ char* sound_name(int index) {
 	}
 }
 
-sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer);
+sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer, int index);
 
 sound_buffer_type* load_sound(int index) {
 	sound_buffer_type* result = NULL;
@@ -2435,7 +2508,7 @@ sound_buffer_type* load_sound(int index) {
 		result = (sound_buffer_type*) load_from_opendats_alloc(index + 10000, "bin", NULL, NULL);
 	}
 	if (result != NULL && (result->type & 7) == sound_digi) {
-		sound_buffer_type* converted = convert_digi_sound(result);
+		sound_buffer_type* converted = convert_digi_sound(result, index);
 		free(result);
 		result = converted;
 	}
@@ -2500,7 +2573,24 @@ bool determine_wave_version(sound_buffer_type* buffer, waveinfo_type* waveinfo) 
 	}
 }
 
-sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
+void declick_digi_buffer_edges(sound_buffer_type* converted_buffer, int frame_count) {
+	int channels = digi_audiospec->channels;
+	int fade_frames = MIN(frame_count / 2, digi_audiospec->freq / 200);
+	if (fade_frames == 0) {
+		return;
+	}
+	short* samples = converted_buffer->converted.samples;
+	for (int i = 0; i < fade_frames; ++i) {
+		float ramp = (float)i / fade_frames; // 0 (silence) .. 1 (original)
+		int j = frame_count - 1 - i;
+		for (int channel = 0; channel < channels; ++channel) {
+			samples[i * channels + channel] = (short)(samples[i * channels + channel] * ramp);
+			samples[j * channels + channel] = (short)(samples[j * channels + channel] * ramp);
+		}
+	}
+}
+
+sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer, int index) {
 	init_digi();
 	if (digi_unavailable) return NULL;
 
@@ -2551,6 +2641,10 @@ sound_buffer_type* convert_digi_sound(sound_buffer_type* digi_buffer) {
 		}
 	}
 
+	if (sound_looping[index]) {
+		declick_digi_buffer_edges(converted_buffer, expanded_frames);
+	}
+
 	return converted_buffer;
 }
 
@@ -2568,6 +2662,7 @@ void play_digi_sound(sound_buffer_type* buffer) {
 	}
 	SDL_LockAudioStream(digi_audio_stream);
 	digi_buffer = (byte*) buffer->converted.samples;
+	digi_buffer_length = buffer->converted.length;
 	digi_playing = 1;
 	digi_remaining_length = buffer->converted.length;
 	digi_remaining_pos = digi_buffer;
