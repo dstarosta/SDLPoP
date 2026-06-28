@@ -2052,9 +2052,6 @@ int digi_remaining_length = 0;
 // The full length of digi_buffer, used to rewind for seamless looping (see digi_callback()).
 int digi_buffer_length = 0;
 
-// The desired samplerate. Everything will be resampled to this.
-const int digi_samplerate = 44100;
-
 void stop_digi(void) {
 //	SDL_PauseAudio(1);
 	if (!digi_playing) return;
@@ -2392,7 +2389,7 @@ void init_digi() {
 	if (digi_audiospec != NULL) return;
 
 	static SDL_AudioSpec spec;
-	spec.freq     = digi_samplerate;
+	spec.freq     = DIGI_SAMPLE_RATE;
 	spec.format   = SDL_AUDIO_S16;
 	spec.channels = 2;
 	digi_audiospec = &spec;

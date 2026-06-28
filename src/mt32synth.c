@@ -117,7 +117,7 @@ static void* resolve(const char* name, int* ok) {
 
 // Tries to open the native libmt32emu library by each known name.
 static dynlib_t open_libmt32emu_in(const char* dir) {
-	char path[1024];
+	char path[POP_MAX_PATH];
 	for (size_t i = 0; i < sizeof(k_dll_names) / sizeof(k_dll_names[0]); ++i) {
 		const char* name = k_dll_names[i];
 		if (dir != NULL) {
@@ -202,8 +202,8 @@ static int load_dll(const char* rom_dir) {
 
 
 static mt32emu_context ctx = NULL;
-static int output_rate = 44100;  // SDLPoP's mixing frequency
-static int synth_rate = 44100;  // The emulator's frequency (matches due to the sample quality setting)
+static int output_rate = DIGI_SAMPLE_RATE;  // SDLPoP's mixing frequency
+static int synth_rate = DIGI_SAMPLE_RATE;  // The emulator's frequency (matches due to the sample quality setting)
 
 static unsigned char* state_bank = NULL;
 static unsigned int   state_bank_len = 0;
@@ -217,8 +217,8 @@ static double resample_pos = 0.0;         // fractional frame index into the cur
 
 static int try_load_pair(mt32emu_context c, const char* rom_dir,
                          const char* ctrl, const char* pcm) {
-	char path_ctrl[1024];
-	char path_pcm[1024];
+	char path_ctrl[MT32_RENDER_CHUNK];
+	char path_pcm[MT32_RENDER_CHUNK];
 
 	if (snprintf(path_ctrl, sizeof(path_ctrl), "%s/%s", rom_dir, ctrl) >= (int)sizeof(path_ctrl)) {
 		return 0;

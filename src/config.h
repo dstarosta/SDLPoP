@@ -38,6 +38,9 @@ The authors of this program may be contacted at https://forum.princed.org
 #define SHARE_PATH "/usr/share"
 #endif
 
+// The desired samplerate. Everything will be resampled to this.
+#define DIGI_SAMPLE_RATE 44100
+
 // Enable or disable fading.
 // Fading used to be very buggy, but now it works correctly.
 #define USE_FADE
