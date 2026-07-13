@@ -20,12 +20,17 @@ The authors of this program may be contacted at https://forum.princed.org
 
 #include "common.h"
 
+#if !SDL_VERSION_ATLEAST(3, 4, 0)
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#endif
 
 #ifdef USE_SCREENSHOT
 
 static int save_surface_as_png(SDL_Surface* surface, const char* filename) {
+#if SDL_VERSION_ATLEAST(3, 4, 0)
+	return SDL_SavePNG(surface, filename) ? 0 : -1;
+#else
 	// Convert to a canonical byte-order format so stbi_write_png always gets RGB(A) bytes.
 	// SDL_PIXELFORMAT_RGB24 / RGBA32 are defined to be R,G,B[,A] in memory on any endian.
 	SDL_PixelFormat target_fmt = SDL_ISPIXELFORMAT_ALPHA(surface->format)
@@ -41,6 +46,7 @@ static int save_surface_as_png(SDL_Surface* surface, const char* filename) {
 	SDL_UnlockSurface(converted);
 	SDL_DestroySurface(converted);
 	return ok ? 0 : -1;
+#endif
 }
 
 char screenshots_folder[POP_MAX_PATH] = "screenshots";

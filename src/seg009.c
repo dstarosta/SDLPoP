@@ -20,12 +20,16 @@ The authors of this program may be contacted at https://forum.princed.org
 
 #include "common.h"
 
+// SDL 3.4.0 added SDL_LoadPNG/SDL_SavePNG to core SDL3; use them when available,
+// otherwise fall back to stb_image (SDL3_image was too slow at batch PNG loads).
+#if !SDL_VERSION_ATLEAST(3, 4, 0)
 #define STBI_ONLY_PNG
 #define STB_IMAGE_IMPLEMENTATION
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include "stb_image.h"
 #pragma GCC diagnostic pop
+#endif
 
 #include <time.h>
 #include <errno.h>
@@ -879,6 +883,18 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 
 // Load a PNG file from disk into a 32-bit RGBA surface.
 SDL_Surface* load_png_file_as_surface(const char* path) {
+#if SDL_VERSION_ATLEAST(3, 4, 0)
+	SDL_Surface* loaded = SDL_LoadPNG(path);
+	if (loaded == NULL) {
+		return NULL;
+	}
+	if (loaded->format == SDL_PIXELFORMAT_RGBA32) {
+		return loaded;
+	}
+	SDL_Surface* surface = SDL_ConvertSurface(loaded, SDL_PIXELFORMAT_RGBA32);
+	SDL_DestroySurface(loaded);
+	return surface;
+#else
 	int w, h;
 	stbi_uc* pixels = stbi_load(path, &w, &h, NULL, STBI_rgb_alpha);
 	if (pixels == NULL) {
@@ -897,6 +913,7 @@ SDL_Surface* load_png_file_as_surface(const char* path) {
 	SDL_UnlockSurface(surface);
 	stbi_image_free(pixels);
 	return surface;
+#endif
 }
 
 // Load a PNG from memory. SDL3 Image was very slow at loading PNGs in batches
@@ -971,20 +988,39 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 	}
 
 	int img_w, img_h;
+
+#if SDL_VERSION_ATLEAST(3, 4, 0)
+	SDL_IOStream* png_io = SDL_IOFromConstMem(png_copy ? png_copy : png_data, png_size);
+	SDL_Surface* decoded = png_io ? SDL_LoadPNG_IO(png_io, true) : NULL;
+	free(png_copy);
+	if (decoded == NULL) return NULL;
+	SDL_Surface* rgb_surface = (decoded->format == SDL_PIXELFORMAT_RGB24)
+	                           ? decoded
+	                           : SDL_ConvertSurface(decoded, SDL_PIXELFORMAT_RGB24);
+	if (rgb_surface != decoded) SDL_DestroySurface(decoded);
+	if (rgb_surface == NULL || !SDL_LockSurface(rgb_surface)) {
+		SDL_DestroySurface(rgb_surface);
+		return NULL;
+	}
+	img_w = rgb_surface->w;
+	img_h = rgb_surface->h;
+	const Uint8* pixels = (const Uint8*)rgb_surface->pixels;
+	int pixels_pitch = rgb_surface->pitch;
+#else
 	stbi_uc* pixels = stbi_load_from_memory(
 	                      (const stbi_uc*)(png_copy ? png_copy : png_data),
 	                      png_size, &img_w, &img_h, NULL, STBI_rgb);
 	free(png_copy);
 	if (pixels == NULL) return NULL;
+	int pixels_pitch = img_w * 3;
+#endif
 
+	image_type* result = NULL;
 	image_type* surface = SDL_CreateSurface(img_w, img_h, SDL_PIXELFORMAT_INDEX8);
 	if (surface == NULL) {
-		stbi_image_free(pixels);
-		return NULL;
+		goto cleanup;
 	}
 
-	// Build the surface palette from the original PLTE when available, else from the VGA palette.
-	// Force index 0 to transparent black.
 	SDL_Color surface_palette[256] = {0};
 	int surface_palette_count = plte_count ? plte_count : 16;
 	if (plte_count) {
@@ -1009,8 +1045,7 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 
 	if (!SDL_LockSurface(surface)) {
 		SDL_DestroySurface(surface);
-		stbi_image_free(pixels);
-		return NULL;
+		goto cleanup;
 	}
 
 	// Map each RGB pixel back to its palette index.
@@ -1019,7 +1054,7 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 		lut_keys[ci] = ((Uint32)lut[ci].r << 16) | ((Uint32)lut[ci].g << 8) | lut[ci].b;
 
 	for (int y = 0; y < img_h; ++y) {
-		const stbi_uc* src_row = pixels + y * img_w * 3;
+		const Uint8* src_row = pixels + y * pixels_pitch;
 		Uint8* dst_row = (Uint8*)surface->pixels + y * surface->pitch;
 		for (int x = 0; x < img_w; ++x) {
 			Uint32 pix = ((Uint32)src_row[x * 3] << 16) | ((Uint32)src_row[x * 3 + 1] << 8) | src_row[x * 3 + 2];
@@ -1052,9 +1087,16 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 	}
 
 	SDL_UnlockSurface(surface);
-	stbi_image_free(pixels);
+	result = surface;
 
-	return surface;
+cleanup:
+#if SDL_VERSION_ATLEAST(3, 4, 0)
+	SDL_UnlockSurface(rgb_surface);
+	SDL_DestroySurface(rgb_surface);
+#else
+	stbi_image_free(pixels);
+#endif
+	return result;
 }
 
 // seg009:121A
