@@ -57,6 +57,7 @@ typedef int             (*fn_play_msg)(mt32emu_const_context context, unsigned i
 typedef int             (*fn_play_sysex)(mt32emu_const_context context, const unsigned char* sysex, unsigned int len);
 typedef void            (*fn_play_sysex_now)(mt32emu_const_context context, const unsigned char* sysex, unsigned int len);
 typedef void            (*fn_render_bit16s)(mt32emu_const_context context, short* stream, unsigned int len);
+typedef void            (*fn_flush_midi_queue)(mt32emu_const_context context);
 typedef unsigned int    (*fn_dump_sysex_bank)(mt32emu_const_context context, unsigned char* bank, unsigned int size);
 typedef unsigned int    (*fn_apply_sysex_bank)(mt32emu_const_context context, const unsigned char* bank, unsigned int size);
 
@@ -76,6 +77,7 @@ static fn_play_msg                             mt32emu_play_msg;
 static fn_play_sysex                           mt32emu_play_sysex;
 static fn_play_sysex_now                       mt32emu_play_sysex_now;
 static fn_render_bit16s                        mt32emu_render_bit16s;
+static fn_flush_midi_queue                     mt32emu_flush_midi_queue;
 static fn_dump_sysex_bank                      mt32emu_dump_sysex_bank;
 static fn_apply_sysex_bank                     mt32emu_apply_sysex_bank;
 
@@ -187,6 +189,7 @@ static int load_dll(const char* rom_dir) {
 	mt32emu_play_sysex                          = (fn_play_sysex)                          resolve("mt32emu_play_sysex", &ok);
 	mt32emu_play_sysex_now                      = (fn_play_sysex_now)                      resolve("mt32emu_play_sysex_now", &ok);
 	mt32emu_render_bit16s                       = (fn_render_bit16s)                       resolve("mt32emu_render_bit16s", &ok);
+	mt32emu_flush_midi_queue                    = (fn_flush_midi_queue)                    resolve("mt32emu_flush_midi_queue", &ok);
 
 	// libmt32emu 2.8+ functions for persisting custom timber/instrument state.
 	mt32emu_dump_sysex_bank                     = (fn_dump_sysex_bank)                     resolve("mt32emu_dump_sysex_bank", &ok);
@@ -390,6 +393,7 @@ void mt32synth_free(void) {
 		mt32emu_play_sysex = NULL;
 		mt32emu_play_sysex_now = NULL;
 		mt32emu_render_bit16s = NULL;
+		mt32emu_flush_midi_queue = NULL;
 		mt32emu_dump_sysex_bank = NULL;
 		mt32emu_apply_sysex_bank = NULL;
 	}
@@ -408,25 +412,14 @@ void mt32_reset_context(bool restore_timbres) {
 		return;
 	}
 
-	// Close/open is the only thing that reliably clears the previous song's *live* state: still-
-	// ringing partials AND the reverb delay lines (everything lighter leaves them alive). It also
-	// flushes the internal MIDI queue for free. The catch: it is NOT thread-safe against rendering
-	// and it discards the uploaded custom timbres - so it must run ONLY on the main thread (callers
-	// hold the audio lock or have midi_playing == 0), and the timbres are restored afterwards.
+	// Do a hardware reset
+	static const unsigned char reset_all[] =
+	{ 0xF0, 0x41, 0x10, 0x16, 0x12, 0x7F, 0x00, 0x00, 0x00, 0x01, 0xF7 };
 
-	mt32emu_close_synth(ctx);
+	mt32emu_flush_midi_queue(ctx);
+	mt32emu_play_sysex_now(ctx, reset_all, (unsigned int)sizeof(reset_all));
 
-	if (mt32emu_open_synth(ctx) != MT32EMU_RC_OK) {
-		fprintf(stderr, "mt32synth: reopen after reset failed\n");
-		return;
-	}
-
-	// Restore timbres for sounds that require them.
-	if (restore_timbres && state_bank != NULL) {
-		mt32emu_apply_sysex_bank(ctx, state_bank, state_bank_len);
-	}
-
-	// Flush the queued SysEx.
+	// Drain the buffer
 	int drain_iters = 32 * (synth_rate / output_rate + 1);
 	short drain_buf[MT32_RENDER_CHUNK * 2];
 	for (int i = 0; i < drain_iters; ++i) {
@@ -434,6 +427,13 @@ void mt32_reset_context(bool restore_timbres) {
 	}
 
 	mt32synth_apply_reverb_pref();
+
+	// Restore timbres
+	if (restore_timbres && state_bank != NULL) {
+		mt32emu_apply_sysex_bank(ctx, state_bank, state_bank_len);
+	}
+
+	mt32emu_set_dac_input_mode(ctx, mt32_dac); // also cleared by the reset
 
 	// Reset render state under the audio lock.
 	SDL_LockAudio();
