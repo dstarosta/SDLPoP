@@ -1,56 +1,74 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.14) # for FetchContent_MakeAvailable
 project(SDLPoP)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=implicit-function-declaration")
+if(NOT MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99 -D_GNU_SOURCE=1")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=implicit-function-declaration")
+endif()
 
 # have CMake output binaries to the directory that contains the source files
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${SDLPoP_SOURCE_DIR}/..")
+# Multi-config generators would otherwise append the config name (../Debug/prince.exe).
+foreach(_cfg ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER "${_cfg}" _cfg_upper)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg_upper} "${SDLPoP_SOURCE_DIR}/..")
+endforeach()
 
-# SDLPoP requires the SDL3 development library.
-# You can pass the SDL3 location to CMake like so: -DSDL3="C:/work/libraries/SDL3-3.0.0"
-# Or alternatively, specify the SDL3 location below:
-
-#set(SDL3 "C:/work/libraries/SDL3-3.0.0")
-
-# On macOS, if you used Homebrew to install SDL3, the location may be something like this:
-
-#set(SDL3 "/usr/local/Cellar/sdl3/3.0.0")
-
-if (NOT(WIN32) AND (DEFINED SDL3))
-    include_directories(${SDL3}/include/SDL3)
-    link_directories(${SDL3}/lib)
+# windres mangles -I paths containing spaces, so let gcc preprocess the .rc first.
+# Must precede FetchContent so it also covers SDL's own version.rc.
+if(WIN32 AND CMAKE_RC_COMPILER MATCHES "windres")
+    set(CMAKE_RC_COMPILE_OBJECT
+        "<CMAKE_C_COMPILER> -E -xc -DRC_INVOKED <DEFINES> <INCLUDES> <SOURCE> -o <OBJECT>.pp.rc"
+        "<CMAKE_RC_COMPILER> <FLAGS> -i <OBJECT>.pp.rc -o <OBJECT>")
 endif()
 
-if (WIN32)
-    if (MSVC)
-        # Don't let Visual Studio run CMake
-        message(SEND_ERROR "To build using MSVC on Windows, you can use NMake or run build.bat.")
-        return()
-    endif()
-
+if(WIN32 AND NOT MSVC)
     # Use the -mwindows compiler flag when compiling with MinGW to hide the console window
     # Only do this when not in debug mode
     if (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mwindows")
     endif (NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
+endif()
 
-    # If the location of SDL3 is not specified, we will try to guess it.
-    if (NOT(DEFINED SDL3))
-        cmake_policy(SET CMP0015 NEW) # suppress warning about relative paths
-        set(SDL3 "../../SDL3-3.0.0")
+if(PSP)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+endif()
+
+# Use an installed SDL3 if there is one, otherwise download and build it.
+# -DSDL3_ROOT=<dir> picks a specific install; -DSDLPoP_SYSTEM_SDL3=ON forbids downloading.
+option(SDLPoP_SYSTEM_SDL3 "Require a preinstalled SDL3; never fetch from source" OFF)
+
+if(DEFINED SDL3 AND NOT DEFINED SDL3_ROOT)
+    set(SDL3_ROOT "${SDL3}")
+endif()
+
+find_package(SDL3 QUIET CONFIG)
+
+if(NOT SDL3_FOUND)
+    if(SDLPoP_SYSTEM_SDL3)
+        message(FATAL_ERROR
+            "SDL3 not found and SDLPoP_SYSTEM_SDL3=ON. Install SDL3 (dev package, "
+            "vcpkg, SDL3_ROOT, or Homebrew) or drop the flag to build SDL3 from source.")
     endif()
 
-    # Automatically detect whether we need the x86 or x64 version of the SDL3 library.
-    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(SDL3_ARCH "x86_64-w64-mingw32")
-    else()
-        set(SDL3_ARCH "i686-w64-mingw32")
-    endif()
+    message(STATUS "SDL3 not found on the system -- fetching and building it from source.")
+    include(FetchContent)
 
-    include_directories(${SDL3}/${SDL3_ARCH}/include)
-    link_directories(${SDL3}/${SDL3_ARCH}/lib)
+    set(SDL_SHARED ON  CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST   OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(
+        SDL3
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG        release-3.4.16
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(SDL3)
 endif()
 
 set(SOURCE_FILES
@@ -84,6 +102,12 @@ set(SOURCE_FILES
 
 if (NOT(APPLE AND CREATE_BUNDLE))
     add_executable(prince ${SOURCE_FILES})
+    if(MSVC)
+        # MSVC equivalent of MinGW's -mwindows. Per-config, since the Visual Studio
+        # generator builds every config from one CMAKE_BUILD_TYPE-less configure.
+        set_target_properties(prince PROPERTIES
+                WIN32_EXECUTABLE $<NOT:$<CONFIG:Debug>>)
+    endif()
 else()
 
     # macOS-specific:
@@ -115,28 +139,39 @@ else()
             ${CMAKE_SOURCE_DIR}/../SDLPoP.ini ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/prince.app/Contents/MacOS/SDLPoP.ini)
 endif()
 
+# SDL3main provides the WinMain -> SDL_main shim; only exists on some platforms.
+if(TARGET SDL3::SDL3main)
+    target_link_libraries(prince SDL3::SDL3main)
+endif()
+
 # mt32synth loads libmt32emu dynamically (dlopen/LoadLibrary). ${CMAKE_DL_LIBS} is the
 # portable dynamic-loader library: empty on Windows, "dl" on Linux/*BSD.
 if(WIN32)
-    target_link_libraries(prince mingw32 SDL3 ${CMAKE_DL_LIBS})
-elseif(APPLE)
-    target_link_libraries(prince SDL3 m ${CMAKE_DL_LIBS})
-elseif(PSP) # PSP port — SDL3 PSP support not verified; kept at SDL2 until tested
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
-	include(FindPkgConfig)
-	pkg_search_module(SDL2 REQUIRED sdl2)
-	pkg_search_module(SDL2IMAGE REQUIRED SDL2_image)
-	target_include_directories(prince PRIVATE ${SDL2_INCLUDE_DIRS})
-	target_link_libraries(prince PRIVATE
-	${SDL2_LIBRARIES} ${SDL2IMAGE_LIBRARIES}
-	)
-	create_pbp_file(
-		TARGET prince
-		ICON_PATH ${CMAKE_SOURCE_DIR}/iconPSP.png
-		BACKGROUND_PATH NULL
-		PREVIEW_PATH NULL
-		TITLE prince
-	)
+    target_link_libraries(prince SDL3::SDL3 ${CMAKE_DL_LIBS})
 else()
-    	target_link_libraries(prince SDL3 m ${CMAKE_DL_LIBS})
+    target_link_libraries(prince SDL3::SDL3 m ${CMAKE_DL_LIBS})
+endif()
+
+# A from-source SDL3 isn't installed anywhere, so put it next to the executable.
+if(TARGET SDL3::SDL3-shared AND SDL_SHARED)
+    if(WIN32)
+        set(_sdl3_runtime_file $<TARGET_FILE:SDL3::SDL3-shared>)
+    else()
+        # The loader looks up the SONAME (libSDL3.so.0), not the symlink TARGET_FILE gives.
+        set(_sdl3_runtime_file $<TARGET_SONAME_FILE:SDL3::SDL3-shared>)
+    endif()
+    add_custom_command(TARGET prince POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${_sdl3_runtime_file} $<TARGET_FILE_DIR:prince>
+        COMMENT "Copying SDL3 shared library next to prince")
+endif()
+
+if(PSP)
+    create_pbp_file(
+        TARGET prince
+        ICON_PATH ${CMAKE_SOURCE_DIR}/iconPSP.png
+        BACKGROUND_PATH NULL
+        PREVIEW_PATH NULL
+        TITLE prince
+    )
 endif()

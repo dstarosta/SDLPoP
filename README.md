@@ -45,7 +45,7 @@ Contributors:
 * usineur (faster music loading)
 * yaqxsw (icon)
 * SergioMartin86
-* dstarosta
+* dstarosta (bug fixes, high jump, jump-n-grab, SDL3 conversion, MT-32 support)
 * Ryzee119
 * berikv
 * xyproto
@@ -396,10 +396,73 @@ While recording, make a quicksave to mark your place, and press quickload to ret
 
 ## COMPILING
 
-### Prerequisites for all platforms
+### CMake (all platforms)
 
-* Make sure that you have the development version of the `SDL3` library installed.
-* See per-platform installation instructions below.
+This is the easiest way to build: CMake downloads and builds SDL3 for you if it
+isn't already installed, so a compiler and git are all you need. It works on
+Windows (MSVC or MinGW), Linux and macOS.
+
+#### Install CMake
+
+Skip this if you build through an IDE that bundles CMake (CLion, Visual Studio's
+CMake support). Otherwise install CMake 3.14 or newer, plus git and a C compiler:
+
+Windows, with [Chocolatey](https://chocolatey.org/install) (the compiler comes
+from Visual Studio if you have it, otherwise `mingw` provides one):
+
+    choco install cmake git mingw
+
+Or with [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+    winget install -e --id Kitware.CMake
+    winget install -e --id Git.Git
+    winget install -e --id BrechtSanders.WinLibs.POSIX.UCRT
+
+Debian/Ubuntu:
+
+    sudo apt install cmake git gcc
+
+Fedora:
+
+    sudo dnf install cmake git gcc
+
+Arch Linux:
+
+    sudo pacman -S cmake git gcc
+
+macOS, with [Homebrew](https://brew.sh/) (the compiler comes from
+`xcode-select --install`):
+
+    brew install cmake git
+
+If you used the [CMake installer](https://cmake.org/download/), tick "Add CMake
+to the system PATH" during setup. Check it is found with `cmake --version`.
+
+#### Build
+
+Run these from the project root (the folder holding `src` and `data`):
+
+    cmake -S src -B build
+    cmake --build build --config Release
+
+The first command creates a `build` folder for CMake's own files; the executable
+itself is written to the project root, next to the `data` folder, along with the
+SDL3 library if CMake had to build it.
+
+Pass `--config Release` as shown. Visual Studio and Xcode pick every
+configuration at build time and default to `Debug`, which produces a much larger
+executable. Makefile and MinGW builds ignore `--config` and take the type at
+configure time instead, defaulting to Release:
+
+    cmake -S src -B build -DCMAKE_BUILD_TYPE=Debug
+
+Release builds hide the console window; debug builds keep it.
+
+To use an SDL3 you already have instead of a downloaded one, point CMake at it
+with `-DSDL3_ROOT=<dir>`. Adding `-DSDLPoP_SYSTEM_SDL3=ON` makes a missing SDL3
+an error rather than downloading it.
+
+The other build systems below don't fetch SDL3; they need it installed first.
 
 ### Windows
 
@@ -446,10 +509,8 @@ To compile, open one of the .dev files and click the compile icon.
 
 #### CMake
 
-* You can also use CMake, in conjunction with the MinGW-w64 toolchain.
-    * You could either invoke CMake from the command line yourself, or use an IDE that uses CMake internally.
-    * As an example, CLion uses CMake as its project model.
-    * If you are using CLion as your IDE, you can simply load the src/ directory as a project.
+* See the [CMake section](#cmake-all-platforms) above; it works with both MSVC and MinGW-w64.
+* IDEs that use CMake as their project model (e.g. CLion) can open `src/` directly.
 
 ### GNU/Linux
 
