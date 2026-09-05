@@ -13,7 +13,8 @@ QUICKSAVE.SAV
 mods/*/
 
 # MT32 ROMs
-/roms
+roms/*
+!roms/roms.txt
 
 # Object files
 *.o

@@ -1,0 +1,10 @@
+Place your licensed MT-32 ROM file pairs here.
+
+cm32l_control.rom
+cm32l_pcm.rom
+mt32_control.rom
+mt32_pcm.rom
+
+You only need 1 pair of files (mt32_* or cm32l_*). But that would make the "mt32_dac" values of
+"2" (GENERATION 1) and "3" (GENERATION 2) in the "SDLPoP.ini" file use the same ROM files producing
+the same exact music output.
