@@ -730,5 +730,7 @@ void menu_was_closed(void);
 void stop_midi(void);
 void init_midi(void);
 void midi_callback(void *userdata, Uint8 *stream, int len);
+void mt32_tail_callback(Uint8 *stream, int len);
+void free_midi_resources(void);
 void play_midi_sound(sound_buffer_type* buffer);
 void init_mt32(void);

@@ -353,6 +353,7 @@ void quit(int exit_code) {
 
 // seg009:0C90
 void restore_stuff() {
+	free_midi_resources(); // before SDL closes the audio the MT-32 emulator plays through
 	SDL_Quit();
 }
 
@@ -2386,8 +2387,11 @@ void audio_callback(void* userdata, Uint8* stream_orig, int len_orig) {
 	// I.e., digi sounds and music will not cut each other short.
 	if (midi_playing) {
 		midi_callback(userdata, stream, len);
-	} else if (ogg_playing) {
-		ogg_callback(userdata, stream, len);
+	} else {
+		if (ogg_playing) {
+			ogg_callback(userdata, stream, len);
+		}
+		mt32_tail_callback(stream, len); // the MT-32 ringing out after a song; nothing otherwise
 	}
 
 #ifdef USE_FAST_FORWARD

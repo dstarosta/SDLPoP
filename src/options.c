@@ -19,6 +19,7 @@ The authors of this program may be contacted at https://forum.princed.org
 */
 
 #include "common.h"
+#include "mt32synth.h"
 #include <ctype.h>
 #ifdef __amigaos4__
 #define strtoimax(a,b,c) strtoll(a,b,c)
@@ -211,6 +212,7 @@ static int global_ini_callback(const char *section, const char *name, const char
 				memmove(path, path + 1, len - 2);
 				path[len - 2] = '\0';
 			}
+			mt32synth_path_to_utf8(path, sizeof(path));
 			if (path[0] != '\0' && strcasecmp(path, "default") != 0) {
 				const char* located = locate_file(path);
 				struct stat info;

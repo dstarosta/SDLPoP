@@ -27,31 +27,28 @@ relative to the executable).
 // Returns the DAC name by its value.
 const char* get_dac_name(int value);
 
-// Initializes the emulator and loads the ROMs from rom_dir (e.g. "data/roms").
-// Returns 1 on success, 0 if ROMs/DLL are unavailable to fall back on OPL.
+// Makes a path from an SDLPoP.ini saved in the system's code page UTF-8; empties it if that fails.
+void mt32synth_path_to_utf8(char* path, size_t path_size);
+
+// Brings the emulator up with the ROMs in rom_dir. Returns 0 if the library or ROMs are missing (use OPL).
 int mt32synth_init(int out_freq, const char* rom_dir);
 
 // Frees the emulator. Safe to call even if init failed.
 void mt32synth_free(void);
 
-// Resets the MT-32 context and restores timbers, when necessary.
-void mt32_reset_context(bool restore_timbres);
-
 // Forwards one raw MIDI short message (status, data1, data2) to the emulator.
 void mt32synth_send_message(int status, int data1, int data2);
 
-// Forwards a raw SysEx packet (PoP's custom-timbre upload) to the emulator.
-void mt32synth_send_sysex(const unsigned char* data, int length);
-
-// Like mt32synth_send_sysex but applied synchronously (not queued for the render thread).
+// Applies a raw SysEx packet (PoP's custom-timbre upload) to the emulator at once, not queued.
 void mt32synth_send_sysex_now(const unsigned char* data, int length);
 
-// Captures the synth's current state (PoP's just-applied init).
-// Returns 1 on success (0 if it should be retried next song).
-int mt32synth_capture_state(void);
+// Returns 1 while the emulator still makes sound (notes or reverb), 0 once it is silent.
+int mt32synth_is_active(void);
 
-// Renders 'num_frames' stereo frames (interleaved L,R 16-bit) into 'buffer', resampled to
-// the mixing frequency. Matches OPL3_GenerateStream so it drops into midi_callback.
+// Empties the reverb, keeping its settings. Only while the audio thread is not rendering from the emulator.
+void mt32synth_flush_reverb(void);
+
+// Renders stereo 16-bit frames at the mixing frequency, as OPL3_GenerateStream does for midi_callback.
 void mt32synth_generate_stream(short* buffer, int num_frames);
 
 #endif // MT32SYNTH_H

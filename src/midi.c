@@ -67,15 +67,20 @@ static int mixing_freq;
 static sbyte midi_semitones_higher;
 static float current_midi_tempo_modifier;
 
-static bool mt32_sound_has_programs = false; // true if the current sound has Program Change events
-static bool mt32_sound_has_programs_cache[59]; // true if sound has Program Changes; filled on first play (max_sound_id+1)
 static int mt32_ok = 0; // 1 = MT-32 emulator; 0 - fall back to OPL
-static int mt32_reset_pending = 1; // an MT-32 song ended or have not played yet
+static bool mt32_note_held[MAX_MIDI_CHANNELS][128]; // notes sounding on the MT-32, by channel
+static int mt32_tail_frames = 0; // frames the MT-32 is still rendered for, after a song ends or is stopped
+static bool mt32_tail_fading = false; // the tail has become quiet and is being faded out
+static int mt32_tail_fade_left = 0; // frames of that fade still to go; after them the tail is unheard
+static int mt32_tail_window_frames = 0; // frames of the tail measured since its loudness was last judged
+static int mt32_tail_window_peak = 0; // the loudest sample among them
 
-// Sound IDs whose notes must be shifted down one octave because they sound more like the OPL version.
-static const int mt32_octave_down_sounds[] = {
-	sound_37_victory,
-};
+#define MT32_TAIL_SECONDS 6 // longest the emulator is given to finish with the last notes
+#define MT32_TAIL_QUIET_LEVEL 400 // a tail below this (of 32767) is only a slight reverb
+#define MT32_TAIL_WINDOW_MS 20 // how long a stretch of the tail is judged at a time
+#define MT32_TAIL_FADE_MS 150 // how quickly a quiet tail is faded out
+#define MT32_RUN_AHEAD_MS 3 // processor time per audio call spent running the unheard emulator ahead
+#define MT32_RUN_AHEAD_FRAMES 512 // frames rendered at a time while doing so
 
 // Tempo adjustments for specific songs:
 // * PV scene, with 'Story 3 Jaffar enters':
@@ -395,22 +400,13 @@ static void opl_write_instrument(instrument_type* instrument, byte voice) {
 }
 
 
-static byte mt32_adjust_note(byte note) {
-	for (size_t i = 0; i < sizeof(mt32_octave_down_sounds) / sizeof(mt32_octave_down_sounds[0]); ++i) {
-		if (current_sound == mt32_octave_down_sounds[i]) {
-			int shifted = (int)note - 12;
-			return (byte)(shifted < 0 ? 0 : shifted);
-		}
-	}
-	return note;
-}
-
 static void midi_note_off(midi_event_type* event) {
 	byte note = event->channel.param1;
 	byte channel = event->channel.channel;
 
 	if (mt32_ok) {
-		mt32synth_send_message(0x80 | channel, mt32_adjust_note(note), 0);
+		mt32_note_held[channel][note & 0x7F] = false;
+		mt32synth_send_message(0x80 | channel, note, 0);
 		return;
 	}
 
@@ -437,7 +433,8 @@ static void midi_note_on(midi_event_type* event) {
 	byte channel = event->channel.channel;
 
 	if (mt32_ok) {
-		mt32synth_send_message((velocity == 0 ? 0x80 : 0x90) | channel, mt32_adjust_note(note), velocity);
+		mt32_note_held[channel][note & 0x7F] = (velocity != 0);
+		mt32synth_send_message((velocity == 0 ? 0x80 : 0x90) | channel, note, velocity);
 		return;
 	}
 
@@ -519,29 +516,15 @@ static void process_midi_event(midi_event_type* event) {
 			}
 
 			break;
-		case 0xF0: { // SysEx event:
-			// SDLPoP's private transpose event: manufacturer id "00 00 34", which is NOT a real
-			// Roland id — it tells PoP's own driver to shift all notes. It should never be
-			// forwarded to the MT-32.
-			bool is_pop_transpose = (event->sysex.length == 7 &&
-			                         event->sysex.data[0] == 0 &&
-			                         event->sysex.data[1] == 0 &&
-			                         event->sysex.data[2] == 0x34 &&
-			                         (event->sysex.data[3] == 0 || event->sysex.data[3] == 1));
-			if (is_pop_transpose) {
-				midi_semitones_higher = event->sysex.data[5]; // used only by the OPL path
-			}
-			if (mt32_ok && !is_pop_transpose) {
-				int slen = (int)event->sysex.length;
-				static byte sx[4096];
-				if (slen + 1 <= (int)sizeof(sx)) {
-					sx[0] = 0xF0;
-					memcpy(sx + 1, event->sysex.data, (size_t)slen);
-					mt32synth_send_sysex(sx, slen + 1);
+		case 0xF0: // SysEx event:
+			// The only SysEx in the songs is this shift. It is for the OPL path: the MT-32 ignores it.
+			if (event->sysex.length == 7) {
+				byte* data = event->sysex.data;
+				if (data[2] == 0x34 && (data[3] == 0 || data[3] == 1) && data[4] == 0) {
+					midi_semitones_higher = data[5]; // Make all notes higher by this amount.
 				}
 			}
 			break;
-		}
 		case 0xFF: // Meta event
 			switch(event->meta.type) {
 				default:
@@ -570,6 +553,114 @@ static void process_midi_event(midi_event_type* event) {
 
 #define ONE_SECOND_IN_US 1000000LL
 
+// What the DOS game sends when a song stops: note offs, then All Notes Off and a centered bend per channel.
+static void mt32_release_notes(void) {
+	for (int channel = 0; channel < MAX_MIDI_CHANNELS; ++channel) {
+		for (int note = 0; note < 128; ++note) {
+			if (mt32_note_held[channel][note]) {
+				mt32_note_held[channel][note] = false;
+				mt32synth_send_message(0x80 | channel, note, 0);
+			}
+		}
+		mt32synth_send_message(0xB0 | channel, 123, 0);
+		mt32synth_send_message(0xE0 | channel, 0, 64);
+	}
+}
+
+// Ends the ringing out. The lock is always taken, so the audio thread is out of the emulator afterwards.
+static void mt32_stop_tail(void) {
+	if (digi_audio_stream == NULL) {
+		return;
+	}
+	SDL_LockAudioStream(digi_audio_stream);
+	mt32_tail_frames = 0;
+	SDL_UnlockAudioStream(digi_audio_stream);
+}
+
+// Starts the ringing out of a song that has ended or been stopped.
+static void mt32_start_tail(void) {
+	mt32_tail_fading = false;
+	mt32_tail_fade_left = 0;
+	mt32_tail_window_frames = 0;
+	mt32_tail_window_peak = 0;
+	mt32_tail_frames = MT32_TAIL_SECONDS * mixing_freq;
+}
+
+// Lets the last notes of an ended song ring out, fades the quiet rest, then runs the emulator out unheard.
+void mt32_tail_callback(Uint8* stream, int len) {
+	static short tail_buffer[4096];
+	int frames_needed = len / 4;
+	int fade_frames = MT32_TAIL_FADE_MS * mixing_freq / 1000;
+	int window_frames = MT32_TAIL_WINDOW_MS * mixing_freq / 1000;
+	while (frames_needed > 0 && mt32_tail_frames > 0) {
+		int advance_frames = MIN(frames_needed, mt32_tail_frames);
+		advance_frames = MIN(advance_frames, (int)(sizeof(tail_buffer) / sizeof(tail_buffer[0]) / 2));
+		if (!mt32_tail_fading) {
+			advance_frames = MIN(advance_frames, window_frames - mt32_tail_window_frames);
+		}
+		mt32synth_generate_stream(tail_buffer, advance_frames);
+		if (!mt32_tail_fading) {
+			for (int sample = 0; sample < advance_frames * 2; ++sample) {
+				mt32_tail_window_peak = MAX(mt32_tail_window_peak, abs(tail_buffer[sample]));
+			}
+			mt32_tail_window_frames += advance_frames;
+		}
+		bool unheard = mt32_tail_fading && mt32_tail_fade_left == 0;
+		if (is_sound_on && enable_music && !unheard) {
+			for (int sample = 0; sample < advance_frames * 2; ++sample) {
+				int tail_sample = tail_buffer[sample];
+				if (mt32_tail_fading) {
+					int fade_left = mt32_tail_fade_left - sample / 2;
+					tail_sample = (fade_left > 0) ? tail_sample * fade_left / fade_frames : 0;
+				}
+				int mixed = (int)((short*)stream)[sample] + tail_sample;
+				if (mixed > 32767) {
+					mixed = 32767;
+				} else if (mixed < -32768) {
+					mixed = -32768;
+				}
+				((short*)stream)[sample] = (short)mixed;
+			}
+		}
+		frames_needed -= advance_frames;
+		stream += advance_frames * 4;
+		if (mt32synth_is_active()) {
+			mt32_tail_frames -= advance_frames;
+		} else {
+			mt32_tail_frames = 0;
+		}
+		if (mt32_tail_fading && mt32_tail_fade_left > 0) {
+			mt32_tail_fade_left = MAX(mt32_tail_fade_left - advance_frames, 0);
+			if (mt32_tail_fade_left == 0) {
+				mt32synth_flush_reverb(); // nothing is heard any more: the reverb need not be run out
+			}
+		}
+		if (!mt32_tail_fading && mt32_tail_window_frames >= window_frames) {
+			if (mt32_tail_window_peak < MT32_TAIL_QUIET_LEVEL) {
+				mt32_tail_fading = true;
+				mt32_tail_fade_left = fade_frames;
+			}
+			mt32_tail_window_frames = 0;
+			mt32_tail_window_peak = 0;
+		}
+		if (mt32_tail_frames == 0) {
+			mt32synth_flush_reverb(); // nothing of this song is left to come back under the next one
+		}
+	}
+	// Once unheard, the emulator is run ahead for a few milliseconds per call, to be finished sooner.
+	if (mt32_tail_frames > 0 && mt32_tail_fading && mt32_tail_fade_left == 0) {
+		Uint64 budget = SDL_GetPerformanceFrequency() * MT32_RUN_AHEAD_MS / 1000;
+		Uint64 start = SDL_GetPerformanceCounter();
+		while (mt32_tail_frames > 0 && SDL_GetPerformanceCounter() - start < budget) {
+			mt32synth_generate_stream(tail_buffer, MT32_RUN_AHEAD_FRAMES);
+			mt32_tail_frames = mt32synth_is_active() ? MAX(mt32_tail_frames - MT32_RUN_AHEAD_FRAMES, 0) : 0;
+		}
+		if (mt32_tail_frames == 0) {
+			mt32synth_flush_reverb();
+		}
+	}
+}
+
 void midi_callback(void* userdata, Uint8* stream, int len) {
 	if (!midi_playing || len <= 0) return;
 	int frames_needed = len / 4;
@@ -582,6 +673,7 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
 			int64_t advance_us = MIN(us_to_next_pause, us_needed);
 			int available_frames = (int)(((advance_us * mixing_freq) + ONE_SECOND_IN_US - 1) / ONE_SECOND_IN_US); // round up.
 			int advance_frames = MIN(available_frames, frames_needed);
+			advance_frames = MIN(advance_frames, (int)(sizeof(temp_buffer) / sizeof(temp_buffer[0]) / 2));
 			advance_us = advance_frames * ONE_SECOND_IN_US / mixing_freq; // recalculate, in case the rounding up increased this.
 			if (mt32_ok) {
 				mt32synth_generate_stream(temp_buffer, advance_frames);
@@ -590,8 +682,7 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
 			}
 			if (is_sound_on && enable_music) {
 				for (int sample = 0; sample < advance_frames * 2; ++sample) {
-					// The line below causes overflows
-					// ((short*)stream)[sample] += temp_buffer[sample];
+					// A plain += would overflow.
 					int mixed = (int)((short*)stream)[sample] + (int)temp_buffer[sample];
 					if (mixed > 32767) {
 						mixed = 32767;
@@ -644,13 +735,18 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
 				}
 			}
 			if (num_finished_tracks >= num_midi_tracks) {
+				if (mt32_ok) {
+					// The song is over for the game, but the MT-32 is left to ring out.
+					midi_playing = 0;
+					free_parsed_midi(&parsed_midi);
+					mt32_start_tail();
+					mt32_tail_callback(stream, frames_needed * 4);
+					return;
+				}
 				// All tracks have finished. Fill the remaining samples with silence and stop playback.
 				SDL_memset(stream, 0, frames_needed * 4);
 //				printf("midi_callback(): sound ended\n");
 				midi_playing = 0;
-				if (mt32_ok) {
-					mt32_reset_pending = 1;
-				}
 				free_parsed_midi(&parsed_midi);
 				return;
 			} else {
@@ -684,7 +780,10 @@ void stop_midi() {
 	SDL_LockAudioStream(digi_audio_stream);
 	midi_playing = 0;
 	if (mt32_ok) {
-		mt32_reset_pending = 1;
+		// As the DOS game does, but with the reverb emptied too, so a stopped song is gone sooner.
+		mt32_release_notes();
+		mt32synth_flush_reverb();
+		mt32_start_tail();
 	}
 	free_parsed_midi(&parsed_midi);
 	SDL_UnlockAudioStream(digi_audio_stream);
@@ -695,6 +794,9 @@ static parsed_midi_type mt32_init_parsed;
 static bool mt32_init_parsed_ok;
 
 void free_midi_resources(void) {
+	// The audio thread must be out of the emulator before it is freed.
+	stop_midi();
+	mt32_stop_tail();
 	free(instruments_data);
 	// MT-32 cleanup - no need for a guard - no-ops
 	instruments_data = NULL;
@@ -708,12 +810,7 @@ void free_midi_resources(void) {
 	mt32_ok = 0;
 }
 
-// Reads Prince of Persia's MT-32 init resource (id -1) directly from PRINCE.DAT handle, as a
-// fallback when the decomposed data/PRINCE/res65535.bin file is not present.
-//
-// We cannot use "load_from_opendats_alloc". It searches every open DAT (others also carry a -1 entry)
-// and compares the index id — stored as the 16-bit value 0xFFFF — against the int -1, which never
-// matches.
+// Reads PoP's MT-32 init (id -1) from PRINCE.DAT: load_from_opendats_alloc never matches a 16-bit 0xFFFF id.
 static void* load_mt32_init_from_dat(dat_type* dat, int* out_size) {
 	if (dat == NULL || dat->handle == NULL || dat->dat_table == NULL) {
 		return NULL;
@@ -772,10 +869,7 @@ void init_midi() {
 		}
 	}
 
-	// Load PoP's MT-32 custom-timbre init and parse it once.
-	// We read it directly from the decomposed resource file data/PRINCE/res65535.bin.
-	// The file is the raw resource: a sound tag byte (0x02 = MIDI) followed by the MThd
-	// MIDI data.
+	// PoP's MT-32 custom-timbre init, as the raw resource: a sound tag byte (0x02 = MIDI), then the MThd data.
 	{
 		const char* init_path = locate_file("data/PRINCE/res65535.bin");
 		FILE* initf = fopen(init_path, "rb");
@@ -809,10 +903,7 @@ void init_midi() {
 	if (dathandle != NULL) close_dat(dathandle);
 }
 
-// Uploads PoP's custom timbres to the emulated MT-32 by replaying every SysEx in the init
-// sequence. Must be sent after each synth reset and before a song, so the MT-32's
-// parts/timbres are configured the way the MT32SND music expects. Only the SysEx events
-// matter; we send them in order.
+// Sends one complete SysEx packet of PoP's init to the MT-32.
 static void mt32_flush_sysex(byte* buf, int len, int* sent) {
 	if (len > 1 && buf[len - 1] == 0xF7) {
 		mt32synth_send_sysex_now(buf, len);
@@ -820,7 +911,7 @@ static void mt32_flush_sysex(byte* buf, int len, int* sent) {
 	}
 }
 
-// Sends PoP specific instruments to the MT-32 emulator.
+// Uploads PoP's custom timbres: every SysEx of the init sequence, in order. Sent once, before the first song.
 static void mt32_send_init(void) {
 	if (!mt32_init_parsed_ok) return;
 
@@ -867,32 +958,27 @@ static void mt32_send_init(void) {
 	(void) sent;
 }
 
-// Returns 1 if the real MT-32 emulator is up (MUNT mt32emu DLL + ROMs both present), 0 if we
-// must use the OPL/Adlib path. The emulator is brought up once, on first call.
+// Brings the MT-32 emulator up, once: the library, a ROM pair and PoP's init must all be there, or OPL is used.
 void init_mt32(void) {
 	static int mt32_init_tried = 0;
 	if (!mt32_init_tried) {
 		mt32_init_tried = 1;
-		// MT32 DAC option set to a negative value means do not use MT-32.
-		// The "sblaster" command line parameter should force the digi/OPL path like PoP 1.3+.
-		if (mt32_dac < 0 || check_param("sblaster")) {
+		// OPL is forced by a negative mt32_dac, an unusable mt32_rom_path, or "sblaster" (as in PoP 1.3+).
+		if (mt32_dac < 0 || mt32_rom_path[0] == '\0' || check_param("sblaster")) {
 			mt32_ok = 0;
 			return;
 		}
 		init_digi();
 		init_midi();
-		if (!digi_unavailable && mt32synth_init(digi_audiospec->freq, mt32_rom_path)) {
-			mt32_ok = 1;
+		// The default path is relative to the executable, wherever the game was started from.
+		const char* rom_dir = locate_file(mt32_rom_path);
+		if (!digi_unavailable && mt32synth_init(digi_audiospec->freq, rom_dir)) {
 			if (mt32_init_parsed_ok) {
 				mt32_send_init();
-				if (!mt32synth_capture_state()) {
-					mt32_ok = 0;
-				}
+				mt32_ok = 1;
 			} else {
-				mt32_ok = 0;
-			}
-			if (!mt32_ok) {
 				mt32synth_free();
+				mt32_ok = 0;
 			}
 		} else {
 			mt32_ok = 0;
@@ -902,26 +988,6 @@ void init_mt32(void) {
 			       get_dac_name(mt32_dac), mt32_quality, mt32_reverb ? "on" : "off");
 		}
 	}
-}
-
-static bool midi_sound_has_program_changes(void) {
-	int id = current_sound;
-	int cache_size = (int)(sizeof(mt32_sound_has_programs_cache) / sizeof(mt32_sound_has_programs_cache[0]));
-	if (id >= 0 && id < cache_size && mt32_sound_has_programs_cache[id]) {
-		return true;
-	}
-	bool found = false;
-	for (int t = 0; t < parsed_midi.num_tracks && !found; ++t) {
-		for (int i = 0; i < parsed_midi.tracks[t].num_events && !found; ++i) {
-			if (parsed_midi.tracks[t].events[i].event_type == 0xC0) {
-				found = true;
-			}
-		}
-	}
-	if (id >= 0 && id < cache_size) {
-		mt32_sound_has_programs_cache[id] = found;
-	}
-	return found;
 }
 
 void play_midi_sound(sound_buffer_type* buffer) {
@@ -936,13 +1002,8 @@ void play_midi_sound(sound_buffer_type* buffer) {
 		return;
 	}
 
-	if (mt32_ok) {
-		mt32_sound_has_programs = midi_sound_has_program_changes();
-		if (mt32_reset_pending) {
-			mt32_reset_context(mt32_sound_has_programs);
-			mt32_reset_pending = 0;
-		}
-	} else {
+	// The MT-32 keeps the last song's instruments, as in the DOS game: the two victory songs select none.
+	if (!mt32_ok) {
 		// Initialize the OPL chip.
 		opl_reset(digi_audiospec->freq);
 		opl_write_reg(0x105, 0x01); // OPL3 enable (note: the PoP1 Adlib sounds don't actually use OPL3 extensions)
@@ -967,5 +1028,13 @@ void play_midi_sound(sound_buffer_type* buffer) {
 	ticks_per_beat = parsed_midi.ticks_per_beat;
 	mixing_freq = digi_audiospec->freq;
 	midi_playing = 1;
+	if (mt32_ok) {
+		// One unheard frame sends the opening events now, as the DOS driver does, even if the song is stopped at once.
+		short first_frame[2] = {0, 0};
+		SDL_LockAudioStream(digi_audio_stream);
+		mt32synth_flush_reverb();
+		midi_callback(NULL, (Uint8*)first_frame, sizeof(first_frame));
+		SDL_UnlockAudioStream(digi_audio_stream);
+	}
 	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }

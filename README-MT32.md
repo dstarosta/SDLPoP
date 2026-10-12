@@ -119,9 +119,9 @@ You can use either set:
 
 MT-32 ROMs are used by default because they are the most popular and match the game era. The CM-32L
 adds extra PCM samples and may sound slightly different on some sounds -- try it if you prefer its
-character. The emulator recognises the ROMs by their contents, so the exact file names only need to
-match one of the pairs above (upper- or lower-case both work, but both files must use the same
-convention). The `mt32_dac` option is documented below.
+character. The emulator recognises the ROMs by their contents, so the file names only need to
+match one of the pairs above; upper and lower case do not matter. When both pairs are present,
+the `mt32_dac` option (documented below) decides which one is used.
 
 ---
 
