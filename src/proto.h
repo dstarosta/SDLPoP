@@ -609,6 +609,7 @@ void window_resized(void);
 void set_gr_mode(byte grmode);
 SDL_Surface* load_png_file_as_surface(const char* path);
 SDL_Surface* get_final_surface(void);
+void recreate_render_surfaces(void);
 void begin_text_draw(const SDL_Rect* rect);
 void end_text_draw(bool is_text);
 void save_smoothed_screen(const char* path);
@@ -747,6 +748,8 @@ void init_mt32(void);
 
 // mac_graphics.c
 void init_mac_graphics(void);
+bool is_graphics_available(byte setting);
+void apply_graphics_setting(void);
 bool uses_mac_graphics(void);
 bool uses_snes_graphics(void);
 FILE* open_snes_resource(const char* dat_filename, int resource_id, const char* extension);

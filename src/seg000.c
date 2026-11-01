@@ -157,6 +157,8 @@ void init_game_main() {
     doorlink1_ad = /*&*/level.doorlinks1;
     doorlink2_ad = /*&*/level.doorlinks2;
     prandom(1);
+    // The splash screen can switch the graphics, so it comes before anything loads with them.
+    show_splash(); // added
     if (graphics_mode == gmMcgaVga) {
         // Guard palettes
         guard_palettes = (byte*) load_from_opendats_alloc(10, "bin", NULL, NULL);
@@ -180,7 +182,6 @@ void init_game_main() {
     init_mt32();
 
     hof_read();
-    show_splash(); // added
     start_game();
 }
 
@@ -2465,26 +2466,62 @@ const rect_type splash_text_2_rect = {50, 0, 200, 320};
 const char* splash_text_1 = "SDLPoP " SDLPOP_VERSION;
 const char* splash_text_2 =
     "In-game, Esc opens a settings/quicksave menu.\n"
-    "\n"
 #ifdef USE_REPLAY
     "To record replays, press Ctrl+Tab in-game.\n"
     "To view replays, press Tab on the title screen.\n"
-    "\n"
 #endif
+    "\n"
     "Edit SDLPoP.ini to customize SDLPoP.\n"
     "Mods also work with SDLPoP.\n"
-    "\n"
     "For more information, read README.md.\n"
     "Questions? Visit https://forum.princed.org\n"
-    "\n"
-    "Press any key to continue...";
+    "\n";
+
+// The splash screen keys that choose the graphics for this run, overriding SDLPoP.ini and the command line.
+static const struct {
+    SDL_Scancode key;
+    byte setting;
+    const char* text;
+} splash_graphics_keys[] = {
+    {SDL_SCANCODE_D, 1, "D - DOS graphics\n"},
+    {SDL_SCANCODE_M, 2, "M - Mac high-res graphics\n"},
+    {SDL_SCANCODE_S, 3, "S - SNES graphics\n"},
+};
+
+static void switch_graphics_from_splash(byte setting) {
+    bool was_mac = uses_mac_graphics();
+    graphics_setting = setting;
+    apply_graphics_setting();
+    if (uses_mac_graphics() != was_mac) {
+        recreate_render_surfaces();
+    }
+}
 
 void show_splash() {
     if (!enable_info_screen || start_level >= 0) return;
+    static const char press_text[] = "Press any key - continue";
+    char keys_text[256] = "";
+    for (int i = 0; i < COUNT(splash_graphics_keys); ++i) {
+        if (is_graphics_available(splash_graphics_keys[i].setting)) {
+            strncat(keys_text, splash_graphics_keys[i].text, sizeof(keys_text) - strlen(keys_text) - 1);
+        }
+    }
+    strncat(keys_text, "\n", sizeof(keys_text) - strlen(keys_text) - 1);
+    strncat(keys_text, press_text, sizeof(keys_text) - strlen(keys_text) - 1);
     current_target_surface = onscreen_surface_;
     draw_rect(&screen_rect, color_0_black);
     show_text_with_color(&splash_text_1_rect, halign_center, valign_middle, splash_text_1, color_15_brightwhite);
     show_text_with_color(&splash_text_2_rect, halign_center, valign_top, splash_text_2, color_7_lightgray);
+    // The key lines go below the centred text, left-aligned with the centred "Press any key" line.
+    int help_lines = 0;
+    for (const char* c = splash_text_2; *c; ++c) {
+        if (*c == '\n') ++help_lines;
+    }
+    font_type* font = textstate.ptr_font;
+    rect_type keys_rect = splash_text_2_rect;
+    keys_rect.top += help_lines * (font->height_above_baseline + font->height_below_baseline + font->space_between_lines);
+    keys_rect.left = (keys_rect.right - get_line_width(press_text, (int)strlen(press_text))) / 2;
+    show_text_with_color(&keys_rect, halign_left, valign_top, keys_text, color_7_lightgray);
 
 #ifdef USE_TEXT // Don't wait for a keypress if there is no text for the user to read.
     int key = 0;
@@ -2510,6 +2547,11 @@ void show_splash() {
 
     } while(key == 0 && !(key_states[SDL_SCANCODE_LSHIFT] & KEYSTATE_HELD || key_states[SDL_SCANCODE_RSHIFT] & KEYSTATE_HELD));
 
+    for (int i = 0; i < COUNT(splash_graphics_keys); ++i) {
+        if (key == splash_graphics_keys[i].key && is_graphics_available(splash_graphics_keys[i].setting)) {
+            switch_graphics_from_splash(splash_graphics_keys[i].setting);
+        }
+    }
     if ((key & WITH_CTRL) || (enable_quicksave && key == SDL_SCANCODE_F9) || (enable_replay && key == SDL_SCANCODE_TAB)) {
         extern int last_key_scancode; // defined in seg009.c
         last_key_scancode = key; // can immediately do Ctrl+L, etc from the splash screen

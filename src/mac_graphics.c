@@ -59,16 +59,26 @@ void init_mac_graphics(void) {
 			}
 		}
 	}
-	bool mac_available = file_exists(locate_file("data/mac/KID/origins.txt"));
-	if (graphics_setting == 2 && !mac_available) {
+	if (graphics_setting == 2 && !is_graphics_available(2)) {
 		printf("Macintosh graphics were requested, but data/mac is missing. Using DOS graphics.\n");
 	}
-	mac_graphics = mac_available && (graphics_setting == 0 || graphics_setting == 2);
-	bool snes_available = file_exists(locate_file("data/snes"));
-	if (graphics_setting == 3 && !snes_available) {
+	if (graphics_setting == 3 && !is_graphics_available(3)) {
 		printf("SNES graphics were requested, but data/snes is missing. Using DOS graphics.\n");
 	}
-	snes_graphics = snes_available && graphics_setting == 3;
+	apply_graphics_setting();
+}
+
+// setting: 1 = DOS, 2 = Mac, 3 = SNES (as in graphics_setting).
+bool is_graphics_available(byte setting) {
+	if (setting == 2) return file_exists(locate_file("data/mac/KID/origins.txt"));
+	if (setting == 3) return file_exists(locate_file("data/snes"));
+	return true;
+}
+
+// At startup, and when the splash screen switches the graphics (then followed by recreate_render_surfaces()).
+void apply_graphics_setting(void) {
+	mac_graphics = is_graphics_available(2) && (graphics_setting == 0 || graphics_setting == 2);
+	snes_graphics = is_graphics_available(3) && graphics_setting == 3;
 }
 
 bool uses_mac_graphics(void) {

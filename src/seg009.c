@@ -2851,11 +2851,9 @@ void window_resized() {
 }
 
 void init_overlay(void) {
-	static bool initialized = false;
-	if (!initialized) {
+	if (overlay_surface == NULL) {
 		overlay_surface = SDL_CreateSurface(get_render_width(), get_render_height(), SURFACE_FORMAT_32BPP);
 		merged_surface = SDL_CreateSurface(get_render_width(), get_render_height(), SURFACE_FORMAT_24BPP);
-		initialized = true;
 	}
 }
 
@@ -3150,6 +3148,36 @@ void init_scaling(void) {
 		sdlperror("init_scaling: SDL_CreateTexture");
 		quit(1);
 	}
+}
+
+static void destroy_texture(SDL_Texture** texture) {
+	if (*texture != NULL) SDL_DestroyTexture(*texture);
+	*texture = NULL;
+}
+
+// After the graphics were switched (and so the render scale): makes again what set_gr_mode() sized by it.
+void recreate_render_surfaces(void) {
+	bool target_was_onscreen = current_target_surface == onscreen_surface_;
+	SDL_DestroySurface(onscreen_surface_);
+	onscreen_surface_ = SDL_CreateSurface(get_render_width(), get_render_height(), SURFACE_FORMAT_24BPP);
+	if (onscreen_surface_ == NULL) {
+		sdlperror("recreate_render_surfaces: SDL_CreateSurface");
+		quit(1);
+	}
+	if (target_was_onscreen) current_target_surface = onscreen_surface_;
+	SDL_DestroySurface(overlay_surface);
+	SDL_DestroySurface(merged_surface);
+	overlay_surface = merged_surface = NULL;
+	init_overlay();
+	SDL_DestroySurface(smooth_surface);
+	smooth_surface = NULL;
+	destroy_texture(&texture_sharp);
+	destroy_texture(&texture_fuzzy);
+	destroy_texture(&texture_blurry);
+	destroy_texture(&texture_smooth);
+	target_texture = NULL;
+	if (renderer_ != NULL) apply_aspect_ratio();
+	init_scaling();
 }
 
 // seg009:38ED
