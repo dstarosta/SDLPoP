@@ -460,6 +460,7 @@ typedef struct dat_type {
 	char filename[POP_MAX_PATH];
 	dat_table_type* dat_table;
 	// handle and dat_table are NULL if the DAT is a directory.
+	bool from_mod; // the DAT file is the mod's own
 } dat_type;
 
 typedef void (*cutscene_ptr_type)(void);

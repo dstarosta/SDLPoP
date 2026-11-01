@@ -39,7 +39,7 @@ void mac_architecture_changed(byte room, byte tile, byte old_modifier, byte modi
 		changed = frames[MIN(old_modifier & 0x7F, 6)] != frames[MIN(modifier & 0x7F, 6)] ||
 		          ((old_modifier ^ modifier) & 0x80);
 	}
-	if (changed) need_full_redraw = 1;
+	if (changed) need_mac_tile_redraw = 1;
 }
 
 // seg007:0000
@@ -482,6 +482,8 @@ Possible values of trob_type:
 				if (!(fixes->fix_feather_interrupted_by_leveldoor && is_feather_fall))
 #endif
 				stop_sounds();
+				// The opening sound loops while not interruptible; if stop_sounds() was skipped, let it play out.
+				sound_interruptible[sound_15_leveldoor_sliding] = 1;
 				if (leveldoor_open == 0 || leveldoor_open == 2) {
 					leveldoor_open = 1;
 					if (current_level == /*4*/ custom->mirror_level) {
@@ -1122,7 +1124,7 @@ void loose_fall() {
 // seg007:132C
 void redraw_at_cur_mob() {
 	if (curmob.room != drawn_room && mac_architecture_visible(curmob.room))
-		need_full_redraw = 1;
+		need_mac_tile_redraw = 1;
 	if (curmob.room == drawn_room) {
 		redraw_height = 0x20;
 		set_redraw_full(curr_tilepos, 1);

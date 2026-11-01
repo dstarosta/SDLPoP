@@ -612,8 +612,10 @@ again:
 
 	// Now we have the arrangement, let's make the picture!
 
-	int image_width = map_width*320;
-	int image_height = map_height*189+3+8;
+	// The screen is drawn at the render scale (2 with Mac graphics).
+	int scale = get_render_scale();
+	int image_width = map_width*320*scale;
+	int image_height = (map_height*189+3+8)*scale;
 
 	SDL_Surface* map_surface = SDL_CreateSurface(image_width, image_height, SURFACE_FORMAT_32BPP);
 	if (map_surface == NULL) {
@@ -695,8 +697,8 @@ again:
 			int room = map[y][x];
 			if (room) {
 				SDL_Rect dest_rect;
-				dest_rect.x = x*320;
-				dest_rect.y = y*189;
+				dest_rect.x = x*320*scale;
+				dest_rect.y = y*189*scale;
 				switch_to_room(room);
 
 				if (want_extras) draw_extras();

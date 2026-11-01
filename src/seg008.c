@@ -863,14 +863,15 @@ void draw_room() {
 static void draw_snes_door_top_from_above(void) {
 	if (!uses_snes_graphics() || drawn_row >= 2) return;
 	// draw_leveldoor() runs for the tile right of the door's left half; find that tile's xh.
-	// (Without Mac graphics, row_below_left_ only holds columns 0..9.)
+	// row_below_left_[i] holds column i-1; without Mac graphics only indexes 0..9 are filled.
 	// The tile above and right of the door also counts: it draws the decorations of the tile above the door's right half.
+	// At column 0, a door whose right half is in column -1 is drawn in the room to the left, not here.
 	int door_xh;
 	if (drawn_col < 9 && row_below_left_[drawn_col + 1].tiletype == tiles_16_level_door_left) {
 		door_xh = draw_xh + 4;
 	} else if (row_below_left_[drawn_col].tiletype == tiles_16_level_door_left) {
 		door_xh = draw_xh;
-	} else if (row_below_left_[drawn_col].tiletype == tiles_17_level_door_right) {
+	} else if (drawn_col > 0 && row_below_left_[drawn_col].tiletype == tiles_17_level_door_right) {
 		door_xh = draw_xh - 4;
 	} else {
 		return;
@@ -1603,8 +1604,13 @@ image_type* get_image(short chtab_id, int id) {
 	return chtab->images[id];
 }
 
+// Physical clip top for the next add_backtable() entry; set before the call because draw mode draws at once.
+static int next_backtable_clip_top = -1;
+
 // seg008:10A8
 int add_backtable(short chtab_id, int id, sbyte xh, sbyte xl, int ybottom, int blit, byte peel) {
+	int clip_top = next_backtable_clip_top;
+	next_backtable_clip_top = -1;
 	if (id == 0) {
 		return 0;
 	}
@@ -1628,7 +1634,7 @@ int add_backtable(short chtab_id, int id, sbyte xh, sbyte xl, int ybottom, int b
 	backtable_item->physical_x = 0;
 	backtable_item->physical_y = 0;
 	backtable_item->physical_clip_bottom = -1;
-	backtable_item->physical_clip_top = -1;
+	backtable_item->physical_clip_top = clip_top;
 	if (draw_mode) {
 		draw_back_fore(0, index);
 	}
@@ -2447,11 +2453,11 @@ void draw_leveldoor() {
 	leveldoor_ybottom = ybottom - (modifier_left & 3) - 48;
 	short y = ybottom - modifier_left;
 	do { // runs at least once
-		if (add_backtable(id_chtab_6_environment, 33 /*level door bottom*/, draw_xh + 1, 0, leveldoor_ybottom, blitters_0_no_transp, 0) &&
-		    uses_snes_graphics()) {
+		if (uses_snes_graphics()) {
 			// The SNES door is a whole panel, not a slab: keep it inside the doorway, or it paints over the tile above.
-			backtable[backtable_count - 1].physical_clip_top = (draw_main_y - 64) * get_render_scale();
+			next_backtable_clip_top = (draw_main_y - 64) * get_render_scale();
 		}
+		add_backtable(id_chtab_6_environment, 33 /*level door bottom*/, draw_xh + 1, 0, leveldoor_ybottom, blitters_0_no_transp, 0);
 		if (y > leveldoor_ybottom) leveldoor_ybottom += 4;
 		else break;
 	} while (true);

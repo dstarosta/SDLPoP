@@ -239,7 +239,8 @@ void draw_level_first() {
 // seg003:037B
 void redraw_screen(int drawing_different_room) {
 	// A Mac tile-change redraw is not a room entry, so it must not touch exit_room_timer or the keyboard buffer.
-	const int native_refresh = !drawing_different_room && !different_room && uses_mac_graphics();
+	const int native_refresh = need_mac_tile_redraw && !need_full_redraw && !drawing_different_room && !different_room;
+	need_mac_tile_redraw = 0;
 	if (drawing_different_room || different_room) mac_show_tile_changes();
 	//remove_flash();
 	if (drawing_different_room

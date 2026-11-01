@@ -397,6 +397,8 @@ extern byte tile_object_redraw[30];
 extern byte redraw_frames_above[10];
 // data:4CE2
 extern word need_full_redraw;
+// Mac only: a tile changed in a visible neighbour room. Unlike need_full_redraw, it must not affect game timing.
+extern word need_mac_tile_redraw;
 // data:588E
 extern short n_curr_objs;
 // data:5BAC

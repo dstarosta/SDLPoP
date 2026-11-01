@@ -1516,7 +1516,9 @@ void draw_image_with_blending(image_type* image, int xpos, int ypos) {
 	SDL_Rect src_rect = {0, 0, image->w, image->h};
 	SDL_Rect dest_rect = {xpos, ypos, image->w, image->h};
 	SDL_SetSurfaceColorKey(image, true, 0);
-	if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
+	if (get_render_scale() != 1) {
+		blit_image_scaled_for_renderer(image, &src_rect, current_target_surface, xpos, ypos);
+	} else if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
 		sdlperror("SDL_BlitSurface");
 		quit(1);
 	}

@@ -30,8 +30,6 @@ const Uint8 ambient_level = 128;
 
 // Called once at startup.
 void init_lighting() {
-	// TODO: the lighting overlay is DOS-sized; support it with Mac graphics.
-	if (uses_mac_graphics()) enable_lighting = 0;
 	if (!enable_lighting) return;
 
 	lighting_mask = load_png_file_as_surface(locate_file(mask_filename));
@@ -40,8 +38,20 @@ void init_lighting() {
 		enable_lighting = 0;
 		return;
 	}
+	// The overlay is drawn at the render scale (2 with Mac graphics).
+	int scale = get_render_scale();
+	if (scale != 1) {
+		SDL_Surface* scaled_mask = SDL_ScaleSurface(lighting_mask, lighting_mask->w * scale, lighting_mask->h * scale, SDL_SCALEMODE_LINEAR);
+		SDL_DestroySurface(lighting_mask);
+		lighting_mask = scaled_mask;
+		if (lighting_mask == NULL) {
+			sdlperror("SDL_ScaleSurface (lighting_mask)");
+			enable_lighting = 0;
+			return;
+		}
+	}
 
-	screen_overlay = SDL_CreateSurface(320, 192, SURFACE_FORMAT_32BPP);
+	screen_overlay = SDL_CreateSurface(320 * scale, 192 * scale, SURFACE_FORMAT_32BPP);
 	if (screen_overlay == NULL) {
 		sdlperror("SDL_CreateRGBSurface (screen_overlay)");
 		enable_lighting = 0;
@@ -49,13 +59,13 @@ void init_lighting() {
 	}
 
 	// "color modulate", i.e. multiply.
-	int result = SDL_SetSurfaceBlendMode(screen_overlay, SDL_BLENDMODE_MOD);
-	if (result != 0) {
+	bool result = SDL_SetSurfaceBlendMode(screen_overlay, SDL_BLENDMODE_MOD);
+	if (!result) {
 		sdlperror("SDL_SetSurfaceBlendMode (screen_overlay)");
 	}
 
 	result = SDL_SetSurfaceBlendMode(lighting_mask, SDL_BLENDMODE_ADD);
-	if (result != 0) {
+	if (!result) {
 		sdlperror("SDL_SetSurfaceBlendMode (lighting_mask)");
 	}
 
@@ -71,8 +81,8 @@ void redraw_lighting() {
 	if (curr_room_tiles == NULL) return;
 	if (is_cutscene) return;
 
-	int result = SDL_FillSurfaceRect(screen_overlay, NULL, bgcolor);
-	if (result != 0) {
+	bool result = SDL_FillSurfaceRect(screen_overlay, NULL, bgcolor);
+	if (!result) {
 		sdlperror("SDL_FillSurfaceRect (screen_overlay)");
 	}
 
@@ -81,8 +91,8 @@ void redraw_lighting() {
 		int tile_type = curr_room_tiles[tile_pos] & 0x1F;
 		if (tile_type == tiles_19_torch || tile_type == tiles_30_torch_with_debris) {
 			// Center of the flame.
-			int x = (tile_pos%10)*32+48;
-			int y = (tile_pos/10)*63+22;
+			int x = ((tile_pos%10)*32+48) * get_render_scale();
+			int y = ((tile_pos/10)*63+22) * get_render_scale();
 
 			// Align the center of lighting mask to the center of the flame.
 			SDL_Rect dest_rect;
@@ -91,8 +101,8 @@ void redraw_lighting() {
 			dest_rect.w = lighting_mask->w;
 			dest_rect.h = lighting_mask->h;
 
-			int result = SDL_BlitSurface(lighting_mask, NULL, screen_overlay, &dest_rect);
-			if (result != 0) {
+			bool result = SDL_BlitSurface(lighting_mask, NULL, screen_overlay, &dest_rect);
+			if (!result) {
 				sdlperror("SDL_BlitSurface (lighting_mask)");
 			}
 		}
@@ -112,8 +122,8 @@ void update_lighting(const rect_type* target_rect_ptr) {
 
 	SDL_Rect sdlrect;
 	rect_to_sdlrect(target_rect_ptr, &sdlrect);
-	int result = SDL_BlitSurface(screen_overlay, &sdlrect, onscreen_surface_, &sdlrect);
-	if (result != 0) {
+	bool result = SDL_BlitSurface(screen_overlay, &sdlrect, onscreen_surface_, &sdlrect);
+	if (!result) {
 		sdlperror("SDL_BlitSurface (screen_overlay)");
 	}
 }

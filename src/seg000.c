@@ -93,6 +93,7 @@ void pop_main() {
     init_copyprot_dialog();
 
     load_mod_options();
+    reapply_graphics_setting(); // The mod's own graphics can change the mode.
 
     // CusPop option
     is_blind_mode = custom->start_in_blind_mode;
@@ -912,10 +913,10 @@ void play_frame() {
 // seg000:09B6
 void draw_game_frame() {
     // A Mac tile-change redraw must not swallow a room change; redraw_screen(1) redraws everything anyway.
-    if (need_full_redraw && different_room && uses_mac_graphics()) {
-        need_full_redraw = 0;
+    if (different_room) {
+        need_mac_tile_redraw = 0;
     }
-    if (need_full_redraw) {
+    if (need_full_redraw || need_mac_tile_redraw) {
         redraw_screen(0);
         need_full_redraw = 0;
     } else {
@@ -2489,12 +2490,8 @@ static const struct {
 };
 
 static void switch_graphics_from_splash(byte setting) {
-    bool was_mac = uses_mac_graphics();
     graphics_setting = setting;
-    apply_graphics_setting();
-    if (uses_mac_graphics() != was_mac) {
-        recreate_render_surfaces();
-    }
+    reapply_graphics_setting();
 }
 
 void show_splash() {

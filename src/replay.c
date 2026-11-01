@@ -557,6 +557,7 @@ int savestate_to_buffer(void) {
 }
 
 void reload_resources(void) {
+	mac_graphics_mod_changed();
 	// the replay's levelset might use different sounds, so we need to free and reload sounds
 	free_all_sounds();
 	load_all_sounds();

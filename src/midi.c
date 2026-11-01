@@ -516,6 +516,19 @@ static void process_midi_event(midi_event_type* event) {
 			}
 
 			break;
+		case 0xA0: // aftertouch
+		case 0xB0: // controller
+		case 0xE0: // pitch bend
+			// The OPL path ignores these.
+			if (mt32_ok) {
+				mt32synth_send_message(event->event_type | event->channel.channel, event->channel.param1, event->channel.param2);
+			}
+			break;
+		case 0xD0: // channel aftertouch
+			if (mt32_ok) {
+				mt32synth_send_message(0xD0 | event->channel.channel, event->channel.param1, 0);
+			}
+			break;
 		case 0xF0: // SysEx event:
 			// The only SysEx in the songs is this shift. It is for the OPL path: the MT-32 ignores it.
 			if (event->sysex.length == 7) {
@@ -810,6 +823,24 @@ void free_midi_resources(void) {
 	mt32_ok = 0;
 }
 
+// parse_midi() has no size limit, so check that the header and every track lie inside the
+// resource (a tag byte, then the MIDI data) and that each track ends with End of Track.
+static bool midi_chunks_fit(const byte* data, int size) {
+	int pos = 1;
+	if (size < pos + 14 || memcmp(data + pos, "MThd", 4) != 0) return false;
+	int num_tracks = (data[pos + 10] << 8) | data[pos + 11];
+	pos += 14;
+	for (int track = 0; track < num_tracks; ++track) {
+		if (size - pos < 8 || memcmp(data + pos, "MTrk", 4) != 0) return false;
+		dword length = ((dword)data[pos + 4] << 24) | (data[pos + 5] << 16) | (data[pos + 6] << 8) | data[pos + 7];
+		pos += 8;
+		if (length < 3 || length > (dword)(size - pos)) return false;
+		pos += (int)length;
+		if (memcmp(data + pos - 3, "\xFF\x2F\x00", 3) != 0) return false;
+	}
+	return true;
+}
+
 // Reads PoP's MT-32 init (id -1) from PRINCE.DAT: load_from_opendats_alloc never matches a 16-bit 0xFFFF id.
 static void* load_mt32_init_from_dat(dat_type* dat, int* out_size) {
 	if (dat == NULL || dat->handle == NULL || dat->dat_table == NULL) {
@@ -890,6 +921,12 @@ void init_midi() {
 	// Fallback to resource -1 from PRINCE.DAT
 	if (mt32_init_data == NULL) {
 		mt32_init_data = load_mt32_init_from_dat(dathandle, &size);
+	}
+
+	if (mt32_init_data != NULL && !midi_chunks_fit(mt32_init_data, size)) {
+		printf("MT-32: init sequence is truncated or malformed\n");
+		free(mt32_init_data);
+		mt32_init_data = NULL;
 	}
 
 	if (mt32_init_data != NULL) {

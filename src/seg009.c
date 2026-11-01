@@ -449,6 +449,7 @@ int showmessage(char* text, int arg_4, void* arg_0);
 // seg009:0F58
 dat_type* open_dat(const char* filename, int optional) {
 	FILE* fp = NULL;
+	bool from_mod = false;
 	if (!use_custom_levelset) {
 		fp = open_dat_from_root_or_data_dir(filename);
 	} else {
@@ -461,6 +462,7 @@ dat_type* open_dat(const char* filename, int optional) {
 			// before checking the root directory, first try mods/MODNAME/
 			snprintf_check(filename_mod, sizeof(filename_mod), "%s/%s", mod_data_path, filename);
 			fp = fopen(filename_mod, "rb");
+			from_mod = fp != NULL;
 		}
 		if (fp == NULL && !skip_normal_data_files) {
 			fp = open_dat_from_root_or_data_dir(filename);
@@ -471,6 +473,7 @@ dat_type* open_dat(const char* filename, int optional) {
 
 	dat_type* pointer = (dat_type*) calloc(1, sizeof(dat_type));
 	snprintf_check(pointer->filename, sizeof(pointer->filename), "%s", filename);
+	pointer->from_mod = from_mod;
 	pointer->next_dat = dat_chain_ptr;
 	dat_chain_ptr = pointer;
 
@@ -894,14 +897,12 @@ image_type* decode_image(image_data_type* image_data, dat_pal_type* palette) {
 	return image;
 }
 
-// Load a PNG file from disk into a 32-bit RGBA surface.
-SDL_Surface* load_png_file_as_surface(const char* path) {
+// Load a PNG from memory into a 32-bit RGBA surface.
+static SDL_Surface* load_png_memory_as_rgba(const void* png_data, int png_size) {
 #if SDL_VERSION_ATLEAST(3, 4, 0)
-	SDL_Surface* loaded = SDL_LoadPNG(path);
-	if (loaded == NULL) {
-		return NULL;
-	}
-	if (loaded->format == SDL_PIXELFORMAT_RGBA32) {
+	SDL_IOStream* png_io = SDL_IOFromConstMem(png_data, png_size);
+	SDL_Surface* loaded = png_io ? SDL_LoadPNG_IO(png_io, true) : NULL;
+	if (loaded == NULL || loaded->format == SDL_PIXELFORMAT_RGBA32) {
 		return loaded;
 	}
 	SDL_Surface* surface = SDL_ConvertSurface(loaded, SDL_PIXELFORMAT_RGBA32);
@@ -909,7 +910,7 @@ SDL_Surface* load_png_file_as_surface(const char* path) {
 	return surface;
 #else
 	int w, h;
-	stbi_uc* pixels = stbi_load(path, &w, &h, NULL, STBI_rgb_alpha);
+	stbi_uc* pixels = stbi_load_from_memory((const stbi_uc*)png_data, png_size, &w, &h, NULL, STBI_rgb_alpha);
 	if (pixels == NULL) {
 		return NULL;
 	}
@@ -929,6 +930,18 @@ SDL_Surface* load_png_file_as_surface(const char* path) {
 #endif
 }
 
+// Load a PNG file from disk into a 32-bit RGBA surface.
+SDL_Surface* load_png_file_as_surface(const char* path) {
+	size_t size = 0;
+	void* data = SDL_LoadFile(path, &size);
+	if (data == NULL) {
+		return NULL;
+	}
+	SDL_Surface* surface = load_png_memory_as_rgba(data, (int)size);
+	SDL_free(data);
+	return surface;
+}
+
 // Load a PNG from memory. SDL3 Image was very slow at loading PNGs in batches
 // so we switched to stb_image (and stb_image_write for screenshot.c).
 //
@@ -936,7 +949,8 @@ SDL_Surface* load_png_file_as_surface(const char* path) {
 // pixels via PLTE, so matching against PLTE always gives the original indices).
 //
 // Index 0 is forced transparent, matching decode_image() behaviour.
-static image_type* load_png_image(const void* png_data, int png_size, dat_pal_type* pal_ptr) {
+// PNGs without a PLTE are loaded as RGBA instead.
+static image_type* load_png_image(const void* png_data, int png_size) {
 	static const Uint8 png_sig[8] = {137, 'P', 'N', 'G', 13, 10, 26, 10};
 	SDL_Color plte[256];      // original PLTE colours — used for surface palette
 	SDL_Color lut[256];       // lookup colours — patched to be unique for reverse mapping
@@ -966,6 +980,9 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 			}
 			chunk += 12 + chunk_len;
 		}
+	}
+	if (plte_count == 0) {
+		return load_png_memory_as_rgba(png_data, png_size);
 	}
 
 	// For each PLTE entry that duplicates an earlier entry's colour, assign a unique
@@ -1035,19 +1052,9 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 	}
 
 	SDL_Color surface_palette[256] = {0};
-	int surface_palette_count = plte_count ? plte_count : 16;
-	if (plte_count) {
-		memcpy(surface_palette, plte, plte_count * sizeof(SDL_Color));
-	} else if (pal_ptr) {
-		for (int i = 0; i < 16; ++i) {
-			surface_palette[i].r = pal_ptr->vga[i].r << 2;
-			surface_palette[i].g = pal_ptr->vga[i].g << 2;
-			surface_palette[i].b = pal_ptr->vga[i].b << 2;
-			surface_palette[i].a = SDL_ALPHA_OPAQUE;
-		}
-	}
+	memcpy(surface_palette, plte, plte_count * sizeof(SDL_Color));
 	surface_palette[0].a = SDL_ALPHA_TRANSPARENT;
-	int pal_size = SDL_max(surface_palette_count, 16);
+	int pal_size = SDL_max(plte_count, 16);
 	SDL_Palette* sdl_palette = SDL_CreatePalette(pal_size);
 
 	if (sdl_palette) {
@@ -1072,27 +1079,10 @@ static image_type* load_png_image(const void* png_data, int png_size, dat_pal_ty
 		for (int x = 0; x < img_w; ++x) {
 			Uint32 pix = ((Uint32)src_row[x * 3] << 16) | ((Uint32)src_row[x * 3 + 1] << 8) | src_row[x * 3 + 2];
 			Uint8 index = 0;
-			if (plte_count) {
-				for (int ci = 0; ci < plte_count; ++ci) {
-					if (lut_keys[ci] == pix) {
-						index = (Uint8)ci;
-						break;
-					}
-				}
-			} else if (pal_ptr) {
-				// Nearest of the 16 VGA palette colors (6-bit per channel).
-				int r = (int)(pix >> 16), g = (int)((pix >> 8) & 0xFF), b = (int)(pix & 0xFF);
-				int best_dist = INT_MAX;
-				for (int ci = 0; ci < 16; ++ci) {
-					int dr = r - (pal_ptr->vga[ci].r << 2);
-					int dg = g - (pal_ptr->vga[ci].g << 2);
-					int db = b - (pal_ptr->vga[ci].b << 2);
-					int dist = dr * dr + dg * dg + db * db;
-					if (dist < best_dist) {
-						best_dist = dist;
-						index = (Uint8)ci;
-						if (!dist) break;
-					}
+			for (int ci = 0; ci < plte_count; ++ci) {
+				if (lut_keys[ci] == pix) {
+					index = (Uint8)ci;
+					break;
 				}
 			}
 			dst_row[x] = index;
@@ -1112,23 +1102,45 @@ cleanup:
 	return result;
 }
 
-static image_type* load_mac_png_image(const void* data, int size) {
-	return load_png_image(data, size, NULL);
-}
-
 static image_type* load_dos_image(int resource_id, dat_pal_type* palette);
+void load_from_opendats_metadata(int resource_id, const char* extension, FILE** out_fp, data_location* result, byte* checksum, int* size, dat_type** out_pointer);
+
+// The DAT (or folder) a DOS image would load from.
+static dat_type* find_image_dat(int resource_id) {
+	dat_type* pointer = NULL;
+	data_location result;
+	byte checksum;
+	int size;
+	FILE* fp = NULL;
+	load_from_opendats_metadata(resource_id, "png", &fp, &result, &checksum, &size, &pointer);
+	if (result == data_none) return NULL;
+	if (result == data_directory) fclose(fp);
+	return pointer;
+}
 
 // seg009:121A
 image_type* load_image(int resource_id, dat_pal_type* palette) {
-	image_type* image = load_mac_image(resource_id, load_mac_png_image);
+	image_type* image = load_mac_image(resource_id, load_png_image);
 	if (image == NULL) {
 		image = load_dos_image(resource_id, palette);
+		if (image != NULL && uses_mac_graphics() && mac_blanks_missing_image(find_image_dat(resource_id), resource_id)) {
+			// No Mac art: draw nothing, so the gap shows, but keep the DOS size for collisions.
+			image_type* blank = SDL_DuplicateSurface(image);
+			if (blank != NULL && SDL_FillSurfaceRect(blank, NULL, 0)) {
+				SDL_SetSurfaceColorKey(blank, true, 0);
+				set_mac_image_dos_size(blank, image->w, image->h);
+				SDL_DestroySurface(image);
+				image = blank;
+			} else {
+				SDL_DestroySurface(blank);
+			}
+		}
 		if (image != NULL && uses_snes_graphics()) {
 			// SNES sprites have other sizes; collisions use the DOS size.
 			pause_snes_resources(true);
 			image_type* dos_image = load_dos_image(resource_id, palette);
 			pause_snes_resources(false);
-			if (dos_image != NULL) set_mac_image_dos_size(image, dos_image->w, dos_image->h);
+			set_mac_image_dos_size(image, dos_image ? dos_image->w : 0, dos_image ? dos_image->h : 0);
 			SDL_DestroySurface(dos_image);
 		}
 		return image;
@@ -1156,7 +1168,7 @@ static image_type* load_dos_image(int resource_id, dat_pal_type* palette) {
 			image = decode_image((image_data_type*) image_data, palette);
 			break;
 		case data_directory:
-			image = load_png_image(image_data, size, palette);
+			image = load_png_image(image_data, size);
 			break;
 	}
 	if (image_data != NULL) free(image_data);
@@ -1459,7 +1471,7 @@ font_type load_font_from_data(/*const*/ rawfont_type* data) {
 // Small font data (hardcoded), defined in menu.c
 extern byte hc_small_font_data[];
 
-void load_font(void) {
+static void load_hc_font(void) {
 	// Try to load font from a file.
 	dat_type* dathandle = open_dat("font", 1);
 	hc_font.chtab = load_sprites_from_file(1000, 1 << 1, 0);
@@ -1467,12 +1479,27 @@ void load_font(void) {
 	if (hc_font.chtab == NULL) {
 		// Use built-in font.
 		hc_font = load_font_from_data((/*const*/ rawfont_type*)hc_font_data);
+	} else {
+		// Mac glyph widths already include the gap between characters.
+		image_type* letter = hc_font.chtab->images['A' - hc_font.first_char];
+		hc_font.space_between_chars = (letter != NULL && is_native_resolution_image(letter)) ? 0 : 1;
 	}
+}
+
+void load_font(void) {
+	load_hc_font();
 
 #ifdef USE_MENU
 	hc_small_font = load_font_from_data((rawfont_type*)hc_small_font_data);
 #endif
 
+}
+
+// data/mac/font has Mac-size glyphs, so the font is reloaded when Mac graphics are switched on or off.
+void reload_font(void) {
+	if (hc_font.chtab == NULL) return;
+	free_chtab(hc_font.chtab);
+	load_hc_font();
 }
 
 // seg009:35C5
@@ -1482,7 +1509,7 @@ int get_char_width(byte character) {
 	if (character <= font->last_char && character >= font->first_char) {
 		image_type* image = font->chtab->images[character - font->first_char];
 		if (image != NULL) {
-			width += image->w; //char_ptrs[character - font->first_char]->width;
+			width += logical_image_width(image); //char_ptrs[character - font->first_char]->width;
 			if (width) width += font->space_between_chars;
 		}
 	}
@@ -1549,7 +1576,7 @@ int draw_text_character(byte character) {
 			begin_text_draw(&glyph_rect);
 			method_3_blit_mono(image, textstate.current_x, ypos, textstate.textblit, textstate.textcolor);
 			end_text_draw(true);
-			width = font->space_between_chars + image->w;
+			width = font->space_between_chars + logical_image_width(image);
 		}
 	}
 	textstate.current_x += width;
@@ -2352,7 +2379,7 @@ void digi_callback(void* userdata, Uint8* stream, int len) {
 		bytes_written += copy_len;
 
 		if (digi_remaining_length == 0) {
-			if (digi_playing && !sound_interruptible[current_sound] && sound_looping[current_sound]) {
+			if (digi_playing && !sound_interruptible[current_sound] && sound_looping[current_sound] && digi_buffer_length > 0) {
 				digi_remaining_pos = digi_buffer;
 				digi_remaining_length = digi_buffer_length;
 				continue;
@@ -3119,6 +3146,8 @@ void init_scaling(void) {
 	int height = get_render_height();
 	if (texture_sharp == NULL) {
 		texture_sharp = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
+		// SDL3 defaults to LINEAR, which would make sharp mode blurry.
+		SDL_SetTextureScaleMode(texture_sharp, SDL_SCALEMODE_NEAREST);
 	}
 	if (get_scaling_type() == 1) {
 		if (texture_fuzzy == NULL) {
@@ -3185,9 +3214,13 @@ void set_gr_mode(byte grmode) {
 #ifdef SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING
 	SDL_SetHint(SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
 #endif
-	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
 		sdlperror("set_gr_mode: SDL_Init");
 		quit(1);
+	}
+	// Without an audio device the game still runs, silently.
+	if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+		printf("Warning: Audio subsystem unavailable: %s\n", SDL_GetError());
 	}
 
 	if (enable_controller_rumble) {
@@ -3232,9 +3265,6 @@ void set_gr_mode(byte grmode) {
 		const char* renderer_name = (use_hardware_acceleration == 0) ? "software" : NULL;
 		renderer_ = SDL_CreateRenderer(window_, renderer_name);
 	}
-	// SDL3 defaults to LINEAR; switch to NEAREST so sharp mode isn't blurry.
-	// Textures that want linear (fuzzy/blurry modes) override this explicitly.
-	SDL_SetDefaultTextureScaleMode(renderer_, SDL_SCALEMODE_NEAREST);
 
 	SDL_Surface* icon = load_png_file_as_surface(locate_file("data/icon.png"));
 	if (icon == NULL) {
@@ -3448,6 +3478,26 @@ int get_text_color(int cga_color, int low_half, int high_half_mask) {
 	}
 }
 
+// Whether the loaded mod has its own copy of this resource, in its DAT or its data folder.
+bool mod_provides_resource(const dat_type* dat, int resource_id, const char* extension) {
+	if (!use_custom_levelset || skip_mod_data_files) return false;
+	if (dat->from_mod && dat->dat_table != NULL) {
+		const dat_table_type* dat_table = dat->dat_table;
+		for (int i = 0; i < SDL_Swap16LE(dat_table->res_count); ++i) {
+			if (SDL_Swap16LE(dat_table->entries[i].id) == resource_id) {
+				// Empty images in DATs fall back to the folders, as in load_from_opendats_metadata().
+				if (strcmp(extension, "png") != 0 || SDL_Swap16LE(dat_table->entries[i].size) > 2) return true;
+				break;
+			}
+		}
+	}
+	char folder[POP_MAX_PATH];
+	dat_folder_name(dat, folder, sizeof(folder));
+	char path[POP_MAX_PATH];
+	snprintf_check(path, sizeof(path), "%s/data/%s/res%d.%s", mod_data_path, folder, resource_id, extension);
+	return file_exists(locate_file(path));
+}
+
 void load_from_opendats_metadata(int resource_id, const char* extension, FILE** out_fp, data_location* result, byte* checksum, int* size, dat_type** out_pointer) {
 	char image_filename[POP_MAX_PATH];
 	FILE* fp = NULL;
@@ -3455,7 +3505,7 @@ void load_from_opendats_metadata(int resource_id, const char* extension, FILE** 
 	// Go through all open DAT files.
 	for (dat_type* pointer = dat_chain_ptr; fp == NULL && pointer != NULL; pointer = pointer->next_dat) {
 		*out_pointer = pointer;
-		FILE* snes_fp = open_snes_resource(pointer->filename, resource_id, extension);
+		FILE* snes_fp = open_snes_resource(pointer, resource_id, extension);
 		if (snes_fp != NULL) {
 			struct stat buf;
 			if (fstat(fileno(snes_fp), &buf) == 0) {
@@ -3920,6 +3970,9 @@ image_type* method_6_blit_img_to_scr(image_type* image, int xpos, int ypos, int 
 
 	if (blit == blitters_0_no_transp) {
 		SDL_SetSurfaceColorKey(image, false, 0);
+	} else if (SDL_ISPIXELFORMAT_ALPHA(image->format)) {
+		// RGBA images (truecolour PNGs) are transparent through their alpha.
+		SDL_SetSurfaceBlendMode(image, SDL_BLENDMODE_BLEND);
 	} else {
 		SDL_SetSurfaceColorKey(image, true, 0);
 	}
@@ -4389,7 +4442,12 @@ void process_events() {
 				break;
 			case SDL_EVENT_MOUSE_WHEEL:
 				if (is_menu_shown) {
-					menu_control_scroll_y = -event.wheel.y;
+#if SDL_VERSION_ATLEAST(3, 2, 12)
+					// Touchpads send fractions of a step; integer_y adds them up into whole steps.
+					menu_control_scroll_y = -event.wheel.integer_y;
+#else
+					menu_control_scroll_y = -(int)event.wheel.y;
+#endif
 				}
 				break;
 #endif
