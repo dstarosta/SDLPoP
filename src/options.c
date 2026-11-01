@@ -96,8 +96,8 @@ NAMES_LIST(tile_type_names, {
 	"lattice_pillar", "lattice_down", "lattice_small", "lattice_left", "lattice_right", // 25..29
 	"torch_with_debris", // 30
 });
-NAMES_LIST(scaling_type_names, {"sharp", "fuzzy", "blurry", "smooth"});
-NAMES_LIST(graphics_setting_names, {"auto", "dos", "mac"});
+NAMES_LIST(scaling_type_names, {"sharp", "fuzzy", "blurry", "smooth", "auto"});
+NAMES_LIST(graphics_setting_names, {"auto", "dos", "mac", "snes"});
 NAMES_LIST(row_names, {"top", "middle", "bottom"});
 KEY_VALUE_LIST(direction_names, {{"left", dir_FF_left}, {"right", dir_0_right}});
 NAMES_LIST(entry_pose_names, {"turning", "falling", "running"});

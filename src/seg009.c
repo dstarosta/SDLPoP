@@ -1122,7 +1122,16 @@ static image_type* load_dos_image(int resource_id, dat_pal_type* palette);
 image_type* load_image(int resource_id, dat_pal_type* palette) {
 	image_type* image = load_mac_image(resource_id, load_mac_png_image);
 	if (image == NULL) {
-		return load_dos_image(resource_id, palette);
+		image = load_dos_image(resource_id, palette);
+		if (image != NULL && uses_snes_graphics()) {
+			// SNES sprites have other sizes; collisions use the DOS size.
+			pause_snes_resources(true);
+			image_type* dos_image = load_dos_image(resource_id, palette);
+			pause_snes_resources(false);
+			if (dos_image != NULL) set_mac_image_dos_size(image, dos_image->w, dos_image->h);
+			SDL_DestroySurface(dos_image);
+		}
+		return image;
 	}
 	// Remember the DOS size: collisions are computed from it.
 	image_type* dos_image = load_dos_image(resource_id, palette);
@@ -2850,6 +2859,11 @@ void init_overlay(void) {
 	}
 }
 
+// "auto" (4): Scale3x suits the high-resolution Mac art, but makes the low-resolution DOS and SNES art look worse.
+static int get_scaling_type(void) {
+	if (scaling_type == 4) return uses_mac_graphics() ? 3 : 0;
+	return scaling_type;
+}
 
 static SDL_Surface* smooth_surface;
 static SDL_Texture* texture_smooth;
@@ -2873,7 +2887,7 @@ static bool is_smooth_dump_requested(void) {
 }
 
 static bool is_text_mask_enabled(void) {
-	return (scaling_type == 3 && renderer_ != NULL) || is_smooth_dump_requested();
+	return (get_scaling_type() == 3 && renderer_ != NULL) || is_smooth_dump_requested();
 }
 
 static void free_text_mask(void* userdata, void* value) {
@@ -3108,19 +3122,19 @@ void init_scaling(void) {
 	if (texture_sharp == NULL) {
 		texture_sharp = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
 	}
-	if (scaling_type == 1) {
+	if (get_scaling_type() == 1) {
 		if (texture_fuzzy == NULL) {
 			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, width * 2, height * 2);
 			SDL_SetTextureScaleMode(texture_fuzzy, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_fuzzy;
-	} else if (scaling_type == 2) {
+	} else if (get_scaling_type() == 2) {
 		if (texture_blurry == NULL) {
 			texture_blurry = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
 			SDL_SetTextureScaleMode(texture_blurry, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_blurry;
-	} else if (scaling_type == 3) {
+	} else if (get_scaling_type() == 3) {
 		if (smooth_surface == NULL) {
 			smooth_surface = SDL_CreateSurface(width * 3, height * 3, SURFACE_FORMAT_24BPP);
 		}
@@ -3331,7 +3345,7 @@ void update_screen() {
 	draw_overlay();
 	SDL_Surface* surface = get_final_surface();
 	init_scaling();
-	if (scaling_type == 1) {
+	if (get_scaling_type() == 1) {
 		// Make "fuzzy pixels" like DOSBox does:
 		// First scale to double size with nearest-neighbor scaling, then scale to full screen with smooth scaling.
 		// The result is not as blurry as if we did only a smooth scaling, but not as sharp as if we did only nearest-neighbor scaling.
@@ -3340,7 +3354,7 @@ void update_screen() {
 		SDL_RenderClear(renderer_);
 		SDL_RenderTexture(renderer_, texture_sharp, NULL, NULL);
 		SDL_SetRenderTarget(renderer_, NULL);
-	} else if (scaling_type == 3) {
+	} else if (get_scaling_type() == 3) {
 		if (scale3x_surface(surface, smooth_surface)) {
 			SDL_UpdateTexture(target_texture, NULL, smooth_surface->pixels, smooth_surface->pitch);
 		}
@@ -3413,6 +3427,17 @@ void load_from_opendats_metadata(int resource_id, const char* extension, FILE** 
 	// Go through all open DAT files.
 	for (dat_type* pointer = dat_chain_ptr; fp == NULL && pointer != NULL; pointer = pointer->next_dat) {
 		*out_pointer = pointer;
+		FILE* snes_fp = open_snes_resource(pointer->filename, resource_id, extension);
+		if (snes_fp != NULL) {
+			struct stat buf;
+			if (fstat(fileno(snes_fp), &buf) == 0) {
+				fp = snes_fp;
+				*result = data_directory;
+				*size = (int)buf.st_size;
+				continue;
+			}
+			fclose(snes_fp);
+		}
 		if (pointer->handle != NULL) {
 			// If it's an actual DAT file:
 			fp = pointer->handle;

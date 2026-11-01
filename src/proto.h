@@ -748,6 +748,9 @@ void init_mt32(void);
 // mac_graphics.c
 void init_mac_graphics(void);
 bool uses_mac_graphics(void);
+bool uses_snes_graphics(void);
+FILE* open_snes_resource(const char* dat_filename, int resource_id, const char* extension);
+void pause_snes_resources(bool paused);
 int get_render_scale(void);
 int get_render_width(void);
 int get_render_height(void);

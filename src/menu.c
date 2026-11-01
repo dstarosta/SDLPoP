@@ -357,7 +357,7 @@ setting_type general_settings[] = {
 };
 
 NAMES_LIST(use_hardware_acceleration_setting_names, {"OFF", "ON", "AUTO",});
-NAMES_LIST(scaling_type_setting_names, {"Sharp", "Fuzzy", "Blurry", "Smooth",});
+NAMES_LIST(scaling_type_setting_names, {"Sharp", "Fuzzy", "Blurry", "Smooth", "Auto",});
 
 int integer_scaling_possible =
 #if SDL_VERSION_ATLEAST(2,0,5) // SDL_SetRenderIntegerScale
@@ -387,13 +387,14 @@ setting_type visuals_settings[] = {
 				.text = "Use integer scaling",
 				.explanation = "Enable pixel perfect scaling. That is, make all pixels the same size by forcing integer scale factors.\n"
 						"Combining with 4:3 aspect ratio requires at least 1600x1200."},
-		{.id = SETTING_SCALING_TYPE, .style = SETTING_STYLE_NUMBER, .number_type = SETTING_BYTE, .max = 3,
+		{.id = SETTING_SCALING_TYPE, .style = SETTING_STYLE_NUMBER, .number_type = SETTING_BYTE, .max = 4,
 				.linked = &scaling_type, .names_list = &scaling_type_setting_names_list,
 				.text = "Scaling method",
 				.explanation = "Sharp - Use nearest neighbour resampling.\n"
 						"Fuzzy - First upscale to double size, then use smooth scaling.\n"
 						"Blurry - Use smooth scaling.\n"
-						"Smooth - Smooth the edges, then use smooth scaling."},
+						"Smooth - Smooth the edges, then use smooth scaling.\n"
+						"Auto - Smooth with Macintosh graphics, sharp otherwise."},
 #ifdef USE_FADE
 		{.id = SETTING_ENABLE_FADE, .style = SETTING_STYLE_TOGGLE, .linked = &enable_fade,
 				.text = "Fading enabled",

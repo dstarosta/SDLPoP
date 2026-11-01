@@ -750,7 +750,8 @@ void do_replay_move() {
 		seed_was_init = 1;
 
 		if (is_validate_mode) {
-			printf("Replay started in level %d, room %d. Graphics: %s.\n", current_level, drawn_room, uses_mac_graphics() ? "Mac" : "DOS");
+			printf("Replay started in level %d, room %d. Graphics: %s.\n", current_level, drawn_room,
+			       uses_mac_graphics() ? "Mac" : uses_snes_graphics() ? "SNES" : "DOS");
 			print_remaining_time();
 			skipping_replay = 1;
 			replay_seek_target = replay_seek_2_end;

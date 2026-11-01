@@ -44,28 +44,58 @@ typedef struct mac_folder_type {
 extern dat_type* dat_chain_ptr;
 
 static bool mac_graphics = false;
+static bool snes_graphics = false;
+static bool snes_paused = false;
 static mac_folder_type* mac_folders[MAC_MAX_FOLDERS];
 static int mac_folder_count = 0;
 
 void init_mac_graphics(void) {
 	const char* param = check_param("graphics=");
 	if (param != NULL) {
-		static const char* names[] = {"auto", "dos", "mac"};
+		static const char* names[] = {"auto", "dos", "mac", "snes"};
 		for (int i = 0; i < COUNT(names); ++i) {
 			if (strcasecmp(param + strlen("graphics="), names[i]) == 0) {
 				graphics_setting = (byte)i;
 			}
 		}
 	}
-	bool available = file_exists(locate_file("data/mac/KID/origins.txt"));
-	if (graphics_setting == 2 && !available) {
+	bool mac_available = file_exists(locate_file("data/mac/KID/origins.txt"));
+	if (graphics_setting == 2 && !mac_available) {
 		printf("Macintosh graphics were requested, but data/mac is missing. Using DOS graphics.\n");
 	}
-	mac_graphics = available && graphics_setting != 1;
+	mac_graphics = mac_available && (graphics_setting == 0 || graphics_setting == 2);
+	bool snes_available = file_exists(locate_file("data/snes"));
+	if (graphics_setting == 3 && !snes_available) {
+		printf("SNES graphics were requested, but data/snes is missing. Using DOS graphics.\n");
+	}
+	snes_graphics = snes_available && graphics_setting == 3;
 }
 
 bool uses_mac_graphics(void) {
 	return mac_graphics;
+}
+
+bool uses_snes_graphics(void) {
+	return snes_graphics;
+}
+
+// data/snes holds only what differs from DOS, in the same folders as data/; it is looked at before the DAT files.
+FILE* open_snes_resource(const char* dat_filename, int resource_id, const char* extension) {
+	if (!snes_graphics || snes_paused) return NULL;
+	char folder[POP_MAX_PATH];
+	snprintf_check(folder, sizeof(folder), "%s", dat_filename);
+	size_t len = strlen(folder);
+	if (len >= 5 && folder[len - 4] == '.') {
+		folder[len - 4] = '\0';
+	}
+	char path[POP_MAX_PATH];
+	snprintf_check(path, sizeof(path), "data/snes/%s/res%d.%s", folder, resource_id, extension);
+	return fopen(locate_file(path), "rb");
+}
+
+// While paused, resources load from the DOS data as if data/snes did not exist.
+void pause_snes_resources(bool paused) {
+	snes_paused = paused;
 }
 
 int get_render_scale(void) {
@@ -194,13 +224,11 @@ int logical_image_height(const image_type* image) {
 }
 
 int dos_image_width(const image_type* image) {
-	if (!is_native_resolution_image(image)) return image->w;
 	int width = (int)SDL_GetNumberProperty(SDL_GetSurfaceProperties((image_type*)image), PROP_MAC_DOS_W, 0);
 	return width > 0 ? width : logical_image_width(image);
 }
 
 int dos_image_height(const image_type* image) {
-	if (!is_native_resolution_image(image)) return image->h;
 	int height = (int)SDL_GetNumberProperty(SDL_GetSurfaceProperties((image_type*)image), PROP_MAC_DOS_H, 0);
 	return height > 0 ? height : logical_image_height(image);
 }

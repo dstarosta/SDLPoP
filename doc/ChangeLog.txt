@@ -793,4 +793,10 @@ DONE: The graphics of the Macintosh version can be used. They are in data/mac an
 	Choose with "graphics = auto/dos/mac" in SDLPoP.ini.
 	The Macintosh graphics come from Prince of Persia Remastered by The-Alok.
 	Details: https://github.com/The-Alok/prince-of-persia-remastered
+DONE: SNES-style graphics can be used with "graphics = snes" in SDLPoP.ini. They are in data/snes.
+	The game plays exactly like the DOS version; only the pictures are different.
+	The graphics come from the SNES-PC-set by Maurice Kaltofen (mk1995), with the prince recoloured
+	in Prince of Persia Remastered by The-Alok.
+	The cutscene pictures come from SNES Remnants by KJ, with the prince recoloured to match.
+	Details: https://www.popot.org/custom_levels.php?mod=0000042
 DONE: Added the "smooth" scaling type: edges are smoothed with Scale3x. Text stays sharp.

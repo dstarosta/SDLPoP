@@ -859,6 +859,26 @@ void draw_room() {
 	load_room_links();
 }
 
+// The SNES level door top reaches up into the tiles above the door; redrawing one of them must not cover it.
+static void draw_snes_door_top_from_above(void) {
+	if (!uses_snes_graphics() || drawn_row >= 2) return;
+	// draw_leveldoor() runs for the tile right of the door's left half; find that tile's xh.
+	// (Without Mac graphics, row_below_left_ only holds columns 0..9.)
+	// The tile above and right of the door also counts: it draws the decorations of the tile above the door's right half.
+	int door_xh;
+	if (drawn_col < 9 && row_below_left_[drawn_col + 1].tiletype == tiles_16_level_door_left) {
+		door_xh = draw_xh + 4;
+	} else if (row_below_left_[drawn_col].tiletype == tiles_16_level_door_left) {
+		door_xh = draw_xh;
+	} else if (row_below_left_[drawn_col].tiletype == tiles_17_level_door_right) {
+		door_xh = draw_xh - 4;
+	} else {
+		return;
+	}
+	// Same place as in draw_leveldoor(), whose draw_main_y is 63 lower.
+	add_backtable(id_chtab_6_environment, 34 /*level door top*/, door_xh + 1, 0, draw_main_y - 1, blitters_10h_transp, 0);
+}
+
 // seg008:01C7
 void draw_tile() {
 	if (uses_mac_graphics()) {
@@ -874,6 +894,7 @@ void draw_tile() {
 	draw_tile_base();
 	draw_tile_anim();
 	draw_tile_fore();
+	draw_snes_door_top_from_above();
 }
 
 // seg008:01F2
@@ -1262,6 +1283,10 @@ void draw_tile_right() {
 				id += 4;
 			}
 #endif
+			if (uses_snes_graphics() && tile_left == tiles_17_level_door_right && custom->tbl_level_type[current_level] != 0) {
+				// The SNES door frame is narrower than the DOS one, which covered the wall band here; the pillar goes on top.
+				add_backtable(id_chtab_6_environment, tile_table[tiles_1_floor].stripe_id, draw_xh, 0, draw_main_y - 27, blitters_2_or, 0);
+			}
 			if (id) {
 				if (tile_left == tiles_5_stuck) {
 					blit = blitters_10h_transp;
@@ -1364,7 +1389,7 @@ void draw_tile_bottom(word arg_0) {
 	word chtab_id = id_chtab_6_environment;
 	switch (curr_tile) {
 		case tiles_20_wall:
-			if (custom->tbl_level_type[current_level] == 0 || custom->enable_wda_in_palace || graphics_mode != gmMcgaVga) {
+			if (custom->tbl_level_type[current_level] == 0 || (custom->enable_wda_in_palace || uses_snes_graphics()) || graphics_mode != gmMcgaVga) {
 				id = wall_fram_bottom[curr_modifier & 0x7F];
 			}
 			chtab_id = id_chtab_7_environmentwall;
@@ -1499,7 +1524,7 @@ void draw_tile_fore() {
 			}
 			break;
 		case tiles_20_wall:
-			if (custom->tbl_level_type[current_level] == 0 || custom->enable_wda_in_palace || graphics_mode != gmMcgaVga) {
+			if (custom->tbl_level_type[current_level] == 0 || (custom->enable_wda_in_palace || uses_snes_graphics()) || graphics_mode != gmMcgaVga) {
 				add_foretable(id_chtab_7_environmentwall, wall_fram_main[curr_modifier & 0x7F], draw_xh, 0, draw_main_y, blitters_0_no_transp, 0);
 			}
 			if (graphics_mode != gmCga && graphics_mode != gmHgaHerc) {
@@ -1805,6 +1830,18 @@ void draw_back_fore(int which_table,int index) {
 		}
 		draw_native_image_physical_blit(image, table_entry->physical_x, table_entry->physical_y + view_dy, table_entry->blit);
 		if (clip_native) SDL_SetSurfaceClipRect(current_target_surface, &saved_clip);
+	} else if (table_entry->physical_clip_top >= 0) {
+		SDL_Rect saved_clip;
+		SDL_GetSurfaceClipRect(current_target_surface, &saved_clip);
+		SDL_Rect clip = saved_clip;
+		int top = table_entry->physical_clip_top;
+		if (clip.y < top) {
+			clip.h = MAX(0, clip.y + clip.h - top);
+			clip.y = top;
+		}
+		SDL_SetSurfaceClipRect(current_target_surface, &clip);
+		draw_image(image, mask, table_entry->xh * 8 + table_entry->xl, table_entry->y, table_entry->blit);
+		SDL_SetSurfaceClipRect(current_target_surface, &saved_clip);
 	} else {
 		draw_image(image, mask, table_entry->xh * 8 + table_entry->xl, table_entry->y, table_entry->blit);
 	}
@@ -2398,6 +2435,11 @@ void draw_leveldoor() {
 		}
 		else {
 			short leveldoor_width = (custom->tbl_level_type[current_level] == 0) ? 39 : 48;
+			image_type* panel = get_image(id_chtab_6_environment, 33 - 1);
+			if (uses_snes_graphics() && panel != NULL) {
+				// The SNES door panel is narrower; a wider wipe would black out part of the pillar on its right.
+				leveldoor_width = MIN(leveldoor_width, logical_image_width(panel));
+			}
 			sbyte x_low = (custom->tbl_level_type[current_level] == 0) ? 2 : 0; // dungeon level doors are shifted 2px to the right
 			add_wipetable(0, 8*(draw_xh + 1) + x_low, ybottom - 4, 45, leveldoor_width, 0);
 		}
@@ -2405,11 +2447,17 @@ void draw_leveldoor() {
 	leveldoor_ybottom = ybottom - (modifier_left & 3) - 48;
 	short y = ybottom - modifier_left;
 	do { // runs at least once
-		add_backtable(id_chtab_6_environment, 33 /*level door bottom*/, draw_xh + 1, 0, leveldoor_ybottom, blitters_0_no_transp, 0);
+		if (add_backtable(id_chtab_6_environment, 33 /*level door bottom*/, draw_xh + 1, 0, leveldoor_ybottom, blitters_0_no_transp, 0) &&
+		    uses_snes_graphics()) {
+			// The SNES door is a whole panel, not a slab: keep it inside the doorway, or it paints over the tile above.
+			backtable[backtable_count - 1].physical_clip_top = (draw_main_y - 64) * get_render_scale();
+		}
 		if (y > leveldoor_ybottom) leveldoor_ybottom += 4;
 		else break;
 	} while (true);
-	add_backtable(id_chtab_6_environment, 34 /*level door top*/, draw_xh + 1, 0, draw_main_y - 64, blitters_0_no_transp, 0);
+	// The SNES door top is taller than the DOS one and transparent above the frame; opaque, it blacks out the tile above.
+	add_backtable(id_chtab_6_environment, 34 /*level door top*/, draw_xh + 1, 0, draw_main_y - 64,
+	              uses_snes_graphics() ? blitters_10h_transp : blitters_0_no_transp, 0);
 }
 
 // seg008:1E0C
@@ -2975,7 +3023,7 @@ void wall_pattern(int which_part,int which_table) {
 	// set the new seed
 	random_seed = drawn_room + tbl_line[drawn_row] + drawn_col;
 	prandom(1); // fetch a random number and discard it
-	word is_dungeon = (custom->tbl_level_type[current_level] < DESIGN_PALACE) || custom->enable_wda_in_palace;
+	word is_dungeon = (custom->tbl_level_type[current_level] < DESIGN_PALACE) || (custom->enable_wda_in_palace || uses_snes_graphics());
 	if ( (!is_dungeon) && (graphics_mode== GRAPHICS_VGA) ) {
 		// I haven't traced the palace WDA
 		//[...]
