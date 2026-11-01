@@ -1534,7 +1534,12 @@ int draw_text_character(byte character) {
 	if (character <= font->last_char && character >= font->first_char) {
 		image_type* image = font->chtab->images[character - font->first_char]; //char_ptrs[character - font->first_char];
 		if (image != NULL) {
-			method_3_blit_mono(image, textstate.current_x, textstate.current_y - font->height_above_baseline, textstate.textblit, textstate.textcolor);
+			int scale = get_render_scale();
+			int ypos = textstate.current_y - font->height_above_baseline;
+			SDL_Rect glyph_rect = {textstate.current_x * scale, ypos * scale, logical_image_width(image) * scale, logical_image_height(image) * scale};
+			begin_text_draw(&glyph_rect);
+			method_3_blit_mono(image, textstate.current_x, ypos, textstate.textblit, textstate.textcolor);
+			end_text_draw(true);
 			width = font->space_between_chars + image->w;
 		}
 	}
@@ -2855,13 +2860,189 @@ static Uint32 rgb24_at(const SDL_Surface* surface, int x, int y) {
 	return value;
 }
 
+// The smooth filter leaves text alone: the fonts and the title and story texts.
+// A surface with text on it has a mask holding the colour of each text pixel (with the top byte set), 0 elsewhere.
+#define TEXT_MASK_PROPERTY "sdlpop.text_mask"
+#define TEXT_MASK_SET 0xFF000000u
+
+// Test aid: "validate <replay> dump-frames=DIR dump-smooth" also saves the smoothed screens.
+static bool is_smooth_dump_requested(void) {
+	static int requested = -1;
+	if (requested < 0) requested = is_validate_mode && check_param("dump-smooth") != NULL;
+	return requested;
+}
+
+static bool is_text_mask_enabled(void) {
+	return (scaling_type == 3 && renderer_ != NULL) || is_smooth_dump_requested();
+}
+
+static void free_text_mask(void* userdata, void* value) {
+	SDL_free(value);
+}
+
+static Uint32* get_text_mask(SDL_Surface* surface, bool create) {
+	if (surface == NULL) return NULL;
+	SDL_PropertiesID props = SDL_GetSurfaceProperties(surface);
+	Uint32* mask = SDL_GetPointerProperty(props, TEXT_MASK_PROPERTY, NULL);
+	if (mask == NULL && create) {
+		mask = SDL_calloc((size_t)surface->w * surface->h, sizeof(Uint32));
+		// On failure SDL calls the cleanup, which frees the mask.
+		if (mask != NULL && !SDL_SetPointerPropertyWithCleanup(props, TEXT_MASK_PROPERTY, mask, free_text_mask, NULL)) {
+			return NULL;
+		}
+	}
+	return mask;
+}
+
+static bool clip_to_surface(const SDL_Surface* surface, const SDL_Rect* rect, SDL_Rect* clipped) {
+	SDL_Rect bounds = {0, 0, surface->w, surface->h};
+	if (rect == NULL) {
+		*clipped = bounds;
+		return true;
+	}
+	return SDL_GetRectIntersection(rect, &bounds, clipped);
+}
+
+static void clear_text_mask(SDL_Surface* surface, const SDL_Rect* rect) {
+	if (!is_text_mask_enabled()) return;
+	Uint32* mask = get_text_mask(surface, false);
+	SDL_Rect area;
+	if (mask == NULL || !clip_to_surface(surface, rect, &area)) return;
+	for (int y = area.y; y < area.y + area.h; ++y) {
+		memset(mask + y * surface->w + area.x, 0, area.w * sizeof(Uint32));
+	}
+}
+
+// Moves the mask along with a copy between surfaces. A keyed copy skips the source's transparent pixels.
+static void copy_text_mask(SDL_Surface* source, const SDL_Rect* source_rect, SDL_Surface* target, const SDL_Rect* target_rect, bool keyed) {
+	if (!is_text_mask_enabled()) return;
+	Uint32* from = get_text_mask(source, false);
+	Uint32* to = get_text_mask(target, from != NULL);
+	if (to == NULL) return;
+	SDL_Rect src, dst;
+	if (!clip_to_surface(source, source_rect, &src) || !clip_to_surface(target, target_rect, &dst)) return;
+	// The rectangles are inside the surfaces in practice; clipping only guards against bad ones.
+	int w = MIN(src.w, dst.w);
+	int h = MIN(src.h, dst.h);
+	for (int y = 0; y < h; ++y) {
+		Uint32* to_row = to + (dst.y + y) * target->w + dst.x;
+		if (from == NULL) {
+			if (!keyed) memset(to_row, 0, w * sizeof(Uint32));
+			continue;
+		}
+		const Uint32* from_row = from + (src.y + y) * source->w + src.x;
+		for (int x = 0; x < w; ++x) {
+			if (!keyed || from_row[x] != 0) to_row[x] = from_row[x];
+		}
+	}
+}
+
+// Copies a rectangle as 24-bit pixels, the format the filter reads.
+static SDL_Surface* copy_rect_rgb24(SDL_Surface* surface, const SDL_Rect* rect) {
+	SDL_Surface* copy = SDL_CreateSurface(rect->w, rect->h, SURFACE_FORMAT_24BPP);
+	if (copy == NULL) return NULL;
+	SDL_BlendMode saved_blend;
+	SDL_GetSurfaceBlendMode(surface, &saved_blend);
+	SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_NONE);
+	SDL_Rect source_rect = *rect;
+	SDL_BlitSurface(surface, &source_rect, copy, NULL);
+	SDL_SetSurfaceBlendMode(surface, saved_blend);
+	return copy;
+}
+
+static SDL_Surface* text_draw_target;
+static SDL_Surface* text_draw_before;
+static SDL_Rect text_draw_rect;
+
+// Call around a drawing on current_target_surface (rect in render pixels, NULL = all of it).
+void begin_text_draw(const SDL_Rect* rect) {
+	text_draw_target = NULL;
+	if (!is_text_mask_enabled() || current_target_surface == NULL) return;
+	if (!clip_to_surface(current_target_surface, rect, &text_draw_rect)) return;
+	text_draw_before = copy_rect_rgb24(current_target_surface, &text_draw_rect);
+	if (text_draw_before != NULL) text_draw_target = current_target_surface;
+}
+
+// The pixels the drawing changed become text pixels, or stop being text pixels if it was not text.
+void end_text_draw(bool is_text) {
+	SDL_Surface* target = text_draw_target;
+	SDL_Surface* before = text_draw_before;
+	text_draw_target = NULL;
+	text_draw_before = NULL;
+	if (target == NULL) return;
+	SDL_Surface* after = copy_rect_rgb24(target, &text_draw_rect);
+	Uint32* mask = get_text_mask(target, is_text);
+	if (after != NULL && mask != NULL) {
+		for (int y = 0; y < text_draw_rect.h; ++y) {
+			Uint32* mask_row = mask + (text_draw_rect.y + y) * target->w + text_draw_rect.x;
+			for (int x = 0; x < text_draw_rect.w; ++x) {
+				Uint32 pixel = rgb24_at(after, x, y);
+				if (pixel != rgb24_at(before, x, y)) {
+					mask_row[x] = is_text ? pixel | TEXT_MASK_SET : 0;
+				}
+			}
+		}
+	}
+	SDL_DestroySurface(after);
+	SDL_DestroySurface(before);
+}
+
+// The pixel still shows the text colour, or that colour darkened evenly by a fade.
+static bool shows_text_colour(Uint32 mask, Uint32 pixel) {
+	if (mask == 0) return false;
+	mask &= ~TEXT_MASK_SET;
+	if (pixel == mask) return true;
+	int drop = -1;
+	for (int shift = 0; shift < 24; shift += 8) {
+		int text = (mask >> shift) & 0xFF;
+		int shown = (pixel >> shift) & 0xFF;
+		if (shown > 0) drop = text - shown;
+	}
+	if (drop <= 0) return false;
+	for (int shift = 0; shift < 24; shift += 8) {
+		int text = (mask >> shift) & 0xFF;
+		int shown = (pixel >> shift) & 0xFF;
+		if (shown != MAX(0, text - drop)) return false;
+	}
+	return true;
+}
+
+// Marks the pixels of the final picture that are text; false if there are none.
+static bool find_text_pixels(SDL_Surface* surface, byte* is_text) {
+	Uint32* screen_mask = get_text_mask(onscreen_surface_, false);
+	Uint32* overlay_mask = surface == merged_surface ? get_text_mask(overlay_surface, false) : NULL;
+	if (screen_mask == NULL && overlay_mask == NULL) return false;
+	if (onscreen_surface_->w != surface->w || onscreen_surface_->h != surface->h) return false;
+	bool found = false;
+	for (int y = 0; y < surface->h; ++y) {
+		for (int x = 0; x < surface->w; ++x) {
+			int index = y * surface->w + x;
+			Uint32 pixel = rgb24_at(surface, x, y);
+			is_text[index] = (screen_mask != NULL && shows_text_colour(screen_mask[index], pixel)) ||
+			                 (overlay_mask != NULL && shows_text_colour(overlay_mask[index], pixel));
+			found |= is_text[index];
+		}
+	}
+	return found;
+}
+
 // Scale3x edge smoothing (https://www.scale2x.it/algorithm) of a 24-bit surface into one three times larger.
+// Text pixels become plain 3x3 blocks, and their neighbours do not take their colour.
 static bool scale3x_surface(SDL_Surface* source, SDL_Surface* destination) {
+	static byte* is_text;
+	static int is_text_size;
+	int size = source->w * source->h;
+	if (is_text_size < size) {
+		free(is_text);
+		is_text = malloc(size);
+		is_text_size = is_text != NULL ? size : 0;
+	}
 	if (!SDL_LockSurface(source)) return false;
 	if (!SDL_LockSurface(destination)) {
 		SDL_UnlockSurface(source);
 		return false;
 	}
+	bool has_text = is_text != NULL && find_text_pixels(source, is_text);
 	for (int y = 0; y < source->h; ++y) {
 		int above = y > 0 ? y - 1 : y;
 		int below = y + 1 < source->h ? y + 1 : y;
@@ -2872,6 +3053,20 @@ static bool scale3x_surface(SDL_Surface* source, SDL_Surface* destination) {
 			Uint32 d = rgb24_at(source, left, y), e = rgb24_at(source, x, y), f = rgb24_at(source, right, y);
 			Uint32 g = rgb24_at(source, left, below), h = rgb24_at(source, x, below), i = rgb24_at(source, right, below);
 			Uint32 out[9] = {e, e, e, e, e, e, e, e, e};
+			if (has_text) {
+				const byte* row_above = is_text + above * source->w;
+				const byte* row = is_text + y * source->w;
+				const byte* row_below = is_text + below * source->w;
+				if (row[x]) b = h = d = f = e; // skips the smoothing below
+				if (row_above[left]) a = e;
+				if (row_above[x]) b = e;
+				if (row_above[right]) c = e;
+				if (row[left]) d = e;
+				if (row[right]) f = e;
+				if (row_below[left]) g = e;
+				if (row_below[x]) h = e;
+				if (row_below[right]) i = e;
+			}
 			if (b != h && d != f) {
 				out[0] = d == b ? d : e;
 				out[1] = ((d == b && e != c) || (b == f && e != a)) ? b : e;
@@ -2893,6 +3088,15 @@ static bool scale3x_surface(SDL_Surface* source, SDL_Surface* destination) {
 	SDL_UnlockSurface(destination);
 	SDL_UnlockSurface(source);
 	return true;
+}
+
+void save_smoothed_screen(const char* path) {
+	if (!is_smooth_dump_requested()) return;
+	SDL_Surface* smoothed = SDL_CreateSurface(onscreen_surface_->w * 3, onscreen_surface_->h * 3, SURFACE_FORMAT_24BPP);
+	if (smoothed != NULL && scale3x_surface(onscreen_surface_, smoothed) && !SDL_SaveBMP(smoothed, path)) {
+		sdlperror("save_smoothed_screen: SDL_SaveBMP");
+	}
+	SDL_DestroySurface(smoothed);
 }
 
 void init_scaling(void) {
@@ -3387,6 +3591,7 @@ void method_1_blit_rect(surface_type* target_surface, surface_type* source_surfa
 			quit(1);
 		}
 	}
+	copy_text_mask(source_surface, &src_rect, target_surface, &dest_rect, blit != blitters_0_no_transp);
 	if (!SDL_BlitSurface(source_surface, &src_rect, target_surface, &dest_rect)) {
 		sdlperror("method_1_blit_rect: SDL_BlitSurface");
 		quit(1);
@@ -3463,6 +3668,7 @@ const rect_type* method_5_rect(const rect_type* rect, int blit, byte color) {
 #else
 	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2, color == 0 ? SDL_ALPHA_TRANSPARENT : SDL_ALPHA_OPAQUE);
 #endif
+	clear_text_mask(current_target_surface, &dest_rect);
 	if (!safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color)) {
 		sdlperror("method_5_rect: SDL_FillSurfaceRect");
 		quit(1);
@@ -3475,6 +3681,7 @@ void draw_rect_with_alpha(const rect_type* rect, byte color, byte alpha) {
 	rect_to_sdlrect(rect, &dest_rect);
 	rgb_type palette_color = palette[color];
 	uint32_t rgb_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(overlay_surface->format), NULL, palette_color.r << 2, palette_color.g << 2, palette_color.b << 2, alpha);
+	clear_text_mask(current_target_surface, &dest_rect);
 	if (!safe_SDL_FillSurfaceRect(current_target_surface, &dest_rect, rgb_color)) {
 		sdlperror("draw_rect_with_alpha: SDL_FillSurfaceRect");
 		quit(1);
@@ -4250,6 +4457,7 @@ void set_bg_attr(int vga_pal_index, int hc_pal_index) {
 			flip_screen(offscreen_surface);
 		}
 		// Then draw the offscreen image onto it.
+		copy_text_mask(offscreen_surface, &rect, onscreen_surface_, &rect, false);
 		if (!SDL_BlitSurface(offscreen_surface, &rect, onscreen_surface_, &rect)) {
 			sdlperror("set_bg_attr: SDL_BlitSurface");
 			quit(1);
@@ -4338,6 +4546,8 @@ palette_fade_type* make_pal_buffer_fadein(surface_type* source_surface, int whic
 	//method_1_blit_rect(onscreen_surface_, source_surface, &screen_rect, &screen_rect, 0);
 	// for RGB
 	//method_5_rect(&screen_rect, 0, color_0_black);
+	// Every fade frame redraws the whole screen from offscreen_surface.
+	copy_text_mask(offscreen_surface, NULL, onscreen_surface_, NULL, false);
 	return palette_buffer;
 }
 

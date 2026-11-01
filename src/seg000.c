@@ -2133,7 +2133,7 @@ static bool draw_full_image_mac(enum full_image_id id, image_type* image, int xp
 }
 
 // seg000:1C3A
-void draw_full_image(enum full_image_id id) {
+static void draw_full_image_pixels(enum full_image_id id) {
     image_type* decoded_image;
     image_type* mask = NULL;
 
@@ -2167,6 +2167,13 @@ void draw_full_image(enum full_image_id id) {
             method_6_blit_img_to_scr(decoded_image, xpos, ypos, blit);
             break;
     }
+}
+
+// All but the palace picture and the story frame are pictures of text, which the smooth filter leaves alone.
+void draw_full_image(enum full_image_id id) {
+    begin_text_draw(NULL);
+    draw_full_image_pixels(id);
+    end_text_draw(id != TITLE_MAIN && id != STORY_FRAME);
 }
 
 // seg000:1D2C

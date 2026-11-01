@@ -731,6 +731,7 @@ void end_replay() {
 }
 
 // Test aid: "validate <replay> dump-frames=DIR" saves the screen every 6 ticks, so builds can be compared picture by picture.
+// With "dump-smooth" it also saves the screen through the smooth filter.
 static void dump_validate_frame(void) {
 	const char* param = check_param("dump-frames=");
 	if (!is_validate_mode || param == NULL || curr_tick % 6 != 0) return;
@@ -739,6 +740,8 @@ static void dump_validate_frame(void) {
 	if (!SDL_SaveBMP(onscreen_surface_, path)) {
 		sdlperror("dump_validate_frame: SDL_SaveBMP");
 	}
+	snprintf_check(path, sizeof(path), "%s/%06d_smooth.bmp", param + strlen("dump-frames="), curr_tick);
+	save_smoothed_screen(path);
 }
 
 void do_replay_move() {
