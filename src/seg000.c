@@ -1945,6 +1945,12 @@ void gen_palace_wall_colors() {
 
 // data:042E
 const rect_type rect_titles = {106, 24, 195, 296};
+// The Mac copyright line reaches below rect_titles, which would cut off its descenders.
+static const rect_type rect_titles_mac = {106, 24, 200, 296};
+
+static const rect_type* get_rect_titles(void) {
+    return uses_mac_graphics() ? &rect_titles_mac : &rect_titles;
+}
 
 // seg000:17E6
 void show_title() {
@@ -1967,29 +1973,29 @@ void show_title() {
     do_wait(timer_0);
 
     start_timer(timer_0, 0xCD);
-    method_1_blit_rect(onscreen_surface_, offscreen_surface, &rect_titles, &rect_titles, blitters_0_no_transp);
+    method_1_blit_rect(onscreen_surface_, offscreen_surface, get_rect_titles(), get_rect_titles(), blitters_0_no_transp);
     draw_full_image(TITLE_MAIN);
     do_wait(timer_0);
 
     start_timer(timer_0, 0x41);
-    method_1_blit_rect(onscreen_surface_, offscreen_surface, &rect_titles, &rect_titles, blitters_0_no_transp);
+    method_1_blit_rect(onscreen_surface_, offscreen_surface, get_rect_titles(), get_rect_titles(), blitters_0_no_transp);
     draw_full_image(TITLE_MAIN);
     draw_full_image(TITLE_GAME);
     do_wait(timer_0);
 
     start_timer(timer_0, 0x10E);
-    method_1_blit_rect(onscreen_surface_, offscreen_surface, &rect_titles, &rect_titles, blitters_0_no_transp);
+    method_1_blit_rect(onscreen_surface_, offscreen_surface, get_rect_titles(), get_rect_titles(), blitters_0_no_transp);
     draw_full_image(TITLE_MAIN);
     do_wait(timer_0);
 
     start_timer(timer_0, 0xEB);
-    method_1_blit_rect(onscreen_surface_, offscreen_surface, &rect_titles, &rect_titles, blitters_0_no_transp);
+    method_1_blit_rect(onscreen_surface_, offscreen_surface, get_rect_titles(), get_rect_titles(), blitters_0_no_transp);
     draw_full_image(TITLE_MAIN);
     draw_full_image(TITLE_POP);
     draw_full_image(TITLE_MECHNER);
     do_wait(timer_0);
 
-    method_1_blit_rect(onscreen_surface_, offscreen_surface, &rect_titles, &rect_titles, blitters_0_no_transp);
+    method_1_blit_rect(onscreen_surface_, offscreen_surface, get_rect_titles(), get_rect_titles(), blitters_0_no_transp);
     draw_full_image(STORY_FRAME);
     draw_full_image(STORY_ABSENCE);
     current_target_surface = onscreen_surface_;

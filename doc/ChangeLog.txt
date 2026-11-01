@@ -771,7 +771,7 @@ FIXED: Avoid misaligned memory access on platforms where it causes a crash. (e.g
 
 (no release date yet)
 =================
-(upcoming version 1.24)
+(upcoming version 1.3)
 
 DONE: You can redefine keyboard controls in the pause menu. (They are not saved on quit yet.)
 FIXED: In the list of high scores, show 0:00 if the time has expired.
@@ -782,3 +782,15 @@ FIXED: Added a configurable fix for: If the prince has only one hit point when h
 	Details: See FIX_ONE_HP_STOPS_BLINKING in config.h and https://github.com/NagyD/SDLPoP/issues/338
 FIXED: Added a configurable fix for: If the prince or a guard falls to his death onto a loose floor, the floor drops, but the body stays there in the air.
 	Details: See FIX_DEAD_FLOATING_IN_AIR in config.h and https://github.com/NagyD/SDLPoP/issues/343
+DONE: Switched from SDL2 to SDL3.
+DONE: MIDI music can be played in a Roland MT-32 emulator (Munt), the same way as in DOSBox Staging.
+	Details: See README-MT32.md and the MT-32 options in SDLPoP.ini.
+FIXED: Fixed pops in sounds, the looping level door opening sound and the victory sound.
+FIXED: The colors of the grid behind the intro text change again.
+DONE: Taking a screenshot is faster and no longer flashes the screen black.
+DONE: The graphics of the Macintosh version can be used. They are in data/mac and are used when that directory exists.
+	The game plays exactly like the DOS version; only the pictures are different.
+	Choose with "graphics = auto/dos/mac" in SDLPoP.ini.
+	The Macintosh graphics come from Prince of Persia Remastered by The-Alok.
+	Details: https://github.com/The-Alok/prince-of-persia-remastered
+DONE: Added the "smooth" scaling type: edges are smoothed with Scale3x. Text stays sharp.

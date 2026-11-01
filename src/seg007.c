@@ -134,10 +134,6 @@ void set_redraw_anim_curr() {
 
 // seg007:019A
 void redraw_at_trob() {
-	/* Mirror appearance/removal can extend above the legacy tile wipe. */
-	if (mac_architecture_visible(trob.room) &&
-	    (curr_tile == tiles_13_mirror ||
-	     (curr_room_tiles[trob.tilepos] & 0x1F) == tiles_13_mirror)) need_full_redraw = 1;
 	redraw_height = 63;
 	word tilepos = get_trob_pos_in_drawn_room();
 	set_redraw_full(tilepos, 1);
@@ -491,8 +487,8 @@ Possible values of trob_type:
 					if (current_level == /*4*/ custom->mirror_level) {
 						// Special event: place mirror
 						get_tile(/*4*/ custom->mirror_room, /*4*/ custom->mirror_column, /*0*/ custom->mirror_row);
+						mac_hide_tile_change(curr_room, curr_tilepos, curr_room_tiles[curr_tilepos]);
 						curr_room_tiles[curr_tilepos] = /*tiles_13_mirror*/ custom->mirror_tile;
-						if (mac_architecture_visible(curr_room)) need_full_redraw = 1;
 					}
 				}
 			} else {

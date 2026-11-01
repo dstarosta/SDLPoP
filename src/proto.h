@@ -449,6 +449,8 @@ void draw_tile(void);
 void draw_tile_aboveroom(void);
 void redraw_needed(short tilepos);
 void redraw_needed_above(int column);
+void mac_hide_tile_change(byte room, word tilepos, byte old_tile);
+void mac_show_tile_changes(void);
 int get_tile_to_draw(int room, int column, int row, byte* ptr_tile, byte* ptr_modifier, byte tile_room0);
 void load_curr_and_left_tile(void);
 void load_leftroom(void);

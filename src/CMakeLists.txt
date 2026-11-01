@@ -118,7 +118,7 @@ else()
     # NOTE: Currently, the SDL3 framework is not being correctly included/linked in the bundle!
     #       As long as this isn't fixed, these bundles will only work if SDL3 is installed.
 
-    set (SDLPoP_VERSION "1.24 RC")
+    set (SDLPoP_VERSION "1.3")
     set (MACOSX_BUNDLE_INFO_STRING          ${PROJECT_NAME})
     set (MACOSX_BUNDLE_ICON_FILE            "icon.icns")
     set_source_files_properties(${MACOSX_BUNDLE_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)

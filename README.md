@@ -293,7 +293,7 @@ Since version 1.15, music is included.
 
 Since version 1.18, SDLPoP can play music from the MIDISND*.DAT files and OGG files are not included.
 
-Since version 1.24, SDPPoP can play MIDI music in a MT-32 emulator. [Roland music](README-MT32.md)
+Since version 1.3, SDLPoP can play MIDI music in a MT-32 emulator. [Roland music](README-MT32.md)
 
 #### Using custom music
 

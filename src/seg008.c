@@ -212,10 +212,25 @@ static void mac_add_wall_fill(int fore, int dx, int bottom, int width, int heigh
 	}
 }
 
+// The bottom course of a palace wall; returns the render-only random state the rest of the wall continues from.
+static dword mac_draw_palace_wall_bottom(int fore) {
+	int row = drawn_row, col = drawn_col;
+	dword seed = drawn_room + row * 10 + col;
+	if (row < 0 || row > 2 || col < 0 || col > 9) return seed;
+	mac_add_wall_fill(fore, 0, draw_bottom_y - 3, 32, 3, mac_palace_color(row, 3, col));
+	int bottom_id = 15 + mac_palace_random(&seed, 2);
+	if (fore) {
+		mac_add_fore_exact(id_chtab_7_environmentwall, bottom_id, 0, MAC_FLOOR_BOTTOM_ANCHOR, blitters_10h_transp);
+	} else {
+		mac_add_back_exact(id_chtab_7_environmentwall, bottom_id, 0, MAC_FLOOR_BOTTOM_ANCHOR, blitters_10h_transp);
+	}
+	return seed;
+}
+
 static void mac_draw_palace_wall(int fore) {
 	int row = drawn_row, col = drawn_col;
 	if (row < 0 || row > 2 || col < 0 || col > 9) return;
-	int main_y = draw_main_y - 3, bottom_y = draw_bottom_y - 3;
+	int main_y = draw_main_y - 3;
 	if (fore) {
 		mac_add_wall_fill(1, 0, main_y - 40, 32, 20, mac_palace_color(row, 0, col));
 		mac_add_wall_fill(1, 0, main_y - 19, 16, 21, mac_palace_color(row, 1, col));
@@ -223,18 +238,13 @@ static void mac_draw_palace_wall(int fore) {
 		mac_add_wall_fill(1, 0, main_y, 8, 19, mac_palace_color(row, 2, col));
 		mac_add_wall_fill(1, 8, main_y, 24, 19, mac_palace_color(row, 2, col + 1));
 	}
-	mac_add_wall_fill(fore, 0, bottom_y, 32, 3, mac_palace_color(row, 3, col));
-	dword seed = drawn_room + row * 10 + col;
-	int bottom_id = 15 + mac_palace_random(&seed, 2);
+	dword seed = mac_draw_palace_wall_bottom(fore);
 	if (fore) {
-		mac_add_fore_exact(id_chtab_7_environmentwall, bottom_id, 0, MAC_FLOOR_BOTTOM_ANCHOR, blitters_10h_transp);
 		const int ids[] = {3, 6, 9, 12};
 		const int ys[] = {-53, -34, -13, 0};
 		for (int i = 0; i < 4; ++i)
 			mac_add_fore_exact(id_chtab_7_environmentwall, ids[i] + mac_palace_random(&seed, 2),
 			                   i ? 0 : 24, MAC_FLOOR_TOP_ANCHOR + ys[i], blitters_10h_transp);
-	} else {
-		mac_add_back_exact(id_chtab_7_environmentwall, bottom_id, 0, MAC_FLOOR_BOTTOM_ANCHOR, blitters_10h_transp);
 	}
 }
 
@@ -354,9 +364,10 @@ static void mac_draw_left_below_corner(void) {
 	} else if (type == tiles_20_wall) {
 		int clip_bottom = row_below_left_[drawn_col + 1].tiletype == tiles_20_wall ?
 		                  draw_main_y * 2 + 2 : -1;
+		// One physical row higher: at its anchor a 1-pixel gap is left under the diagonal edge of the side face above.
 		mac_add_back_or_fore_exact(0, id_chtab_7_environmentwall, 2, draw_xh * 8,
 		                          draw_main_y + 1 + MAC_FLOOR_BOTTOM_ANCHOR,
-		                          blitters_10h_transp, clip_bottom, -1, 0);
+		                          blitters_10h_transp, clip_bottom, -1, -1);
 	} else if (type < COUNT(tile_table)) {
 		mac_add_back_exact(id_chtab_6_environment, tile_table[type].topright_id, 0, MAC_FLOOR_BOTTOM_ANCHOR, blitters_10h_transp);
 	}
@@ -372,14 +383,13 @@ static int mac_can_see_bottomleft(void) {
 static void mac_draw_left_floor_overhang(void) {
 	if (!mac_can_see_bottomleft()) return;
 
-	mac_draw_left_below_corner();
-
-	if (tile_left == tiles_5_stuck) return;
-
-	if (tile_left < COUNT(tile_table) && tile_table[tile_left].floor_right) {
+	// DOS draws this black mask after the corner below; the Mac mask reaches into the Mac corner, so it goes first.
+	if (tile_left != tiles_5_stuck && tile_left < COUNT(tile_table) && tile_table[tile_left].floor_right) {
 		mac_add_floor_back_exact("right-mask", tiles_1_floor, 0, 0x2A, 0,
 			MAC_FLOOR_TOP_ANCHOR + 2, blitters_9_black);
 	}
+
+	mac_draw_left_below_corner();
 }
 
 static void mac_draw_below_gate_top(void) {
@@ -578,18 +588,27 @@ static void mac_draw_left_animated(void) {
 	}
 }
 
-static void mac_draw_current_floor_front(void) {
+// With also_fore, the front also goes in front of the characters, as draw_tile_bottom(1) does.
+static void mac_draw_current_floor_front(int also_fore) {
 	mac_floor_state_type floor_state;
 	if (mac_get_floor_state(curr_tile, curr_modifier, &floor_state)) {
 		mac_add_floor_back_exact("front", curr_tile, curr_modifier, floor_state.front_id, 0,
 			floor_state.front_anchor_y, blitters_10h_transp);
+		if (also_fore) {
+			mac_add_floor_fore_exact("front", curr_tile, curr_modifier, floor_state.front_id, 0,
+				floor_state.front_anchor_y, blitters_10h_transp);
+		}
 		return;
 	}
 
 	int id = 0;
 	short chtab = id_chtab_6_environment;
 	if (curr_tile == tiles_20_wall) {
-		if (mac_is_palace()) { mac_draw_palace_wall(0); return; }
+		if (mac_is_palace()) {
+			mac_draw_palace_wall(0);
+			if (also_fore) mac_draw_palace_wall_bottom(1);
+			return;
+		}
 		static const byte dungeon_ids[4] = {7,9,5,3};
 		chtab = id_chtab_7_environmentwall;
 		id = mac_is_palace() ? 3 : dungeon_ids[curr_modifier & 3];
@@ -597,6 +616,7 @@ static void mac_draw_current_floor_front(void) {
 		id = tile_table[curr_tile].bottom_id;
 	}
 	mac_add_back_exact(chtab, id, 0, MAC_FLOOR_BOTTOM_ANCHOR, blitters_10h_transp);
+	if (also_fore) mac_add_fore_exact(chtab, id, 0, MAC_FLOOR_BOTTOM_ANCHOR, blitters_10h_transp);
 }
 
 static int mac_lattice_in_foreground(void) {
@@ -723,7 +743,7 @@ static void mac_draw_tile_exact(void) {
 	mac_draw_below_gate_top();
 	mac_draw_left_other_overhang();
 	mac_draw_left_animated();
-	mac_draw_current_floor_front();
+	mac_draw_current_floor_front(0);
 	mac_draw_current_floor_top();
 	mac_draw_current_animated();
 	mac_draw_current_foreground();
@@ -733,7 +753,7 @@ static void mac_draw_overlay_components(int mid) {
 	mac_back_to_mid = mid;
 	mac_draw_left_other_overhang();
 	mac_draw_left_animated();
-	mac_draw_current_floor_front();
+	mac_draw_current_floor_front(0);
 	mac_draw_current_floor_top();
 	mac_draw_current_animated();
 	mac_back_to_mid = 0;
@@ -752,11 +772,11 @@ static void mac_draw_other_overlay_exact(void) {
 	}
 }
 
-static void mac_draw_tile_above_exact(void) {
+static void mac_draw_tile_above_exact(int front_also_fore) {
 	mac_draw_left_floor_overhang();
 	mac_draw_below_gate_top();
 	mac_draw_left_other_overhang();
-	mac_draw_current_floor_front();
+	mac_draw_current_floor_front(front_also_fore);
 	mac_draw_current_foreground();
 }
 
@@ -859,7 +879,7 @@ void draw_tile() {
 // seg008:01F2
 void draw_tile_aboveroom() {
 	if (uses_mac_graphics()) {
-		mac_draw_tile_above_exact();
+		mac_draw_tile_above_exact(0);
 		return;
 	}
 	draw_tile_floorright();
@@ -883,8 +903,10 @@ void redraw_needed(short tilepos) {
 		int redraw_mac_fore = 0;
 		if (redraw_frames_full[tilepos]) { --redraw_frames_full[tilepos]; redraw_mac_tile = 1; }
 		if (redraw_frames_anim[tilepos]) { --redraw_frames_anim[tilepos]; redraw_mac_tile = 1; }
-		if (redraw_frames2[tilepos]) { --redraw_frames2[tilepos]; redraw_mac_other_overlay = 1; }
-		if (redraw_frames_floor_overlay[tilepos]) {
+		if (redraw_frames2[tilepos]) {
+			--redraw_frames2[tilepos];
+			redraw_mac_other_overlay = 1;
+		} else if (redraw_frames_floor_overlay[tilepos]) {
 			--redraw_frames_floor_overlay[tilepos];
 			redraw_mac_floor_overlay = 1;
 		}
@@ -963,16 +985,17 @@ void redraw_needed(short tilepos) {
 void redraw_needed_above(int column) {
 	if (redraw_frames_above[column] != 0) {
 		--redraw_frames_above[column];
-		if (uses_mac_graphics()) {
-			mac_draw_tile_above_exact();
-			return;
-		}
 #ifdef FIX_BIGPILLAR_JUMP_UP
 		if (curr_tile != tiles_9_bigpillar_top)
 #endif
 		{
+			// Clears what was there, e.g. a loose floor that fell from the room above.
 			draw_tile_wipe(3);
-			draw_tile_floorright();
+			if (!uses_mac_graphics()) draw_tile_floorright();
+		}
+		if (uses_mac_graphics()) {
+			mac_draw_tile_above_exact(1);
+			return;
 		}
 		draw_tile_anim_topright();
 		draw_tile_right();
@@ -980,6 +1003,23 @@ void redraw_needed_above(int column) {
 		draw_loose(1);
 		draw_tile_fore();
 	}
+}
+
+// DOS never redraws the tile where the level door places the mirror, so the mirror shows only once the room
+// is drawn again. Mac redraws whole rooms when tiles change, so it keeps drawing the old tile until then.
+static byte mac_hidden_tile_room;
+static word mac_hidden_tilepos;
+static byte mac_hidden_old_tile;
+
+void mac_hide_tile_change(byte room, word tilepos, byte old_tile) {
+	if (!uses_mac_graphics()) return;
+	mac_hidden_tile_room = room;
+	mac_hidden_tilepos = tilepos;
+	mac_hidden_old_tile = old_tile;
+}
+
+void mac_show_tile_changes(void) {
+	mac_hidden_tile_room = 0;
 }
 
 // seg008:02FE
@@ -991,6 +1031,9 @@ int get_tile_to_draw(int room, int column, int row, byte* ptr_tiletype, byte* pt
 	} else if (room) {
 		*ptr_tiletype = curr_room_tiles[tilepos] & 0x1F;
 		*ptr_modifier = curr_room_modif[tilepos];
+		if (room == mac_hidden_tile_room && tilepos == mac_hidden_tilepos) {
+			*ptr_tiletype = mac_hidden_old_tile & 0x1F;
+		}
 	} else {
 		*ptr_modifier = 0;
 		*ptr_tiletype = tile_room0;
@@ -2396,6 +2439,8 @@ static void mac_draw_floor_overlay_exact(void) {
 	    curr_tile != tiles_3_pillar &&
 	    curr_tile != tiles_5_stuck &&
 	    curr_tile != tiles_19_torch) {
+		// As in draw_floor_overlay: other tiles (gates, loose floors, buttons...) are drawn over the climbing kid.
+		mac_draw_other_overlay_exact();
 		return;
 	}
 

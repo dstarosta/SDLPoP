@@ -240,6 +240,7 @@ void draw_level_first() {
 void redraw_screen(int drawing_different_room) {
 	// A Mac tile-change redraw is not a room entry, so it must not touch exit_room_timer or the keyboard buffer.
 	const int native_refresh = !drawing_different_room && !different_room && uses_mac_graphics();
+	if (drawing_different_room || different_room) mac_show_tile_changes();
 	//remove_flash();
 	if (drawing_different_room
 #ifdef USE_SCREENSHOT
