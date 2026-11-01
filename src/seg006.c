@@ -19,6 +19,7 @@ The authors of this program may be contacted at https://forum.princed.org
 */
 
 #include "common.h"
+#include "mac_graphics.h"
 
 #define SEQTBL_BASE 0x196E
 #define SEQTBL_0 (seqtbl - SEQTBL_BASE)
@@ -855,6 +856,8 @@ void reset_obj_clip() {
 	obj_clip_top = 0;
 	obj_clip_right = 320;
 	obj_clip_bottom = 192;
+	if (is_cutscene && uses_mac_graphics())
+		obj_clip_bottom = screen_rect.bottom;
 }
 
 // seg006:051C
@@ -1015,8 +1018,9 @@ void set_char_collision() {
 		char_width_half = 0;
 		char_height = 0;
 	} else {
-		char_width_half = (image->/*width*/w + 1) / 2;
-		char_height = image->/*height*/h;
+		// Collision always uses the DOS sprite size, so physics do not depend on the graphics.
+		char_width_half = (dos_image_width(image) + 1) / 2;
+		char_height = dos_image_height(image);
 	}
 	char_x_left = obj_x / 2 + 58;
 	if (Char.direction >= dir_0_right) {
@@ -1677,6 +1681,12 @@ void do_pickup(int obj_type) {
 	redraw_height = 35;
 	set_wipe(curr_tilepos, 1);
 	set_redraw_full(curr_tilepos, 1);
+	if (obj_type == -1 && curr_tilepos % 10 < 9 &&
+	    uses_mac_graphics()) {
+		// The Mac floor sword reaches into the next cell, so redraw that one too.
+		set_wipe(curr_tilepos + 1, 1);
+		set_redraw_full(curr_tilepos + 1, 1);
+	}
 }
 
 // seg006:10E6
@@ -1766,8 +1776,14 @@ void clip_char() {
 #endif
 	// frames 217..228: going up the level door
 	if (frame >= frame_224_exit_stairs_8 && frame < 229) {
-		obj_clip_top = leveldoor_ybottom + 1;
-		obj_clip_right = leveldoor_right;
+		rect_type native_clip;
+		if (mac_get_leveldoor_clip(&native_clip)) {
+			obj_clip_top = native_clip.top;
+			obj_clip_right = native_clip.right;
+		} else {
+			obj_clip_top = leveldoor_ybottom + 1;
+			obj_clip_right = leveldoor_right;
+		}
 	} else {
 		if (
 			get_tile(room, char_col_left, char_top_row) == tiles_20_wall ||
@@ -2107,11 +2123,13 @@ void add_sword_to_objtable() {
 	) {
 		short sword_frame = cur_frame.sword & 0x3F;
 		if (sword_frame) {
-			obj_id = sword_tbl[sword_frame].id;
+			// The Mac sword sprites come with their own attachment table.
+			const sword_table_type* table = uses_mac_graphics() ? mac_sword_tbl : sword_tbl;
+			obj_id = table[sword_frame].id;
 			if (obj_id != 0xFF) {
 				obj_x = calc_screen_x_coord(obj_x);
-				obj_dx_forward(sword_tbl[sword_frame].x);
-				obj_y += sword_tbl[sword_frame].y;
+				obj_dx_forward(table[sword_frame].x);
+				obj_y += table[sword_frame].y;
 				obj_chtab = id_chtab_0_sword;
 				add_objtable(3); // sword
 			}

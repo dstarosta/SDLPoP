@@ -57,6 +57,7 @@ prince
 *.dSYM/
 *.pdb
 *.ilk
+tests/
 
 # Dev-C++
 *.layout

@@ -107,7 +107,7 @@ extern byte curr_modifier;
 // data:4CD8
 extern tile_and_mod leftroom_[3];
 // data:5950
-extern tile_and_mod row_below_left_[10];
+extern tile_and_mod row_below_left_[11];
 // data:2274
 extern const word tbl_line[] INIT(= {0, 10, 20});
 
@@ -180,7 +180,7 @@ extern short peels_count;
 
 
 // data:5FF4
-extern back_table_type foretable[200];
+extern back_table_type foretable[FORETABLE_MAX];
 // data:463C
 extern back_table_type backtable[200];
 // data:3D38
@@ -747,6 +747,8 @@ extern byte use_hardware_acceleration INIT(= 2);
 extern byte use_correct_aspect_ratio INIT(= 0);
 extern byte use_integer_scaling INIT(= 0);
 extern byte scaling_type INIT(= 0);
+// 0 = auto (Mac if data/mac exists), 1 = DOS, 2 = Mac.
+extern byte graphics_setting INIT(= 0);
 extern char mt32_rom_path[POP_MAX_PATH] INIT(= "roms");
 extern int mt32_dac INIT(= 2);
 extern int mt32_quality INIT(= 2);

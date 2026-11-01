@@ -571,12 +571,23 @@ chtab_type* load_sprites_from_file(int resource, int palette_bits, int quit_on_e
 	}
 
 	int n_images = shpl->n_images;
+	int image_offset = 0;
+	// The Mac princess room keeps its props at 962..975 instead of DOS 952..963.
+	bool mac_princess_room = resource == 950 && mac_has_image("PV", 975);
+	if (mac_princess_room) {
+		n_images = 15;
+		image_offset = 10;
+	}
+	// The Mac potion table has ten more images (the green and blue bubbles).
+	if (resource == 150 && mac_has_image("PRINCE", 183)) {
+		n_images = MAX(n_images, 33);
+	}
 	size_t alloc_size = sizeof(chtab_type) + sizeof(void*) * n_images;
 	chtab_type* chtab = (chtab_type*) malloc(alloc_size);
 	memset(chtab, 0, alloc_size);
 	chtab->n_images = n_images;
 	for (int i = 1; i <= n_images; i++) {
-		chtab->images[i - 1] = load_image(resource + i, pal_ptr);
+		chtab->images[i - 1] = load_image(resource + i + (i > 1 ? image_offset : 0), pal_ptr);
 	}
 	set_loaded_palette(pal_ptr);
 	return chtab;
@@ -1101,9 +1112,30 @@ cleanup:
 	return result;
 }
 
+static image_type* load_mac_png_image(const void* data, int size) {
+	return load_png_image(data, size, NULL);
+}
+
+static image_type* load_dos_image(int resource_id, dat_pal_type* palette);
+
 // seg009:121A
 image_type* load_image(int resource_id, dat_pal_type* palette) {
-	// stub
+	image_type* image = load_mac_image(resource_id, load_mac_png_image);
+	if (image == NULL) {
+		return load_dos_image(resource_id, palette);
+	}
+	// Remember the DOS size: collisions are computed from it.
+	image_type* dos_image = load_dos_image(resource_id, palette);
+	set_mac_image_dos_size(image, dos_image ? dos_image->w : 0, dos_image ? dos_image->h : 0);
+	SDL_DestroySurface(dos_image);
+	if (!SDL_SetSurfaceColorKey(image, true, 0)) {
+		sdlperror("load_image: SDL_SetSurfaceColorKey");
+		quit(1);
+	}
+	return image;
+}
+
+static image_type* load_dos_image(int resource_id, dat_pal_type* palette) {
 	data_location result;
 	int size;
 	void* image_data = load_from_opendats_alloc(resource_id, "png", &result, &size);
@@ -1185,11 +1217,12 @@ int set_joy_mode() {
 // seg009:178B
 surface_type* make_offscreen_buffer(const rect_type* rect) {
 	// stub
+	int scale = get_render_scale();
 #ifndef USE_ALPHA
 	// Bit order matches onscreen buffer, good for fading.
-	return SDL_CreateSurface(rect->right, rect->bottom, SURFACE_FORMAT_24BPP);
+	return SDL_CreateSurface(rect->right * scale, rect->bottom * scale, SURFACE_FORMAT_24BPP);
 #else
-	return SDL_CreateSurface(rect->right, rect->bottom, SURFACE_FORMAT_32BPP);
+	return SDL_CreateSurface(rect->right * scale, rect->bottom * scale, SURFACE_FORMAT_32BPP);
 #endif
 	//return surface;
 }
@@ -2008,15 +2041,17 @@ peel_type* read_peel_from_screen(const rect_type* rect) {
 	peel_type* result = calloc(1, sizeof(peel_type));
 	//memset(&result, 0, sizeof(result));
 	result->rect = *rect;
+	int scale = get_render_scale();
 #ifndef USE_ALPHA
-	SDL_Surface* peel_surface = SDL_CreateSurface(rect->right - rect->left, rect->bottom - rect->top, SURFACE_FORMAT_24BPP);
+	SDL_Surface* peel_surface = SDL_CreateSurface((rect->right - rect->left) * scale, (rect->bottom - rect->top) * scale, SURFACE_FORMAT_24BPP);
 #else
-	SDL_Surface* peel_surface = SDL_CreateSurface(rect->right - rect->left, rect->bottom - rect->top, SURFACE_FORMAT_32BPP);
+	SDL_Surface* peel_surface = SDL_CreateSurface((rect->right - rect->left) * scale, (rect->bottom - rect->top) * scale, SURFACE_FORMAT_32BPP);
 #endif
 	if (peel_surface == NULL) {
 		sdlperror("read_peel_from_screen: SDL_CreateRGBSurface");
 		quit(1);
 	}
+	mark_native_resolution_image(peel_surface);
 	result->peel = peel_surface;
 	rect_type target_rect = {0, 0, rect->right - rect->left, rect->bottom - rect->top};
 	method_1_blit_rect(result->peel, current_target_surface, &target_rect, rect, 0);
@@ -2781,9 +2816,9 @@ int check_sound_playing() {
 void apply_aspect_ratio() {
 	// Allow us to use a consistent set of screen co-ordinates, even if the screen size changes
 	if (use_correct_aspect_ratio) {
-		SDL_SetRenderLogicalPresentation(renderer_, 320 * 5, 200 * 6, SDL_LOGICAL_PRESENTATION_LETTERBOX); // 4:3
+		SDL_SetRenderLogicalPresentation(renderer_, get_render_width() * 5, get_render_height() * 6, SDL_LOGICAL_PRESENTATION_LETTERBOX); // 4:3
 	} else {
-		SDL_SetRenderLogicalPresentation(renderer_, 320, 200, SDL_LOGICAL_PRESENTATION_LETTERBOX); // 16:10
+		SDL_SetRenderLogicalPresentation(renderer_, get_render_width(), get_render_height(), SDL_LOGICAL_PRESENTATION_LETTERBOX); // 16:10
 	}
 	window_resized();
 }
@@ -2804,32 +2839,92 @@ void window_resized() {
 void init_overlay(void) {
 	static bool initialized = false;
 	if (!initialized) {
-		overlay_surface = SDL_CreateSurface(320, 200, SURFACE_FORMAT_32BPP);
-		merged_surface = SDL_CreateSurface(320, 200, SURFACE_FORMAT_24BPP);
+		overlay_surface = SDL_CreateSurface(get_render_width(), get_render_height(), SURFACE_FORMAT_32BPP);
+		merged_surface = SDL_CreateSurface(get_render_width(), get_render_height(), SURFACE_FORMAT_24BPP);
 		initialized = true;
 	}
 }
 
 
+static SDL_Surface* smooth_surface;
+static SDL_Texture* texture_smooth;
+
+static Uint32 rgb24_at(const SDL_Surface* surface, int x, int y) {
+	Uint32 value = 0;
+	memcpy(&value, (const byte*)surface->pixels + y * surface->pitch + x * 3, 3);
+	return value;
+}
+
+// Scale3x edge smoothing (https://www.scale2x.it/algorithm) of a 24-bit surface into one three times larger.
+static bool scale3x_surface(SDL_Surface* source, SDL_Surface* destination) {
+	if (!SDL_LockSurface(source)) return false;
+	if (!SDL_LockSurface(destination)) {
+		SDL_UnlockSurface(source);
+		return false;
+	}
+	for (int y = 0; y < source->h; ++y) {
+		int above = y > 0 ? y - 1 : y;
+		int below = y + 1 < source->h ? y + 1 : y;
+		for (int x = 0; x < source->w; ++x) {
+			int left = x > 0 ? x - 1 : x;
+			int right = x + 1 < source->w ? x + 1 : x;
+			Uint32 a = rgb24_at(source, left, above), b = rgb24_at(source, x, above), c = rgb24_at(source, right, above);
+			Uint32 d = rgb24_at(source, left, y), e = rgb24_at(source, x, y), f = rgb24_at(source, right, y);
+			Uint32 g = rgb24_at(source, left, below), h = rgb24_at(source, x, below), i = rgb24_at(source, right, below);
+			Uint32 out[9] = {e, e, e, e, e, e, e, e, e};
+			if (b != h && d != f) {
+				out[0] = d == b ? d : e;
+				out[1] = ((d == b && e != c) || (b == f && e != a)) ? b : e;
+				out[2] = b == f ? f : e;
+				out[3] = ((d == b && e != g) || (d == h && e != a)) ? d : e;
+				out[5] = ((b == f && e != i) || (h == f && e != c)) ? f : e;
+				out[6] = d == h ? d : e;
+				out[7] = ((d == h && e != i) || (h == f && e != g)) ? h : e;
+				out[8] = h == f ? f : e;
+			}
+			for (int row = 0; row < 3; ++row) {
+				byte* dst = (byte*)destination->pixels + (y * 3 + row) * destination->pitch + x * 9;
+				for (int col = 0; col < 3; ++col) {
+					memcpy(dst + col * 3, &out[row * 3 + col], 3);
+				}
+			}
+		}
+	}
+	SDL_UnlockSurface(destination);
+	SDL_UnlockSurface(source);
+	return true;
+}
+
 void init_scaling(void) {
 	// Don't crash in validate mode.
 	if (renderer_ == NULL) return;
 
+	int width = get_render_width();
+	int height = get_render_height();
 	if (texture_sharp == NULL) {
-		texture_sharp = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 320, 200);
+		texture_sharp = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
 	}
 	if (scaling_type == 1) {
 		if (texture_fuzzy == NULL) {
-			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, 320 * 2, 200 * 2);
+			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, width * 2, height * 2);
 			SDL_SetTextureScaleMode(texture_fuzzy, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_fuzzy;
 	} else if (scaling_type == 2) {
 		if (texture_blurry == NULL) {
-			texture_blurry = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 320, 200);
+			texture_blurry = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
 			SDL_SetTextureScaleMode(texture_blurry, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_blurry;
+	} else if (scaling_type == 3) {
+		if (smooth_surface == NULL) {
+			smooth_surface = SDL_CreateSurface(width * 3, height * 3, SURFACE_FORMAT_24BPP);
+		}
+		if (texture_smooth == NULL) {
+			texture_smooth = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width * 3, height * 3);
+			SDL_SetTextureScaleMode(texture_smooth, SDL_SCALEMODE_LINEAR);
+		}
+		target_texture = smooth_surface != NULL ? texture_smooth : NULL;
 	} else {
 		target_texture = texture_sharp;
 	}
@@ -2909,7 +3004,7 @@ void set_gr_mode(byte grmode) {
 	 * update copies it into target_texture, which the SDL renderer then displays.
 	 * The function handling screen updates is update_screen().
 	 * */
-	onscreen_surface_ = SDL_CreateSurface(320, 200, SURFACE_FORMAT_24BPP);
+	onscreen_surface_ = SDL_CreateSurface(get_render_width(), get_render_height(), SURFACE_FORMAT_24BPP);
 	if (onscreen_surface_ == NULL) {
 		sdlperror("set_gr_mode: SDL_CreateRGBSurface");
 		quit(1);
@@ -3041,6 +3136,10 @@ void update_screen() {
 		SDL_RenderClear(renderer_);
 		SDL_RenderTexture(renderer_, texture_sharp, NULL, NULL);
 		SDL_SetRenderTarget(renderer_, NULL);
+	} else if (scaling_type == 3) {
+		if (scale3x_surface(surface, smooth_surface)) {
+			SDL_UpdateTexture(target_texture, NULL, smooth_surface->pixels, smooth_surface->pitch);
+		}
 	} else {
 		SDL_UpdateTexture(target_texture, NULL, surface->pixels, surface->pitch);
 	}
@@ -3262,10 +3361,11 @@ int load_from_opendats_to_area(int resource, void* area, int length, const char*
 // SDL-specific implementations
 
 void rect_to_sdlrect(const rect_type* rect, SDL_Rect* sdlrect) {
-	sdlrect->x = rect->left;
-	sdlrect->y = rect->top;
-	sdlrect->w = rect->right - rect->left;
-	sdlrect->h = rect->bottom - rect->top;
+	int scale = get_render_scale();
+	sdlrect->x = rect->left * scale;
+	sdlrect->y = rect->top * scale;
+	sdlrect->w = (rect->right - rect->left) * scale;
+	sdlrect->h = (rect->bottom - rect->top) * scale;
 }
 
 void method_1_blit_rect(surface_type* target_surface, surface_type* source_surface, const rect_type* target_rect, const rect_type* source_rect, int blit) {
@@ -3332,13 +3432,18 @@ image_type* method_3_blit_mono(image_type* image, int xpos, int ypos, int blitte
 	SDL_UnlockSurface(image);
 
 	SDL_Rect src_rect = {0, 0, w, h};
-	SDL_Rect dest_rect = {xpos, ypos, w, h};
+	copy_native_image_properties(image, colored_image);
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_BLEND);
 	SDL_SetSurfaceBlendMode(current_target_surface, SDL_BLENDMODE_BLEND);
 	SDL_SetSurfaceAlphaMod(colored_image, 255);
-	if (!SDL_BlitSurface(colored_image, &src_rect, current_target_surface, &dest_rect)) {
-		sdlperror("method_3_blit_mono: SDL_BlitSurface");
-		quit(1);
+	if (get_render_scale() != 1) {
+		blit_image_scaled_for_renderer(colored_image, &src_rect, current_target_surface, xpos, ypos);
+	} else {
+		SDL_Rect dest_rect = {xpos, ypos, w, h};
+		if (!SDL_BlitSurface(colored_image, &src_rect, current_target_surface, &dest_rect)) {
+			sdlperror("method_3_blit_mono: SDL_BlitSurface");
+			quit(1);
+		}
 	}
 	SDL_DestroySurface(colored_image);
 
@@ -3416,10 +3521,6 @@ void draw_rect_contours(const rect_type* rect, byte color) {
 }
 
 void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* image, SDL_Rect* src_rect) {
-	if (dest_rect->w != src_rect->w || dest_rect->h != src_rect->h) {
-		printf("blit_xor: dest_rect and src_rect have different sizes\n");
-		quit(1);
-	}
 	SDL_Surface* helper_surface = SDL_CreateSurface(dest_rect->w, dest_rect->h, SURFACE_FORMAT_24BPP);
 	if (helper_surface == NULL) {
 		sdlperror("blit_xor: SDL_CreateRGBSurface");
@@ -3430,6 +3531,20 @@ void blit_xor(SDL_Surface* target_surface, SDL_Rect* dest_rect, SDL_Surface* ima
 	if (image_24 == NULL) {
 		sdlperror("blit_xor: SDL_CreateRGBSurface");
 		quit(1);
+	}
+	// At 2x the DOS image is smaller than the target area: scale it up first.
+	SDL_Rect scaled_rect = {0, 0, dest_rect->w, dest_rect->h};
+	if (dest_rect->w != src_rect->w || dest_rect->h != src_rect->h) {
+		SDL_Surface* scaled = SDL_CreateSurface(dest_rect->w, dest_rect->h, SURFACE_FORMAT_24BPP);
+		SDL_SetSurfaceColorKey(image_24, false, 0);
+		SDL_SetSurfaceBlendMode(image_24, SDL_BLENDMODE_NONE);
+		if (scaled == NULL || !SDL_BlitSurfaceScaled(image_24, src_rect, scaled, NULL, SDL_SCALEMODE_NEAREST)) {
+			sdlperror("blit_xor: scale");
+			quit(1);
+		}
+		SDL_DestroySurface(image_24);
+		image_24 = scaled;
+		src_rect = &scaled_rect;
 	}
 	SDL_Rect dest_rect2 = *src_rect;
 	// Read what is currently where we want to draw the new image.
@@ -3478,6 +3593,7 @@ void draw_colored_torch(int color, SDL_Surface* image, int xpos, int ypos) {
 		sdlperror("draw_colored_torch: SDL_ConvertSurface");
 		quit(1);
 	}
+	copy_native_image_properties(image, colored_image);
 	SDL_SetSurfaceBlendMode(colored_image, SDL_BLENDMODE_NONE);
 
 	if (!SDL_LockSurface(colored_image)) {
@@ -3523,7 +3639,8 @@ image_type* method_6_blit_img_to_scr(image_type* image, int xpos, int ypos, int 
 	}
 
 	SDL_Rect src_rect = {0, 0, image->w, image->h};
-	SDL_Rect dest_rect = {xpos, ypos, image->w, image->h};
+	int scale = is_native_resolution_image(image) ? 1 : get_render_scale();
+	SDL_Rect dest_rect = {xpos * get_render_scale(), ypos * get_render_scale(), image->w * scale, image->h * scale};
 
 	if (blit == blitters_3_xor) {
 		blit_xor(current_target_surface, &dest_rect, image, &src_rect);
@@ -3546,7 +3663,9 @@ image_type* method_6_blit_img_to_scr(image_type* image, int xpos, int ypos, int 
 	} else {
 		SDL_SetSurfaceColorKey(image, true, 0);
 	}
-	if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
+	if (get_render_scale() != 1) {
+		blit_image_scaled_for_renderer(image, &src_rect, current_target_surface, xpos, ypos);
+	} else if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
 		sdlperror("method_6_blit_img_to_scr: SDL_BlitSurface 2247");
 		printf("[DBG] src fmt=%u w=%d h=%d pal=%p dst fmt=%u\n",
 		       image->format, image->w, image->h,
@@ -4445,7 +4564,8 @@ void set_chtab_palette(chtab_type* chtab, byte* colors, int n_colors) {
 		for (int i = 0; i < chtab->n_images; ++i) {
 			//printf("i=%d\n",i);
 			image_type* current_image = chtab->images[i];
-			if (current_image != NULL) {
+			// Mac images carry their own colours; DOS palette swaps would corrupt them.
+			if (current_image != NULL && !is_native_resolution_image(current_image)) {
 
 				int n_colors_to_be_set = n_colors;
 				SDL_Palette* current_palette = SDL_GetSurfacePalette(current_image);

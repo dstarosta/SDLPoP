@@ -62,6 +62,7 @@ void pop_main() {
 #endif
 
     load_global_options();
+    init_mac_graphics();
     check_mod_param();
 #ifdef USE_MENU
     load_ingame_settings();
@@ -909,6 +910,10 @@ void play_frame() {
 
 // seg000:09B6
 void draw_game_frame() {
+    // A Mac tile-change redraw must not swallow a room change; redraw_screen(1) redraws everything anyway.
+    if (need_full_redraw && different_room && uses_mac_graphics()) {
+        need_full_redraw = 0;
+    }
     if (need_full_redraw) {
         redraw_screen(0);
         need_full_redraw = 0;
@@ -1389,14 +1394,23 @@ void read_joyst_control() {
 }
 
 // seg000:10EA
+// The Mac flasks are 8 logical pixels wide, so they are spaced wider and sit 2 pixels higher.
+static short hp_step(void) {
+    return uses_mac_graphics() ? 8 : 7;
+}
+
+static short hp_ypos(void) {
+    return uses_mac_graphics() ? 192 : 194;
+}
+
 void draw_kid_hp(short curr_hp, short max_hp) {
     for (short drawn_hp_index = curr_hp; drawn_hp_index < max_hp; ++drawn_hp_index) {
         // empty HP
-        method_6_blit_img_to_scr(get_image(id_chtab_2_kid, 217), drawn_hp_index * 7, 194, blitters_0_no_transp);
+        method_6_blit_img_to_scr(get_image(id_chtab_2_kid, 217), drawn_hp_index * hp_step(), hp_ypos(), blitters_0_no_transp);
     }
     for (short drawn_hp_index = 0; drawn_hp_index < curr_hp; ++drawn_hp_index) {
         // full HP
-        method_6_blit_img_to_scr(get_image(id_chtab_2_kid, 216), drawn_hp_index * 7, 194, blitters_0_no_transp);
+        method_6_blit_img_to_scr(get_image(id_chtab_2_kid, 216), drawn_hp_index * hp_step(), hp_ypos(), blitters_0_no_transp);
     }
 }
 
@@ -1409,11 +1423,12 @@ void draw_guard_hp(short curr_hp, short max_hp) {
             // shadow has HP only on level 12
             (guard_charid != charid_1_shadow || current_level == 12)
        ) {
+        short right = uses_mac_graphics() ? 312 : 314;
         for (short drawn_hp_index = curr_hp; drawn_hp_index < max_hp; ++drawn_hp_index) {
-            method_6_blit_img_to_scr(chtab_addrs[id_chtab_5_guard]->images[0], 314 - drawn_hp_index * 7, 194, blitters_9_black);
+            method_6_blit_img_to_scr(chtab_addrs[id_chtab_5_guard]->images[0], right - drawn_hp_index * hp_step(), hp_ypos(), blitters_9_black);
         }
         for (short drawn_hp_index = 0; drawn_hp_index < curr_hp; ++drawn_hp_index) {
-            method_6_blit_img_to_scr(chtab_addrs[id_chtab_5_guard]->images[0], 314 - drawn_hp_index * 7, 194, blitters_0_no_transp);
+            method_6_blit_img_to_scr(chtab_addrs[id_chtab_5_guard]->images[0], right - drawn_hp_index * hp_step(), hp_ypos(), blitters_0_no_transp);
         }
     }
 }
@@ -2088,6 +2103,35 @@ void release_title_images() {
     }
 }
 
+// The story frame has a transparent centre: blue behind the intro text, red behind the ending.
+static Uint32 mac_story_background_rgb = 0x100060;
+
+// Title and story screens with Mac graphics: the Mac images have other sizes and their own anchors.
+static bool draw_full_image_mac(enum full_image_id id, image_type* image, int xpos, int ypos) {
+    if (!is_native_resolution_image(image)) return false;
+    if (id == STORY_FRAME) {
+        draw_native_rect_physical(0, 0, image->w, image->h, mac_story_background_rgb);
+        draw_native_image_physical(image, xpos * 2, ypos * 2);
+        return true;
+    }
+    short origin_x, origin_y;
+    if (id >= STORY_ABSENCE && id <= STORY_CREDITS && get_native_image_origin(image, &origin_x, &origin_y)) {
+        draw_native_image_physical(image, xpos * 2 - origin_x, ypos * 2 - origin_y);
+        return true;
+    }
+    // The palace picture is transparent at the top, so the border goes under it.
+    if (id == TITLE_MAIN && chtab_title40 != NULL && chtab_title40->images[0] != NULL) {
+        method_6_blit_img_to_scr(chtab_title40->images[0], 0, 0, blitters_0_no_transp);
+        draw_native_image_physical(image, (get_render_width() - image->w) / 2, 0);
+        return true;
+    }
+    if (id == TITLE_PRESENTS || id == TITLE_GAME || id == TITLE_POP || id == TITLE_MECHNER) {
+        draw_native_image_physical(image, (get_render_width() - image->w) / 2, ypos * 2);
+        return true;
+    }
+    return false;
+}
+
 // seg000:1C3A
 void draw_full_image(enum full_image_id id) {
     image_type* decoded_image;
@@ -2099,6 +2143,7 @@ void draw_full_image(enum full_image_id id) {
     int blit = full_image[id].blitter;
     int xpos = full_image[id].xpos;
     int ypos = full_image[id].ypos;
+    if (draw_full_image_mac(id, decoded_image, xpos, ypos)) return;
 
     switch (blit) {
         case blitters_white:
@@ -2288,6 +2333,7 @@ void free_optsnd_chtab() {
 
 // seg000:22C8
 void load_title_images(int bgcolor) {
+    mac_story_background_rgb = bgcolor ? 0x100060 : 0x800000;
     dat_type* dathandle = open_dat("TITLE.DAT", 'G');
     chtab_title40 = load_sprites_from_file(40, 1 << 11, 1);
     chtab_title50 = load_sprites_from_file(50, 1 << 12, 1);

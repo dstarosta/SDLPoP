@@ -1,7 +1,7 @@
 ﻿[Project]
 FileName=port_debug.dev
 Name=SDLPoP
-UnitCount=31
+UnitCount=33
 Type=1
 Ver=2
 ObjFiles=
@@ -352,6 +352,26 @@ BuildCmd=
 
 [Unit31]
 FileName=stb_image_write.h
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit32]
+FileName=mac_graphics.c
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit33]
+FileName=mac_graphics.h
 CompileCpp=0
 Folder=
 Compile=1

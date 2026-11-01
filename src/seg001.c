@@ -51,6 +51,15 @@ hof_type hof[MAX_HOF_COUNT];
 
 #define N_STARS 6
 
+static void restore_princess_stars(void);
+static void reset_mac_stars(void);
+
+static int mac_native_princess_room(void) {
+	chtab_type* room = chtab_addrs[id_chtab_8_princessroom];
+	return uses_mac_graphics() && room &&
+	       room->n_images == 15 && is_native_resolution_image(room->images[0]);
+}
+
 // data:0D92
 rect_type hof_rects[MAX_HOF_COUNT] = {
 { 84,   72,   96,  248},
@@ -157,6 +166,11 @@ void play_opp_seq() {
 // seg001:0156
 void draw_princess_room_bg() {
 	memset(table_counts, 0, sizeof(table_counts));
+	const int native_room = mac_native_princess_room();
+	if (native_room) {
+		free_peels();
+		add_backtable_physical(id_chtab_8_princessroom, 1, 0, 0, blitters_0_no_transp);
+	}
 	loadkid();
 	if (Char.frame) {
 		load_frame_to_obj();
@@ -169,11 +183,23 @@ void draw_princess_room_bg() {
 		obj_tilepos = 30;
 		add_objtable(0);
 	}
-	redraw_needed_tiles();
-	add_foretable(id_chtab_8_princessroom, 2 /*pillar piece*/, 30, 0, 167, blitters_10h_transp, 0);
+	if (native_room) {
+		draw_objtable_items_at_tile(30);
+		mac_add_fore_anchor_exact(id_chtab_8_princessroom, 2, 240, 167, blitters_10h_transp);
+	} else {
+		redraw_needed_tiles();
+		add_foretable(id_chtab_8_princessroom, 2 /*pillar piece*/, 30, 0, 167, blitters_10h_transp, 0);
+	}
 	princess_room_torch();
 	draw_hourglass();
 	draw_tables();
+	if (native_room) {
+		current_target_surface = offscreen_surface;
+		restore_princess_stars();
+		current_target_surface = onscreen_surface_;
+		rect_type dirty = screen_rect;
+		add_drect(&dirty);
+	}
 }
 
 // seg001:01E0
@@ -507,19 +533,37 @@ void princess_room_torch() {
 	for (short which = 2; which--; ) {
 		which_torch = !which_torch;
 		princess_torch_frame[which_torch] = get_torch_frame(princess_torch_frame[which_torch]);
-		add_backtable(id_chtab_1_flameswordpotion, princess_torch_frame[which_torch] + 1, princess_torch_pos_xh[which_torch], princess_torch_pos_xl[which_torch], 116, 0, 0);
+		if (mac_native_princess_room()) {
+			static const short anchor_x[] = {78, 290};
+			int id = 13 + princess_torch_frame[which_torch] % 3;
+			image_type* image = get_image(id_chtab_8_princessroom, id - 1);
+			short ox = 0, oy = 0;
+			get_native_image_origin(image, &ox, &oy);
+			add_backtable_physical(id_chtab_8_princessroom, id,
+				anchor_x[which_torch] * 2 - ox, 121 * 2 - oy, blitters_10h_transp);
+		} else {
+			add_backtable(id_chtab_1_flameswordpotion, princess_torch_frame[which_torch] + 1,
+				princess_torch_pos_xh[which_torch], princess_torch_pos_xl[which_torch], 116, 0, 0);
+		}
 	}
 }
 
 // seg001:0863
 void draw_hourglass() {
+	const int native_room = mac_native_princess_room();
 	if (hourglass_sandflow >= 0) {
 		hourglass_sandflow = (hourglass_sandflow + 1) % 3;
 		if (hourglass_state >= 7) return;
-		add_foretable(id_chtab_8_princessroom, hourglass_sandflow + 10, 20, 0, 164, blitters_10h_transp, 0);
+		if (native_room)
+			mac_add_fore_anchor_exact(id_chtab_8_princessroom, hourglass_sandflow + 10, 160, 164, blitters_10h_transp);
+		else
+			add_foretable(id_chtab_8_princessroom, hourglass_sandflow + 10, 20, 0, 164, blitters_10h_transp, 0);
 	}
 	if (hourglass_state) {
-		add_midtable(id_chtab_8_princessroom, hourglass_state + 2, 19, 0, 168, blitters_10h_transp, 1);
+		if (native_room)
+			mac_add_mid_anchor_exact(id_chtab_8_princessroom, hourglass_state + 2, 152, 168, blitters_10h_transp, 0);
+		else
+			add_midtable(id_chtab_8_princessroom, hourglass_state + 2, 19, 0, 168, blitters_10h_transp, 1);
 	}
 }
 
@@ -661,19 +705,31 @@ void load_intro(int which_imgs,cutscene_ptr_type func,int free_sounds) {
 	}
 	free_all_chtabs_from(id_chtab_3_princessinstory);
 	load_chtab_from_file(id_chtab_8_princessroom, 950, "PV.DAT", 1<<13);
-	load_chtab_from_file(id_chtab_9_princessbed, 980, "PV.DAT", 1<<14);
+	// The Mac room picture includes the bed and is redrawn every frame, so it stays loaded.
+	const int native_room = mac_native_princess_room();
+	// Between levels the room buffer is 192 rows high; the Mac cutscene needs the full screen.
+	const int restore_room_buffer = native_room && offscreen_surface->h == rect_top.bottom * get_render_scale();
+	if (restore_room_buffer) {
+		free_surface(offscreen_surface);
+		offscreen_surface = make_offscreen_buffer(&screen_rect);
+	}
+	if (!native_room) load_chtab_from_file(id_chtab_9_princessbed, 980, "PV.DAT", 1<<14);
 	current_target_surface = offscreen_surface;
+	if (native_room) reset_clip_rect();
 	method_6_blit_img_to_scr(get_image(id_chtab_8_princessroom, 0), 0, 0, 0);
-	method_6_blit_img_to_scr(get_image(id_chtab_9_princessbed, 0), 0, 142, blitters_2_or);
+	if (!native_room) method_6_blit_img_to_scr(get_image(id_chtab_9_princessbed, 0), 0, 142, blitters_2_or);
 
 	// Free the images that are not needed anymore.
 	free_all_chtabs_from(id_chtab_9_princessbed);
-	SDL_DestroySurface(get_image(id_chtab_8_princessroom, 0));
-	if (NULL != chtab_addrs[id_chtab_8_princessroom]) chtab_addrs[id_chtab_8_princessroom]->images[0] = NULL;
+	if (!native_room) {
+		SDL_DestroySurface(get_image(id_chtab_8_princessroom, 0));
+		if (NULL != chtab_addrs[id_chtab_8_princessroom]) chtab_addrs[id_chtab_8_princessroom]->images[0] = NULL;
+	}
 
 	load_chtab_from_file(id_chtab_3_princessinstory, 800, "PV.DAT", 1<<9);
 	load_chtab_from_file(id_chtab_4_jaffarinstory_princessincutscenes,
 	                     50*which_imgs + 850, "PV.DAT", 1<<10);
+	reset_mac_stars();
 	for (short current_star = 0; current_star < N_STARS; ++current_star) {
 		draw_star(current_star, 0);
 	}
@@ -690,6 +746,10 @@ void load_intro(int which_imgs,cutscene_ptr_type func,int free_sounds) {
 	is_cutscene = 0;
 	free_all_chtabs_from(3);
 	draw_rect(&screen_rect, color_0_black);
+	if (restore_room_buffer) {
+		free_surface(offscreen_surface);
+		offscreen_surface = make_offscreen_buffer(&rect_top);
+	}
 }
 
 typedef struct star_type {
@@ -709,9 +769,58 @@ star_type stars[N_STARS] = {
 // data:0DE6
 const byte star_colors[N_STAR_COLORS] = {8, 7, 15, 15, 7};
 
+// The stars painted in the Mac room picture (640x400 centres): two in the window, nine over the balconies.
+static const short mac_star_centres[][2] = {
+	{ 17, 209}, { 31, 203},
+	{199, 226}, {239, 201}, {303, 209}, {318, 226}, {338, 203}, {416, 193}, {442, 219}, {543, 200}, {549, 221},
+};
+#define N_MAC_STARS COUNT(mac_star_centres)
+static byte mac_star_colors[N_MAC_STARS];
+static byte mac_star_turn;
+
+static void reset_mac_stars(void) {
+	for (int i = 0; i < N_MAC_STARS; ++i) {
+		mac_star_colors[i] = i % N_STAR_COLORS;
+	}
+	mac_star_turn = 0;
+}
+
+// Repaints a Mac star from the room picture, dimmed like the DOS star colours (dark grey, grey, white).
+static void draw_mac_star(int which_star) {
+	static const int brightness[N_STAR_COLORS] = {85, 170, 255, 255, 170};
+	image_type* room = get_image(id_chtab_8_princessroom, 0);
+	SDL_Palette* palette = room ? SDL_GetSurfacePalette(room) : NULL;
+	if (palette == NULL || !SDL_LockSurface(room)) return;
+	int level = brightness[mac_star_colors[which_star]];
+	for (int y = mac_star_centres[which_star][1] - 2; y <= mac_star_centres[which_star][1] + 2; ++y) {
+		for (int x = mac_star_centres[which_star][0] - 2; x <= mac_star_centres[which_star][0] + 2; ++x) {
+			SDL_Color c = palette->colors[((byte*)room->pixels)[y * room->pitch + x]];
+			if (c.r + c.g + c.b < 60) continue;
+			Uint32 rgb = ((Uint32)(c.r * level / 255) << 16) | ((Uint32)(c.g * level / 255) << 8) | (Uint32)(c.b * level / 255);
+			draw_native_rect_physical(x, y, 1, 1, rgb);
+		}
+	}
+	SDL_UnlockSurface(room);
+}
+
+// Redraws the stars at their current colours; the Mac room is recomposed every frame.
+static void restore_princess_stars(void) {
+	for (int i = 0; i < N_MAC_STARS; ++i) {
+		draw_mac_star(i);
+	}
+}
+
 // seg001:0E1C
 void draw_star(int which_star,int mark_dirty) {
 	// The stars in the window of the princess's room.
+	if (mac_native_princess_room()) {
+		// The Mac picture has its own stars; spread the DOS twinkles over them without extra random numbers.
+		stars[which_star].color = (stars[which_star].color + 1) % N_STAR_COLORS;
+		int mac_star = (which_star * 2 + mac_star_turn++) % N_MAC_STARS;
+		mac_star_colors[mac_star] = (mac_star_colors[mac_star] + 1) % N_STAR_COLORS;
+		draw_mac_star(mac_star);
+		return;
+	}
 	rect_type rect;
 	short star_color;
 	star_color = 15;

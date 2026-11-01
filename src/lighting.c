@@ -30,6 +30,8 @@ const Uint8 ambient_level = 128;
 
 // Called once at startup.
 void init_lighting() {
+	// TODO: the lighting overlay is DOS-sized; support it with Mac graphics.
+	if (uses_mac_graphics()) enable_lighting = 0;
 	if (!enable_lighting) return;
 
 	lighting_mask = load_png_file_as_surface(locate_file(mask_filename));

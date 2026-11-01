@@ -238,6 +238,8 @@ void draw_level_first() {
 
 // seg003:037B
 void redraw_screen(int drawing_different_room) {
+	// A Mac tile-change redraw is not a room entry, so it must not touch exit_room_timer or the keyboard buffer.
+	const int native_refresh = !drawing_different_room && !different_room && uses_mac_graphics();
 	//remove_flash();
 	if (drawing_different_room
 #ifdef USE_SCREENSHOT
@@ -265,12 +267,18 @@ void redraw_screen(int drawing_different_room) {
 #ifdef USE_LIGHTING
 	redraw_lighting();
 #endif
-		if (is_keyboard_mode) {
+		if (is_keyboard_mode && !native_refresh) {
 			clear_kbd_buf();
+		}
+		// Mac room art is transparent, so clear stale pixels before the first table pass only.
+		if (uses_mac_graphics()) {
+			current_target_surface = offscreen_surface;
+			draw_rect(&rect_top, color_0_black);
+			current_target_surface = onscreen_surface_;
 		}
 		is_blind_mode = 1;
 		draw_tables();
-		if (is_keyboard_mode) {
+		if (is_keyboard_mode && !native_refresh) {
 			clear_kbd_buf();
 		}
 #ifdef USE_COPYPROT
@@ -290,7 +298,7 @@ void redraw_screen(int drawing_different_room) {
 		memset(table_counts, 0, sizeof(table_counts));
 		draw_moving();
 		draw_tables();
-		if (is_keyboard_mode) {
+		if (is_keyboard_mode && !native_refresh) {
 			clear_kbd_buf();
 		}
 		need_drects = 1;
@@ -304,11 +312,11 @@ void redraw_screen(int drawing_different_room) {
 		if (upside_down) {
 			flip_screen(offscreen_surface);
 		}
-		if (is_keyboard_mode) {
+		if (is_keyboard_mode && !native_refresh) {
 			clear_kbd_buf();
 		}
 	}
-	exit_room_timer = 2;
+	if (!native_refresh) exit_room_timer = 2;
 
 }
 
@@ -588,6 +596,10 @@ void check_mirror() {
 				if (clip_top < obj_y) {
 					obj_clip_top = clip_top;
 					obj_clip_left = (Char.curr_col << 5) + 9;
+					if (uses_mac_graphics()) {
+						obj_tilepos = get_tilepos_nominus(Char.curr_col, Char.curr_row);
+						set_redraw_fore(obj_tilepos, 1);
+					}
 					add_objtable(4); // mirror image
 				}
 			}

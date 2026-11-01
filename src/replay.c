@@ -713,6 +713,9 @@ void end_replay() {
 		}
 
 		print_remaining_time();
+		printf("Final state: kid room=%d x=%d y=%d frame=%d dir=%d hp=%d/%d; guard room=%d x=%d frame=%d alive=%d hp=%d; seed=%u\n",
+		       Kid.room, Kid.x, Kid.y, Kid.frame, Kid.direction, hitp_curr, hitp_max,
+		       Guard.room, Guard.x, Guard.frame, Guard.alive, guardhp_curr, (unsigned)random_seed);
 
 		int minute_ticks = curr_tick % 720;
 		printf("Play duration:  %d min, %d sec, %d ticks. (curr_tick=%d)\n\n",
@@ -727,18 +730,30 @@ void end_replay() {
 	}
 }
 
+// Test aid: "validate <replay> dump-frames=DIR" saves the screen every 6 ticks, so builds can be compared picture by picture.
+static void dump_validate_frame(void) {
+	const char* param = check_param("dump-frames=");
+	if (!is_validate_mode || param == NULL || curr_tick % 6 != 0) return;
+	char path[POP_MAX_PATH];
+	snprintf_check(path, sizeof(path), "%s/%06d.bmp", param + strlen("dump-frames="), curr_tick);
+	if (!SDL_SaveBMP(onscreen_surface_, path)) {
+		sdlperror("dump_validate_frame: SDL_SaveBMP");
+	}
+}
+
 void do_replay_move() {
 	if (curr_tick == 0) {
 		random_seed = saved_random_seed;
 		seed_was_init = 1;
 
 		if (is_validate_mode) {
-			printf("Replay started in level %d, room %d.\n", current_level, drawn_room);
+			printf("Replay started in level %d, room %d. Graphics: %s.\n", current_level, drawn_room, uses_mac_graphics() ? "Mac" : "DOS");
 			print_remaining_time();
 			skipping_replay = 1;
 			replay_seek_target = replay_seek_2_end;
 		}
 	}
+	dump_validate_frame();
 	if (curr_tick == num_replay_ticks) { // replay is finished
 		end_replay();
 		return;

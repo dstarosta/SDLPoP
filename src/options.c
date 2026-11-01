@@ -96,7 +96,8 @@ NAMES_LIST(tile_type_names, {
 	"lattice_pillar", "lattice_down", "lattice_small", "lattice_left", "lattice_right", // 25..29
 	"torch_with_debris", // 30
 });
-NAMES_LIST(scaling_type_names, {"sharp", "fuzzy", "blurry"});
+NAMES_LIST(scaling_type_names, {"sharp", "fuzzy", "blurry", "smooth"});
+NAMES_LIST(graphics_setting_names, {"auto", "dos", "mac"});
 NAMES_LIST(row_names, {"top", "middle", "bottom"});
 KEY_VALUE_LIST(direction_names, {{"left", dir_FF_left}, {"right", dir_0_right}});
 NAMES_LIST(entry_pose_names, {"turning", "falling", "running"});
@@ -196,6 +197,7 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_boolean("use_correct_aspect_ratio", &use_correct_aspect_ratio);
 		process_boolean("use_integer_scaling", &use_integer_scaling);
 		process_byte("scaling_type", &scaling_type, &scaling_type_names_list);
+		process_byte("graphics", &graphics_setting, &graphics_setting_names_list);
 		process_int("mt32_dac", &mt32_dac, NULL);
 		process_int("mt32_quality", &mt32_quality, NULL);
 		process_boolean("mt32_reverb", &mt32_reverb);

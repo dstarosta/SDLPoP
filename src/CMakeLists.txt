@@ -94,6 +94,7 @@ set(SOURCE_FILES
         midi.c opl3.c opl3.h mt32synth.c mt32synth.h
         replay.c
         lighting.c
+        mac_graphics.c mac_graphics.h
         screenshot.c
         menu.c
         stb_vorbis.c
