@@ -566,6 +566,25 @@ static void process_midi_event(midi_event_type* event) {
 
 #define ONE_SECOND_IN_US 1000000LL
 
+// The victory fanfares select no programs, so in DOS they play on whatever the last song left; some programs are an octave up or down.
+// They get the set they have in normal play: song 27's (the cutscene before the guards) and song 29's (meet Jaffar).
+static const byte mt32_victory_programs[7] = {12, 15, 6, 8, 6, 6, 6};
+static const byte mt32_victory_jaffar_programs[7] = {2, 4, 2, 2, 1, 11, 7};
+
+static void mt32_send_fanfare_programs(void) {
+	const byte* programs;
+	if (current_sound == sound_37_victory) {
+		programs = mt32_victory_programs;
+	} else if (current_sound == sound_43_victory_Jaffar) {
+		programs = mt32_victory_jaffar_programs;
+	} else {
+		return;
+	}
+	for (int channel = 0; channel < 7; ++channel) {
+		mt32synth_send_message(0xC0 | channel, programs[channel], 0);
+	}
+}
+
 // What the DOS game sends when a song stops: note offs, then All Notes Off and a centered bend per channel.
 static void mt32_release_notes(void) {
 	for (int channel = 0; channel < MAX_MIDI_CHANNELS; ++channel) {
@@ -1044,7 +1063,7 @@ void play_midi_sound(sound_buffer_type* buffer) {
 		return;
 	}
 
-	// The MT-32 keeps the last song's instruments, as in the DOS game: the two victory songs select none.
+	// The MT-32 keeps the last song's instruments, as in the DOS game; the victory songs get theirs in mt32_send_fanfare_programs().
 	if (!mt32_ok) {
 		// Initialize the OPL chip.
 		opl_reset(digi_audiospec->freq);
@@ -1075,6 +1094,7 @@ void play_midi_sound(sound_buffer_type* buffer) {
 		// One unheard frame sends the opening events now, as the DOS driver does, even if the song is stopped at once.
 		short first_frame[2] = {0, 0};
 		mt32synth_flush_reverb();
+		mt32_send_fanfare_programs();
 		midi_callback(NULL, (Uint8*)first_frame, sizeof(first_frame));
 	}
 	SDL_UnlockAudioStream(digi_audio_stream);
