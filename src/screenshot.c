@@ -537,7 +537,6 @@ void save_level_screenshot(bool want_extras) {
 				xpos[other_room] = other_x;
 				ypos[other_room] = other_y;
 				processed[other_room] = true;
-				printf("Adding room %d to map.\n", other_room);
 				if (queue_end >= NUMBER_OF_ROOMS) {
 					printf("Queue overflow!\n");
 					break;

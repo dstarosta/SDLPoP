@@ -4044,10 +4044,6 @@ image_type* method_6_blit_img_to_scr(image_type* image, int xpos, int ypos, int 
 		blit_image_scaled_for_renderer(image, &src_rect, current_target_surface, xpos, ypos);
 	} else if (!SDL_BlitSurface(image, &src_rect, current_target_surface, &dest_rect)) {
 		sdlperror("method_6_blit_img_to_scr: SDL_BlitSurface 2247");
-		printf("[DBG] src fmt=%u w=%d h=%d pal=%p dst fmt=%u\n",
-		       image->format, image->w, image->h,
-		       (void*)SDL_GetSurfacePalette(image),
-		       current_target_surface->format);
 		//quit(1);
 	}
 	/*

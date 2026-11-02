@@ -845,7 +845,6 @@ void show_hof() {
 	char time_text[12];
 	for (short index = 0; index < hof_count; ++index) {
 
-		printf("index = %d, hof[index].min = %d, hof[index].tick = %d\n", index, hof[index].min, hof[index].tick);
 #ifdef ALLOW_INFINITE_TIME
 		int minutes, seconds;
 		if (hof[index].min > 0) {

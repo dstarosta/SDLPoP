@@ -30,6 +30,7 @@ CREDITS:
 #include "opl3.h"
 #include "mt32synth.h"
 #include "math.h"
+#include <limits.h>
 
 #define MAX_MIDI_CHANNELS 16
 #define MAX_OPL_VOICES 18
