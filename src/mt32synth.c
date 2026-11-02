@@ -82,8 +82,9 @@ static HMODULE open_library_utf8(const char* name) {
 	if (MultiByteToWideChar(CP_UTF8, 0, name, -1, wide_name, POP_MAX_PATH) == 0) {
 		return NULL;
 	}
-	// A bare name is left as it is, for the system's own search.
+	// A bare name is left as it is, for the system's own search, but without the current directory in it.
 	if (wcspbrk(wide_name, L"/\\") == NULL) {
+		SetDllDirectoryW(L"");
 		return LoadLibraryW(wide_name);
 	}
 	DWORD full_len = GetFullPathNameW(wide_name, POP_MAX_PATH, full_path, NULL);

@@ -749,6 +749,7 @@ void midi_callback(void *userdata, Uint8 *stream, int len);
 void mt32_tail_callback(Uint8 *stream, int len);
 void free_midi_resources(void);
 void play_midi_sound(sound_buffer_type* buffer);
+bool midi_chunks_fit(const byte* data, int size);
 void init_mt32(void);
 
 // mac_graphics.c

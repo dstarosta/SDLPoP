@@ -624,6 +624,7 @@ void end_sequence() {
 	clear_screen_and_sounds();
 	is_ending_sequence = true; // added (fix being able to pause the game during the end sequence)
 	load_opt_sounds(sound_56_ending_music, sound_56_ending_music); // winning theme
+	current_sound = sound_56_ending_music; // added
 	play_sound_from_buffer(sound_pointers[sound_56_ending_music]); // winning theme
 	if(offscreen_surface) free_surface(offscreen_surface); // missing in original
 	offscreen_surface = make_offscreen_buffer(&screen_rect);

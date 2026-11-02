@@ -2683,7 +2683,13 @@ sound_buffer_type* load_sound(int index) {
 	}
 	if (result == NULL) {
 		//printf("Trying to load from DAT\n");
-		result = (sound_buffer_type*) load_from_opendats_alloc(index + 10000, "bin", NULL, NULL);
+		int size = 0;
+		result = (sound_buffer_type*) load_from_opendats_alloc(index + 10000, "bin", NULL, &size);
+		if (result != NULL && (result->type & 7) == sound_midi && !midi_chunks_fit((const byte*) result, size)) {
+			printf("MIDI sound %d is truncated or malformed\n", index);
+			free(result);
+			result = NULL;
+		}
 	}
 	if (result != NULL && (result->type & 7) == sound_digi) {
 		sound_buffer_type* converted = convert_digi_sound(result, index);

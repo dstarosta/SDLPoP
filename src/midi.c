@@ -97,12 +97,12 @@ static instrument_type hardcoded_instrument = {
 	0x13, 0x09, 0x04, {{0x02, 0x8D, 0xD7, 0x37, 0x00}, {0x03, 0x03, 0xF5, 0x18, 0x00}}, 0x00, {0x00, 0x00},
 };
 
-// Read a variable length integer (max 4 bytes).
-static dword midi_read_variable_length(byte** buffer_position) {
+// Read a variable length integer (max 4 bytes), not reading past end.
+static dword midi_read_variable_length(byte** buffer_position, const byte* end) {
 	dword result = 0;
 	byte* pos = *buffer_position;
 	int i;
-	for (i = 0; i < 4; ++i) {
+	for (i = 0; i < 4 && pos + i < end; ++i) {
 		result = (result << 7) | (pos[i] & 0x7F);
 		if ((pos[i] & 0x80) == 0) break; // The most significant bit being 0 means that this is the last u8.
 	}
@@ -154,7 +154,8 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
 	parsed_midi->num_tracks = num_tracks;
 	midi_raw_chunk_type* next_track_chunk = (midi_raw_chunk_type*) midi->header.tracks; // The first track chunk starts after the header chunk.
 	byte last_event_type = 0;
-	for (int track_index = 0; track_index < num_tracks; ++track_index) {
+	int track_index;
+	for (track_index = 0; track_index < num_tracks; ++track_index) {
 		midi_raw_chunk_type* track_chunk = next_track_chunk;
 		if (memcmp(track_chunk->chunk_type, "MTrk", 4) != 0) {
 			printf("Warning: midi track without 'MTrk' chunk header.\n");
@@ -162,6 +163,8 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
 			return 0;
 		}
 		next_track_chunk = (midi_raw_chunk_type*) (track_chunk->data + (dword) SDL_Swap32BE(track_chunk->chunk_length));
+		// midi_chunks_fit() has checked that every track lies inside the resource; no read goes past its track.
+		const byte* track_end = (const byte*) next_track_chunk;
 		midi_track_type* track = &parsed_midi->tracks[track_index];
 		byte* buffer_position = track_chunk->data;
 		for (;;) {
@@ -174,7 +177,8 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
 			track->events = new_track_events;
 
 			midi_event_type* event = &track->events[track->num_events - 1];
-			event->delta_time = midi_read_variable_length(&buffer_position);
+			event->delta_time = midi_read_variable_length(&buffer_position, track_end);
+			if (buffer_position >= track_end) goto malformed;
 			event->event_type = *buffer_position;
 			if (event->event_type & 0x80) {
 				if (event->event_type < 0xF8) last_event_type = event->event_type;
@@ -194,6 +198,7 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
 				case 0xC0: // program change
 				case 0xD0: { // channel aftertouch
 					// Read the channel event.
+					if (track_end - buffer_position < num_channel_event_params) goto malformed;
 					event->channel.channel = event->event_type & 0x0F;
 					event->event_type &= 0xF0;
 					event->channel.param1 = *buffer_position++;
@@ -208,13 +213,16 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
 						case 0xF0: // SysEx
 						case 0xF7: // SysEx split
 							// Read SysEx event
-							event->sysex.length = midi_read_variable_length(&buffer_position);
+							event->sysex.length = midi_read_variable_length(&buffer_position, track_end);
+							if (buffer_position > track_end || event->sysex.length > (dword)(track_end - buffer_position)) goto malformed;
 							event->sysex.data = buffer_position;
 							buffer_position += event->sysex.length;
 							break;
 						case 0xFF: // Meta event
+							if (buffer_position >= track_end) goto malformed;
 							event->meta.type = *buffer_position++;
-							event->meta.length = midi_read_variable_length(&buffer_position);
+							event->meta.length = midi_read_variable_length(&buffer_position, track_end);
+							if (buffer_position > track_end || event->meta.length > (dword)(track_end - buffer_position)) goto malformed;
 							event->meta.data = buffer_position;
 							buffer_position += event->meta.length;
 							break;
@@ -228,11 +236,7 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
 			if (event->event_type == 0xFF /* meta event */ && event->meta.type == 0x2F /* end of track */) {
 				break;
 			}
-			if (buffer_position >= (byte*) next_track_chunk) {
-				printf("Error parsing MIDI events (track %d)\n", track_index);
-				free_parsed_midi(parsed_midi);
-				return 0;
-			}
+			if (buffer_position >= track_end) goto malformed;
 
 		}
 
@@ -240,6 +244,11 @@ bool parse_midi(midi_raw_chunk_type* midi, parsed_midi_type* parsed_midi) {
 
 //	printf("Midi file looks good...\n");
 	return 1;
+
+malformed:
+	printf("Error parsing MIDI events (track %d)\n", track_index);
+	free_parsed_midi(parsed_midi);
+	return 0;
 }
 
 #if 0
@@ -543,6 +552,7 @@ static void process_midi_event(midi_event_type* event) {
 				default:
 					break;
 				case 0x51: { // set tempo
+					if (event->meta.length < 3) break;
 					byte* data = event->meta.data;
 					int new_tempo = (data[0] << 16) | (data[1] << 8) | (data[2]);
 					new_tempo *= (1.0f + current_midi_tempo_modifier); // tempo adjustment for specific songs
@@ -700,7 +710,7 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
 	while (frames_needed > 0) {
 		if (ticks_to_next_pause > 0) {
 			// Fill the audio buffer (we have already processed the MIDI events up till this point)
-			int64_t us_to_next_pause = ticks_to_next_pause * us_per_beat / ticks_per_beat;
+			int64_t us_to_next_pause = (int64_t)ticks_to_next_pause * us_per_beat / ticks_per_beat;
 			int64_t us_needed = frames_needed * ONE_SECOND_IN_US / mixing_freq;
 			int64_t advance_us = MIN(us_to_next_pause, us_needed);
 			int available_frames = (int)(((advance_us * mixing_freq) + ONE_SECOND_IN_US - 1) / ONE_SECOND_IN_US); // round up.
@@ -847,9 +857,9 @@ void free_midi_resources(void) {
 	mt32_ok = 0;
 }
 
-// parse_midi() has no size limit, so check that the header and every track lie inside the
+// parse_midi() trusts the chunk lengths, so check that the header and every track lie inside the
 // resource (a tag byte, then the MIDI data) and that each track ends with End of Track.
-static bool midi_chunks_fit(const byte* data, int size) {
+bool midi_chunks_fit(const byte* data, int size) {
 	int pos = 1;
 	if (size < pos + 14 || memcmp(data + pos, "MThd", 4) != 0) return false;
 	int num_tracks = (data[pos + 10] << 8) | data[pos + 11];
@@ -903,6 +913,28 @@ static void* load_mt32_init_from_dat(dat_type* dat, int* out_size) {
 	return NULL;
 }
 
+// Reads PoP's MT-32 init from a loose res65535.bin file.
+static void* load_mt32_init_file(const char* path, int* out_size) {
+	FILE* initf = fopen(path, "rb");
+	if (initf == NULL) {
+		return NULL;
+	}
+	void* buf = NULL;
+	struct stat st;
+	if (fstat(fileno(initf), &st) == 0 && st.st_size > 4 && st.st_size <= INT_MAX) {
+		buf = malloc((size_t) st.st_size);
+		if (buf != NULL && fread(buf, 1, (size_t) st.st_size, initf) != (size_t) st.st_size) {
+			free(buf);
+			buf = NULL;
+		}
+	}
+	fclose(initf);
+	if (buf != NULL) {
+		*out_size = (int) st.st_size;
+	}
+	return buf;
+}
+
 void init_midi() {
 	static bool initialized = false;
 	if (initialized) return;
@@ -924,27 +956,16 @@ void init_midi() {
 		}
 	}
 
-	// PoP's MT-32 custom-timbre init, as the raw resource: a sound tag byte (0x02 = MIDI), then the MThd data.
-	{
-		const char* init_path = locate_file("data/PRINCE/res65535.bin");
-		FILE* initf = fopen(init_path, "rb");
-		if (initf != NULL) {
-			struct stat st;
-			if (fstat(fileno(initf), &st) == 0 && st.st_size > 4) {
-				size = (int) st.st_size;
-				mt32_init_data = malloc((size_t) size);
-				if (mt32_init_data != NULL && fread(mt32_init_data, 1, (size_t) size, initf) != (size_t) size) {
-					free(mt32_init_data);
-					mt32_init_data = NULL;
-				}
-			}
-			fclose(initf);
-		}
+	// PoP's MT-32 custom-timbre init (a sound tag byte, then the MThd data), looked up like any resource:
+	// PRINCE.DAT (open_dat() takes a mod's first), then the mod's data folder, then the game's.
+	mt32_init_data = load_mt32_init_from_dat(dathandle, &size);
+	if (mt32_init_data == NULL && use_custom_levelset && !skip_mod_data_files) {
+		char mod_init_path[POP_MAX_PATH];
+		snprintf_check(mod_init_path, sizeof(mod_init_path), "%s/data/PRINCE/res65535.bin", mod_data_path);
+		mt32_init_data = load_mt32_init_file(locate_file(mod_init_path), &size);
 	}
-
-	// Fallback to resource -1 from PRINCE.DAT
 	if (mt32_init_data == NULL) {
-		mt32_init_data = load_mt32_init_from_dat(dathandle, &size);
+		mt32_init_data = load_mt32_init_file(locate_file("data/PRINCE/res65535.bin"), &size);
 	}
 
 	if (mt32_init_data != NULL && !midi_chunks_fit(mt32_init_data, size)) {
@@ -1093,6 +1114,7 @@ void play_midi_sound(sound_buffer_type* buffer) {
 	if (mt32_ok) {
 		// One unheard frame sends the opening events now, as the DOS driver does, even if the song is stopped at once.
 		short first_frame[2] = {0, 0};
+		mt32_release_notes(); // DOS sends this before every song too, also after one that ended by itself
 		mt32synth_flush_reverb();
 		mt32_send_fanfare_programs();
 		midi_callback(NULL, (Uint8*)first_frame, sizeof(first_frame));

@@ -2007,6 +2007,7 @@ void show_title() {
         delay_ticks(1);
     }
 //	method_1_blit_rect(onscreen_surface_, offscreen_surface, &screen_rect, &screen_rect, blitters_0_no_transp);
+    current_sound = sound_55_story_1_absence; // added: the intro's tempo change must not carry over
     play_sound_from_buffer(sound_pointers[sound_55_story_1_absence]); // story 1: In the absence
     transition_ltr();
     pop_wait(timer_0, 0x258);
