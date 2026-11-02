@@ -1679,6 +1679,9 @@ void do_pickup(int obj_type) {
 	curr_room_tiles[curr_tilepos] = tiles_1_floor;
 	curr_room_modif[curr_tilepos] = 0;
 	redraw_height = 35;
+#ifdef USE_COPYPROT
+	if (current_level == 15) redraw_height += copyprot_letter_raise(); // the drunk potion's letter goes too
+#endif
 	set_wipe(curr_tilepos, 1);
 	set_redraw_full(curr_tilepos, 1);
 	if (obj_type == -1 && curr_tilepos % 10 < 9 &&

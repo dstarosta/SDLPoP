@@ -2492,10 +2492,17 @@ static const struct {
     byte setting;
     const char* text;
 } splash_graphics_keys[] = {
-    {SDL_SCANCODE_D, 1, "D - DOS graphics\n"},
-    {SDL_SCANCODE_M, 2, "M - Mac high-res graphics\n"},
-    {SDL_SCANCODE_S, 3, "S - SNES graphics\n"},
+    {SDL_SCANCODE_D, 1, "D - DOS graphics"},
+    {SDL_SCANCODE_M, 2, "M - Mac high-res graphics"},
+    {SDL_SCANCODE_S, 3, "S - SNES graphics"},
 };
+
+// The graphics the game uses if another key is pressed.
+static byte splash_default_graphics(void) {
+    if (uses_mac_graphics()) return 2;
+    if (uses_snes_graphics()) return 3;
+    return 1;
+}
 
 static void switch_graphics_from_splash(byte setting) {
     graphics_setting = setting;
@@ -2506,9 +2513,14 @@ void show_splash() {
     if (!enable_info_screen || start_level >= 0) return;
     static const char press_text[] = "Press any key - continue";
     char keys_text[256] = "";
+    int key_lines = 0;
+    int default_line = -1;
     for (int i = 0; i < COUNT(splash_graphics_keys); ++i) {
         if (is_graphics_available(splash_graphics_keys[i].setting)) {
+            if (splash_graphics_keys[i].setting == splash_default_graphics()) default_line = key_lines;
+            ++key_lines;
             strncat(keys_text, splash_graphics_keys[i].text, sizeof(keys_text) - strlen(keys_text) - 1);
+            strncat(keys_text, "\n", sizeof(keys_text) - strlen(keys_text) - 1);
         }
     }
     strncat(keys_text, "\n", sizeof(keys_text) - strlen(keys_text) - 1);
@@ -2526,10 +2538,18 @@ void show_splash() {
         if (*c == '\n') ++help_lines;
     }
     font_type* font = textstate.ptr_font;
+    int line_height = font->height_above_baseline + font->height_below_baseline + font->space_between_lines;
     rect_type keys_rect = splash_text_2_rect;
-    keys_rect.top += help_lines * (font->height_above_baseline + font->height_below_baseline + font->space_between_lines);
+    keys_rect.top += help_lines * line_height;
     keys_rect.left = (keys_rect.right - get_line_width(press_text, (int)strlen(press_text))) / 2;
     show_text_with_color(&keys_rect, halign_left, valign_top, keys_text, color_7_lightgray);
+    // The default graphics get a star left of their key letter, so the letters stay in one column.
+    if (default_line >= 0) {
+        rect_type star_rect = keys_rect;
+        star_rect.top += default_line * line_height;
+        star_rect.left -= get_line_width("*", 1);
+        show_text_with_color(&star_rect, halign_left, valign_top, "*", color_7_lightgray);
+    }
     textstate.ptr_font = saved_font;
 #endif
 

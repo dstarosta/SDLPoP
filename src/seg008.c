@@ -912,6 +912,12 @@ void draw_tile_aboveroom() {
 	draw_tile_fore();
 }
 
+#ifdef USE_COPYPROT
+// Mac tiles redrawn this frame on the potions level: their art (e.g. a wall's side face) covers the letters, drawn again in draw_tables().
+static bool mac_letter_tiles[30];
+static bool mac_letter_tiles_pending;
+#endif
+
 // seg008:0211
 void redraw_needed(short tilepos) {
 	if (wipe_frames[tilepos]) {
@@ -925,6 +931,12 @@ void redraw_needed(short tilepos) {
 		int redraw_mac_fore = 0;
 		if (redraw_frames_full[tilepos]) { --redraw_frames_full[tilepos]; redraw_mac_tile = 1; }
 		if (redraw_frames_anim[tilepos]) { --redraw_frames_anim[tilepos]; redraw_mac_tile = 1; }
+#ifdef USE_COPYPROT
+		if (redraw_mac_tile && current_level == 15 && tilepos >= 0 && tilepos < 30) {
+			mac_letter_tiles[tilepos] = true;
+			mac_letter_tiles_pending = true;
+		}
+#endif
 		if (redraw_frames2[tilepos]) {
 			--redraw_frames2[tilepos];
 			redraw_mac_other_overlay = 1;
@@ -2385,6 +2397,14 @@ void draw_tables() {
 	restore_peels();
 	draw_wipes(0);
 	draw_table(0); // backtable
+#ifdef USE_COPYPROT
+	// Above the redrawn background, below the people, as a full redraw draws them.
+	if (mac_letter_tiles_pending) {
+		draw_copyprot_letters(mac_letter_tiles);
+		memset(mac_letter_tiles, 0, sizeof(mac_letter_tiles));
+		mac_letter_tiles_pending = false;
+	}
+#endif
 	//printf("midtable_count = %d\n", midtable_count); // debug
 #ifdef FIX_BLACK_RECT // I'm not sure if this is the best way to fix this.
 	draw_wipes(1);

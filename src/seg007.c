@@ -282,6 +282,14 @@ void animate_potion() {
 #ifdef USE_COPYPROT
 		// the fix below does not display letters on the copy protection level
 		if (current_level == 15) {
+			if (uses_mac_graphics()) {
+				// Mac bubbles have no mask to clear the last frame: wipe below the (raised) letter instead.
+				redraw_height = 30;
+				word tilepos = get_trob_pos_in_drawn_room();
+				set_redraw_full(tilepos, 1);
+				set_wipe(tilepos, 1);
+				return;
+			}
 			set_redraw_anim_curr();
 			return;
 		}

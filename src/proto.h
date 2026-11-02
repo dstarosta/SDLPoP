@@ -190,6 +190,8 @@ void set_start_pos(void);
 void find_start_level_door(void);
 void draw_level_first(void);
 void redraw_screen(int drawing_different_room);
+int copyprot_letter_raise(void);
+void draw_copyprot_letters(const bool* on_tiles);
 int play_level_2(void);
 void redraw_at_char(void);
 void redraw_at_char2(void);

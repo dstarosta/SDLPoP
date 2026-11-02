@@ -236,6 +236,28 @@ void draw_level_first() {
 	do_simple_wait(1);
 }
 
+// Mac and SNES potions are taller: their letters on the potions level sit higher, clear of the bubbles (and of the Mac bubble wipe).
+int copyprot_letter_raise(void) {
+	return uses_mac_graphics() ? 4 : uses_snes_graphics() ? 8 : 0;
+}
+
+#ifdef USE_COPYPROT
+// Letters on the potions level, into the offscreen buffer: all in the drawn room, or only those on the given tiles.
+void draw_copyprot_letters(const bool* on_tiles) {
+	if (current_level != 15) return;
+	surface_type* saved_target = current_target_surface;
+	current_target_surface = offscreen_surface;
+	int letter_raise = copyprot_letter_raise();
+	for (short i = 0; i < 14; ++i) {
+		if (copyprot_room[i] == drawn_room && (on_tiles == NULL || on_tiles[copyprot_tile[i]])) {
+			set_curr_pos((copyprot_tile[i] % 10 << 5) + 24, copyprot_tile[i] / 10 * 63 + 38 - letter_raise);
+			draw_text_character(copyprot_letter[cplevel_entr[i]]);
+		}
+	}
+	current_target_surface = saved_target;
+}
+#endif
+
 // seg003:037B
 void redraw_screen(int drawing_different_room) {
 	// A Mac tile-change redraw is not a room entry, so it must not touch exit_room_timer or the keyboard buffer.
@@ -284,17 +306,7 @@ void redraw_screen(int drawing_different_room) {
 			clear_kbd_buf();
 		}
 #ifdef USE_COPYPROT
-		if (current_level == 15) {
-			// letters on potions level
-			current_target_surface = offscreen_surface;
-			for (short i = 0; i < 14; ++i) {
-				if (copyprot_room[i] == drawn_room) {
-					set_curr_pos((copyprot_tile[i] % 10 << 5) + 24, copyprot_tile[i] / 10 * 63 + 38);
-					draw_text_character(copyprot_letter[cplevel_entr[i]]);
-				}
-			}
-			current_target_surface = onscreen_surface_;
-		}
+		draw_copyprot_letters(NULL);
 #endif
 		is_blind_mode = 0;
 		memset(table_counts, 0, sizeof(table_counts));
