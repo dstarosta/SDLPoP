@@ -1850,7 +1850,7 @@ void redefine_key(const char* name, int* key) {
 
     // Use the regular big font for the dialog instead of the small menu font.
     font_type* saved_font = textstate.ptr_font;
-    textstate.ptr_font = &hc_font;
+    textstate.ptr_font = get_dos_font();
 
     int new_key = showmessage_any_key(message, 1, &key_test_quit);
 
@@ -2414,7 +2414,14 @@ void show_copyprot(int where) {
 
 // seg000:2489
 void show_loading() {
+#ifdef USE_TEXT
+    font_type* saved_font = textstate.ptr_font;
+    textstate.ptr_font = get_dos_font();
+#endif
     show_text(&screen_rect, halign_center, valign_middle, "Loading. . . .");
+#ifdef USE_TEXT
+    textstate.ptr_font = saved_font;
+#endif
     update_screen();
 }
 
@@ -2507,6 +2514,9 @@ void show_splash() {
     strncat(keys_text, press_text, sizeof(keys_text) - strlen(keys_text) - 1);
     current_target_surface = onscreen_surface_;
     draw_rect(&screen_rect, color_0_black);
+#ifdef USE_TEXT
+    font_type* saved_font = textstate.ptr_font;
+    textstate.ptr_font = get_dos_font();
     show_text_with_color(&splash_text_1_rect, halign_center, valign_middle, splash_text_1, color_15_brightwhite);
     show_text_with_color(&splash_text_2_rect, halign_center, valign_top, splash_text_2, color_7_lightgray);
     // The key lines go below the centred text, left-aligned with the centred "Press any key" line.
@@ -2519,6 +2529,8 @@ void show_splash() {
     keys_rect.top += help_lines * (font->height_above_baseline + font->height_below_baseline + font->space_between_lines);
     keys_rect.left = (keys_rect.right - get_line_width(press_text, (int)strlen(press_text))) / 2;
     show_text_with_color(&keys_rect, halign_left, valign_top, keys_text, color_7_lightgray);
+    textstate.ptr_font = saved_font;
+#endif
 
 #ifdef USE_TEXT // Don't wait for a keypress if there is no text for the user to read.
     int key = 0;

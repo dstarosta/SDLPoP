@@ -797,6 +797,10 @@ int save_recorded_replay_dialog() {
 	short bgcolor = color_8_darkgray;
 	short color = color_15_brightwhite;
 	current_target_surface = onscreen_surface_;
+#ifdef USE_TEXT
+	font_type* saved_font = textstate.ptr_font;
+	textstate.ptr_font = get_dos_font();
+#endif
 	method_1_blit_rect(offscreen_surface, onscreen_surface_, &copyprot_dialog->peel_rect, &copyprot_dialog->peel_rect, 0);
 	draw_dialog_frame(copyprot_dialog);
 	shrink2_rect(&rect, &copyprot_dialog->text_rect, 2, 1);
@@ -816,6 +820,9 @@ int save_recorded_replay_dialog() {
 	do {
 		input_length = input_str(&input_rect, input_filename, 64, "", 0, 0, color, bgcolor);
 	} while (input_length == 0); // filename must be at least 1 character
+#ifdef USE_TEXT
+	textstate.ptr_font = saved_font;
+#endif
 
 	if (input_length < 0) {
 		return 0;  // Escape was pressed -> discard the replay

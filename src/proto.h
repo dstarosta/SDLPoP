@@ -573,6 +573,9 @@ void set_loaded_palette(dat_pal_type *palette_ptr);
 chtab_type* load_sprites_from_file(int resource,int palette_bits, int quit_on_error);
 void free_chtab(chtab_type *chtab_ptr);
 void reload_font(void);
+#ifdef USE_TEXT
+font_type* get_dos_font(void);
+#endif
 image_type* decode_image(image_data_type* image_data, dat_pal_type* palette);
 image_type*load_image(int index, dat_pal_type* palette);
 void draw_image_transp(image_type* image,image_type* mask,int xpos,int ypos);

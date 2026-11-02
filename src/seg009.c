@@ -1449,6 +1449,10 @@ font_type load_font_from_data(/*const*/ rawfont_type* data) {
 		load_font_character_offsets(data);
 	}
 	chtab_type* chtab = malloc(sizeof(chtab_type) + sizeof(image_type*) * n_chars);
+	// free_chtab() reads these.
+	chtab->n_images = n_chars;
+	chtab->chtab_palette_bits = 0;
+	chtab->has_palette_bits = 0;
 	// Make a dummy palette for decode_image().
 	dat_pal_type dat_pal;
 	memset(&dat_pal, 0, sizeof(dat_pal));
@@ -1471,19 +1475,66 @@ font_type load_font_from_data(/*const*/ rawfont_type* data) {
 // Small font data (hardcoded), defined in menu.c
 extern byte hc_small_font_data[];
 
+// A font file has no metrics, so it gets the DOS ones; character N is image 1000+N.
+static font_type font_from_sprites(chtab_type* chtab) {
+	font_type font = {0x01, 0xFF, 7, 2, 1, 1, chtab};
+	if (chtab->n_images < font.last_char) {
+		font.last_char = (byte)chtab->n_images;
+	}
+	return font;
+}
+
+static bool hc_font_is_mac(void) {
+	if (hc_font.chtab == NULL || 'A' < hc_font.first_char || 'A' > hc_font.last_char) return false;
+	image_type* letter = hc_font.chtab->images['A' - hc_font.first_char];
+	return letter != NULL && is_native_resolution_image(letter);
+}
+
 static void load_hc_font(void) {
 	// Try to load font from a file.
 	dat_type* dathandle = open_dat("font", 1);
-	hc_font.chtab = load_sprites_from_file(1000, 1 << 1, 0);
+	chtab_type* chtab = load_sprites_from_file(1000, 1 << 1, 0);
 	close_dat(dathandle);
-	if (hc_font.chtab == NULL) {
+	if (chtab == NULL) {
 		// Use built-in font.
 		hc_font = load_font_from_data((/*const*/ rawfont_type*)hc_font_data);
 	} else {
+		hc_font = font_from_sprites(chtab);
 		// Mac glyph widths already include the gap between characters.
-		image_type* letter = hc_font.chtab->images['A' - hc_font.first_char];
-		hc_font.space_between_chars = (letter != NULL && is_native_resolution_image(letter)) ? 0 : 1;
+		hc_font.space_between_chars = hc_font_is_mac() ? 0 : 1;
 	}
+}
+
+// Like load_sprites_from_file(1000), but without the Mac glyphs.
+static chtab_type* load_dos_font_sprites(void) {
+	dat_type* dathandle = open_dat("font", 1);
+	dat_shpl_type* shpl = (dat_shpl_type*) load_from_opendats_alloc(1000, "pal", NULL, NULL);
+	chtab_type* chtab = NULL;
+	if (shpl != NULL) {
+		int n_images = shpl->n_images;
+		size_t alloc_size = sizeof(chtab_type) + sizeof(void*) * n_images;
+		chtab = (chtab_type*) malloc(alloc_size);
+		memset(chtab, 0, alloc_size);
+		chtab->n_images = n_images;
+		for (int i = 1; i <= n_images; i++) {
+			chtab->images[i - 1] = load_dos_image(1000 + i, &shpl->palette);
+		}
+		free(shpl);
+	}
+	close_dat(dathandle);
+	return chtab;
+}
+
+static font_type dos_font;
+
+// The splash screen and dialogs keep the DOS font (a mod's own, if it has one) when the game uses the Mac one.
+font_type* get_dos_font(void) {
+	if (!hc_font_is_mac()) return &hc_font;
+	if (dos_font.chtab == NULL) {
+		chtab_type* chtab = load_dos_font_sprites();
+		dos_font = chtab != NULL ? font_from_sprites(chtab) : load_font_from_data((/*const*/ rawfont_type*)hc_font_data);
+	}
+	return &dos_font;
 }
 
 void load_font(void) {
@@ -1500,6 +1551,10 @@ void reload_font(void) {
 	if (hc_font.chtab == NULL) return;
 	free_chtab(hc_font.chtab);
 	load_hc_font();
+	if (dos_font.chtab != NULL) {
+		free_chtab(dos_font.chtab);
+		dos_font.chtab = NULL;
+	}
 }
 
 // seg009:35C5
@@ -1746,7 +1801,10 @@ int showmessage(char* text, int arg_4, void* arg_0) {
 	//saved_font_ptr = current_target_surface->ptr_font;
 	//current_target_surface->ptr_font = ptr_font;
 	shrink2_rect(&rect, &copyprot_dialog->text_rect, 2, 1);
+	font_type* saved_font = textstate.ptr_font;
+	textstate.ptr_font = get_dos_font();
 	show_text_with_color(&rect, halign_center, valign_middle, text, color_15_brightwhite);
+	textstate.ptr_font = saved_font;
 	//textstate.ptr_font = saved_font_ptr;
 	//current_target_surface->ptr_font = saved_font_ptr;
 	clear_kbd_buf();
@@ -1873,7 +1931,7 @@ void show_dialog(const char* text) {
 int get_text_center_y(const rect_type* rect) {
 	const font_type* font;
 	short empty_height; // height of empty space above+below the line of text
-	font = &hc_font;//current_target_surface->ptr_font;
+	font = textstate.ptr_font;
 	empty_height = rect->bottom - font->height_above_baseline - font->height_below_baseline - rect->top;
 	return ((empty_height - empty_height % 2) >> 1) + font->height_above_baseline + empty_height % 2 + rect->top;
 }

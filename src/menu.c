@@ -1967,6 +1967,8 @@ void draw_confirmation_dialog(int which_dialog, const char* text) {
 
 		if (highlighted_button != old_highlighted_button) {
 			old_highlighted_button = highlighted_button;
+			font_type* saved_font = textstate.ptr_font;
+			textstate.ptr_font = get_dos_font();
 			// Need to redraw the dialog box.
 			uint32_t clear_color = SDL_MapRGBA(SDL_GetPixelFormatDetails(current_target_surface->format), NULL, 0, 0, 0, 255);
 			SDL_FillSurfaceRect(overlay_surface, NULL, clear_color);
@@ -1992,6 +1994,7 @@ void draw_confirmation_dialog(int which_dialog, const char* text) {
 			draw_rect(highlight_rect, color_8_darkgray);
 			show_text_with_color(&ok_text_rect, halign_center, valign_middle, "OK", ok_text_color);
 			show_text_with_color(&cancel_text_rect, halign_center, valign_middle, "Cancel", cancel_text_color);
+			textstate.ptr_font = saved_font;
 			update_screen();
 		}
 
@@ -2029,7 +2032,7 @@ void draw_select_level_dialog(void) {
 
 		if (menu_current_level != old_edited_level_number) {
 			font_type* saved_font = textstate.ptr_font;
-			textstate.ptr_font = &hc_font;
+			textstate.ptr_font = get_dos_font();
 
 			old_edited_level_number = menu_current_level;
 			// Need to redraw the dialog box.
