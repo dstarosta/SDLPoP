@@ -788,9 +788,14 @@ void midi_callback(void* userdata, Uint8* stream, int len) {
 
 
 void stop_midi() {
-	if (!midi_playing) return;
+	if (digi_audio_stream == NULL) return;
 //	SDL_PauseAudio(1);
+	// Checked under the lock: the audio callback frees the song when it ends.
 	SDL_LockAudioStream(digi_audio_stream);
+	if (!midi_playing) {
+		SDL_UnlockAudioStream(digi_audio_stream);
+		return;
+	}
 	midi_playing = 0;
 	if (mt32_ok) {
 		// As the DOS game does, but with the reverb emptied too, so a stopped song is gone sooner.
@@ -1064,14 +1069,14 @@ void play_midi_sound(sound_buffer_type* buffer) {
 	current_midi_tempo_modifier = midi_tempo_modifiers[current_sound];
 	ticks_per_beat = parsed_midi.ticks_per_beat;
 	mixing_freq = digi_audiospec->freq;
+	SDL_LockAudioStream(digi_audio_stream);
 	midi_playing = 1;
 	if (mt32_ok) {
 		// One unheard frame sends the opening events now, as the DOS driver does, even if the song is stopped at once.
 		short first_frame[2] = {0, 0};
-		SDL_LockAudioStream(digi_audio_stream);
 		mt32synth_flush_reverb();
 		midi_callback(NULL, (Uint8*)first_frame, sizeof(first_frame));
-		SDL_UnlockAudioStream(digi_audio_stream);
 	}
+	SDL_UnlockAudioStream(digi_audio_stream);
 	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }
