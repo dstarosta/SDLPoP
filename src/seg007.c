@@ -1282,6 +1282,31 @@ void fell_on_your_head() {
 	}
 }
 
+#ifdef USE_FALLING_TILES_KILL_GUARDS
+// Char (the guard, his collision box just set) is killed by a falling tile that comes down on at least half of his body.
+// His body rather than his column (the weight point's), which can be the next tile while he stands on this one.
+void check_loose_fall_on_guard() {
+	if (!fixes->enable_falling_tiles_kill_guards || Char.alive >= 0) return;
+	if (Char.charid != charid_2_guard && Char.charid != charid_6_vizier) return;
+	if (Char.action >= actions_2_hang_climb && Char.action != actions_7_turn) return;
+	short body_width = char_x_right_coll - char_x_left_coll;
+	if (body_width <= 0) return;
+	for (short index = 0; index < mobs_count; ++index) {
+		mob_type* mob = &mobs[index];
+		if (mob->speed == -1 || mob->room != Char.room || !(mob->y < Char.y && Char.y - 30 < mob->y)) continue;
+		short tile_left = x_bump[(mob->xh >> 2) + FIRST_ONSCREEN_COLUMN] + TILE_MIDX;
+		short overlap = MIN(tile_left + TILE_SIZEX, char_x_right_coll) - MAX(tile_left, char_x_left_coll);
+		if (overlap * 2 >= body_width) {
+			Char.y = y_land[Char.curr_row + 1];
+			take_hp(100);
+			seqtbl_offset_char(seq_22_crushed); // dead (because of loose floor)
+			guard_crushed = 1;
+			return;
+		}
+	}
+}
+#endif
+
 // seg007:1669
 void play_door_sound_if_visible(int sound_id) {
 	word tilepos = trob.tilepos;

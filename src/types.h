@@ -1276,6 +1276,7 @@ typedef struct fixes_options_type {
 	byte fix_one_hp_stops_blinking;
 	byte fix_dead_floating_in_air;
 	byte enable_all_gate_sounds;
+	byte enable_falling_tiles_kill_guards;
 } fixes_options_type;
 
 #define NUM_GUARD_SKILLS 12

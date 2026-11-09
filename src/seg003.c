@@ -89,6 +89,9 @@ void play_level(int level_number) {
 		mobs_count = 0;
 		trobs_count = 0;
 		next_sound = -1;
+#ifdef USE_FALLING_TILES_KILL_GUARDS
+		guard_crushed = 0;
+#endif
 		holding_sword = 0;
 		grab_timer = 0;
 		can_guard_see_kid = 0;

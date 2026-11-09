@@ -1956,6 +1956,12 @@ void on_guard_killed() {
 		leveldoor_open = 2;
 		play_sound(sound_43_victory_Jaffar); // Jaffar's death
 	} else if (Char.charid != charid_1_shadow) {
+#ifdef USE_FALLING_TILES_KILL_GUARDS
+		if (guard_crushed) {
+			guard_crushed = 0;
+			return; // the falling tile's crash, no victory sound (as with a spiked guard)
+		}
+#endif
 		play_sound(sound_37_victory); // Guard's death
 	}
 }

@@ -340,6 +340,7 @@ void options_process_enhancements(SDL_IOStream* rw, rw_process_func_type process
 	process(fixes_options_replay.enable_super_high_jump);
 	process(fixes_options_replay.enable_jump_grab);
 	process(fixes_options_replay.enable_all_gate_sounds);
+	process(fixes_options_replay.enable_falling_tiles_kill_guards);
 }
 
 void options_process_fixes(SDL_IOStream* rw, rw_process_func_type process_func) {
@@ -640,7 +641,9 @@ void apply_replay_options(void) {
 	}
 
 	// apply the options from the memory buffer (max. replay_options_size bytes will be read)
-	fixes_options_replay.enable_all_gate_sounds = 0; // (replays from before this option: their sections end before it)
+	// (replays from before these options: their sections end before them)
+	fixes_options_replay.enable_all_gate_sounds = 0;
+	fixes_options_replay.enable_falling_tiles_kill_guards = 0;
 	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
 		load_options_from_buffer(replay_options_sections[i].replay_data, replay_options_sections[i].data_size, replay_options_sections[i].section_func);
 	}

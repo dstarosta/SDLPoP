@@ -334,6 +334,9 @@ The authors of this program may be contacted at https://forum.princed.org
 // The closing gates can be heard in every room, not only on the screen (as in Prince of Persia 2)
 #define USE_ALL_GATE_SOUNDS
 
+// A falling tile kills a guard it comes down on (as in Prince of Persia 2)
+#define USE_FALLING_TILES_KILL_GUARDS
+
 // Debug features:
 
 // When the program starts, check whether the deobfuscated sequence table (seqtbl.c) is correct.

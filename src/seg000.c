@@ -1251,6 +1251,9 @@ void play_guard_frame() {
                 check_spike_below();
                 check_spiked();
                 check_chomped_guard();
+#ifdef USE_FALLING_TILES_KILL_GUARDS
+                check_loose_fall_on_guard();
+#endif
             }
         }
         saveshad();

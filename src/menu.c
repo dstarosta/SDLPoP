@@ -215,6 +215,7 @@ enum setting_ids {
 	SETTING_ENABLE_SUPER_HIGH_JUMP,
 	SETTING_ENABLE_JUMP_GRAB,
 	SETTING_ENABLE_ALL_GATE_SOUNDS,
+	SETTING_ENABLE_FALLING_TILES_KILL_GUARDS,
 	SETTING_USE_CUSTOM_OPTIONS,
 	SETTING_START_MINUTES_LEFT,
 	SETTING_START_TICKS_LEFT,
@@ -481,6 +482,13 @@ setting_type gameplay_settings[] = {
 				.text = "Hear all gates",
 				.explanation = "The closing gates can be heard in every room, not only on the screen (as in Prince of Persia 2).\n"
 						"With positional stereo, a gate further away sounds further away."},
+#endif
+#ifdef USE_FALLING_TILES_KILL_GUARDS
+		{.id = SETTING_ENABLE_FALLING_TILES_KILL_GUARDS, .style = SETTING_STYLE_TOGGLE,
+				.linked = &fixes_saved.enable_falling_tiles_kill_guards, .required = &use_fixes_and_enhancements,
+				.text = "Falling tiles kill guards",
+				.explanation = "A falling tile kills a guard it comes down on (as in Prince of Persia 2).\n"
+						"It hits him when it covers at least half of his body."},
 #endif
 		{.id = SETTING_FIX_GATE_SOUNDS, .style = SETTING_STYLE_TOGGLE,
 				.linked = &fixes_saved.fix_gate_sounds, .required = &use_fixes_and_enhancements,

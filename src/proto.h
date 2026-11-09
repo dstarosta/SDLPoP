@@ -441,6 +441,9 @@ void sub_9A8E(void);
 int is_spike_harmful(void);
 void check_loose_fall_on_kid(void);
 void fell_on_your_head(void);
+#ifdef USE_FALLING_TILES_KILL_GUARDS
+void check_loose_fall_on_guard(void);
+#endif
 void play_door_sound_if_visible(int sound_id);
 
 // SEG008.C
