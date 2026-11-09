@@ -2579,10 +2579,6 @@ void show_splash() {
         if (key == SDL_SCANCODE_ESCAPE) {
             quit(0);
         }
-        int base_key = key & ~(WITH_SHIFT | WITH_CTRL | WITH_ALT);
-        if (base_key >= SDL_SCANCODE_F1 && base_key <= SDL_SCANCODE_F12) {
-            key = 0; // the function keys are not "any key"
-        }
 
         bool joy_input = 0;
         for (int i = 0; i < JOYINPUT_NUM; i++) {
@@ -2607,7 +2603,7 @@ void show_splash() {
             switch_graphics_from_splash(splash_graphics_keys[i].setting);
         }
     }
-    if ((key & WITH_CTRL) || (enable_replay && key == SDL_SCANCODE_TAB)) {
+    if ((key & WITH_CTRL) || (enable_quicksave && key == SDL_SCANCODE_F9) || (enable_replay && key == SDL_SCANCODE_TAB)) {
         extern int last_key_scancode; // defined in seg009.c
         last_key_scancode = key; // can immediately do Ctrl+L, etc from the splash screen
     }

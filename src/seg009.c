@@ -84,6 +84,9 @@ void find_exe_dir(void) {
 	}
 	if (last_slash != NULL) {
 		*last_slash = '\0';
+	} else {
+		// Started by name (e.g. "prince" from cmd): argv[0] has no directory, so it is the current one.
+		snprintf_check(exe_dir, sizeof(exe_dir), ".");
 	}
 #endif
 	found_exe_dir = true;

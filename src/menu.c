@@ -2411,6 +2411,14 @@ void calculate_exe_crc(void) {
 	if (exe_crc == 0) {
 		// Get the CRC32 fingerprint of the executable.
 		FILE* exe_file = fopen(g_argv[0], "rb");
+#if defined WIN32 || _WIN32 || WIN64 || _WIN64
+		if (exe_file == NULL) {
+			// Started by name (e.g. "prince" from cmd): argv[0] has no ".exe".
+			char exe_name[POP_MAX_PATH];
+			snprintf_check(exe_name, sizeof(exe_name), "%s.exe", g_argv[0]);
+			exe_file = fopen(exe_name, "rb");
+		}
+#endif
 		if (exe_file != NULL) {
 			fseek(exe_file, 0, SEEK_END);
 			size_t size = ftell(exe_file);
