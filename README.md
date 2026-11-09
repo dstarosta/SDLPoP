@@ -440,14 +440,32 @@ to the system PATH" during setup. Check it is found with `cmake --version`.
 
 #### Build
 
-Run these from the project root (the folder holding `src` and `data`):
+The Roland MT-32 music library (Munt's libmt32emu) is a git submodule. Fetch it
+once after cloning (or clone with `--recursive`):
+
+    git submodule update --init
+
+The quickest way to build is the default workflow, run from the `src` folder. It
+needs CMake 3.25 or newer and [Ninja](https://ninja-build.org/) (`choco install
+ninja`, `winget install -e --id Ninja-build.Ninja`, or the `ninja-build` /
+`ninja` package):
+
+    cd src
+    cmake --workflow --preset default
+
+It makes a Release build in `src/build`. Without Ninja or with an older CMake,
+run these from the project root (the folder holding `src` and `data`) instead:
 
     cmake -S src -B build
     cmake --build build --config Release
 
-The first command creates a `build` folder for CMake's own files; the executable
-itself is written to the project root, next to the `data` folder, along with the
-SDL3 library if CMake had to build it.
+The first command creates a `build` folder for CMake's own files. Either way the
+executable itself is written to the project root, next to the `data` folder,
+along with the SDL3 library if CMake had to build it, and the MT-32 library
+(`libmt32emu-x64.dll` on 64-bit Windows, `libmt32emu.so.2` on Linux,
+`libmt32emu.2.dylib` on macOS) unless a
+file of that name is already there. Without the submodule the game still builds;
+it then uses a libmt32emu you put beside it, or plays the OPL music.
 
 Pass `--config Release` as shown. Visual Studio and Xcode pick every
 configuration at build time and default to `Debug`, which produces a much larger

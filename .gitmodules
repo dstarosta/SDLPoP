@@ -1,0 +1,3 @@
+[submodule "extern/munt"]
+	path = extern/munt
+	url = https://github.com/munt/munt.git

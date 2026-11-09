@@ -2618,13 +2618,14 @@ const char* get_writable_file_path(char* custom_path_buffer, size_t max_len, con
 #if defined WIN32 || _WIN32 || WIN64 || _WIN64
     const char* save_path = getenv("SDLPOP_SAVE_PATH");
 #else
-    char save_path[POP_MAX_PATH];
+    char save_path_buffer[POP_MAX_PATH] = "";
+    const char* save_path = save_path_buffer;
     const char* custom_save_path = getenv("SDLPOP_SAVE_PATH");
     const char* home_path = getenv("HOME");
     if (custom_save_path != NULL && custom_save_path[0] != '\0')
-        snprintf_check(save_path, max_len, "%s", custom_save_path);
+        snprintf_check(save_path_buffer, sizeof(save_path_buffer), "%s", custom_save_path);
     else if (home_path != NULL && home_path[0] != '\0')
-        snprintf_check(save_path, max_len, "%s/.%s", home_path, POP_DIR_NAME);
+        snprintf_check(save_path_buffer, sizeof(save_path_buffer), "%s/.%s", home_path, POP_DIR_NAME);
 #endif
 
     if (save_path != NULL && save_path[0] != '\0') {

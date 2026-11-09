@@ -34,8 +34,16 @@ file.
 
 ### Linux
 
-Install `libmt32emu` (version 2.8+). It may not be in your distribution's package repositories, in
-which case build it from source:
+The CMake build (see "COMPILING" in `README.md`) builds the library from the `extern/munt`
+submodule and puts `libmt32emu.so.2` next to `prince`, unless a file of that name is already there.
+Fetch the submodule first:
+
+```sh
+git submodule update --init
+```
+
+With another build system, install `libmt32emu` (version 2.8+). It may not be in your
+distribution's package repositories, in which case build it from source:
 
 ```sh
 git clone https://github.com/munt/munt.git
@@ -51,7 +59,12 @@ After installing, the game finds the library on the normal system library path.
 
 ### macOS
 
-Install `libmt32emu` (2.8+) with Homebrew if a recent enough version is available:
+As on Linux, the CMake build builds the library from the `extern/munt` submodule (fetch it with
+`git submodule update --init`) and puts `libmt32emu.2.dylib` next to `prince`, unless a file of that
+name is already there.
+
+With another build system, install `libmt32emu` (2.8+) with Homebrew if a recent enough version is
+available:
 
 ```sh
 brew install mt32emu

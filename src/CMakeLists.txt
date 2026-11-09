@@ -24,6 +24,8 @@ if(WIN32 AND CMAKE_RC_COMPILER MATCHES "windres")
     set(CMAKE_RC_COMPILE_OBJECT
         "<CMAKE_C_COMPILER> -E -xc -DRC_INVOKED <DEFINES> <INCLUDES> <SOURCE> -o <OBJECT>.pp.rc"
         "<CMAKE_RC_COMPILER> <FLAGS> -i <OBJECT>.pp.rc -o <OBJECT>")
+    # windres looks for icon.rc's icon.ico in the folder it runs in, the build folder
+    configure_file(icon.ico ${CMAKE_CURRENT_BINARY_DIR}/icon.ico COPYONLY)
 endif()
 
 if(WIN32 AND NOT MSVC)
@@ -69,6 +71,57 @@ if(NOT SDL3_FOUND)
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(SDL3)
+endif()
+
+# A library built here goes to a folder of its own in the build tree: only the copy after prince's link puts it
+# beside prince, and never over a file of its name there
+function(own_output_dir target dir)
+    set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${dir}
+                                               LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${dir})
+    foreach(_cfg ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER "${_cfg}" _cfg_upper)
+        set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${_cfg_upper} ${CMAKE_CURRENT_BINARY_DIR}/${dir}
+                                                   LIBRARY_OUTPUT_DIRECTORY_${_cfg_upper} ${CMAKE_CURRENT_BINARY_DIR}/${dir})
+    endforeach()
+endfunction()
+if(TARGET SDL3-shared)
+    own_output_dir(SDL3-shared sdl3)
+endif()
+
+# The Roland MT-32: Munt's libmt32emu built from extern/munt (a git submodule) as the shared library mt32synth loads at
+# run time, put beside prince unless one is already there. OFF, or the submodule not checked out: a libmt32emu from
+# elsewhere, as with the other build files.
+set(SDLPoP_MT32 "AUTO" CACHE STRING "Build Munt's libmt32emu from extern/munt: AUTO, ON or OFF")
+set_property(CACHE SDLPoP_MT32 PROPERTY STRINGS AUTO ON OFF)
+set(have_mt32 OFF)
+if(NOT SDLPoP_MT32 STREQUAL "OFF")
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../extern/munt/mt32emu/CMakeLists.txt)
+        enable_language(CXX)
+        set(libmt32emu_SHARED ON CACHE BOOL "" FORCE)
+        set(libmt32emu_C_INTERFACE ON CACHE BOOL "" FORCE)
+        set(libmt32emu_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../extern/munt/mt32emu munt EXCLUDE_FROM_ALL)
+        own_output_dir(mt32emu munt)
+        if(WIN32)
+            # the name mt32synth looks for first; the MinGW runtime built in, so the DLL needs nothing beside it
+            if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+                set_target_properties(mt32emu PROPERTIES PREFIX "" RUNTIME_OUTPUT_NAME libmt32emu-x64)
+            else()
+                set_target_properties(mt32emu PROPERTIES PREFIX "" RUNTIME_OUTPUT_NAME libmt32emu-x86)
+            endif()
+            if(NOT MSVC)
+                target_link_options(mt32emu PRIVATE -static)
+            endif()
+        elseif(NOT MSVC AND NOT APPLE)
+            target_link_options(mt32emu PRIVATE -static-libgcc -static-libstdc++)
+        endif()
+        if(NOT MSVC AND NOT APPLE)
+            target_link_options(mt32emu PRIVATE $<$<CONFIG:Release>:-s>)   # (stripped, as prince)
+        endif()
+        set(have_mt32 ON)
+    elseif(SDLPoP_MT32 STREQUAL "ON")
+        message(FATAL_ERROR "SDLPoP_MT32=ON but extern/munt is missing: git submodule update --init extern/munt")
+    endif()
 endif()
 
 set(SOURCE_FILES
@@ -142,6 +195,11 @@ else()
 endif()
 
 # SDL3main provides the WinMain -> SDL_main shim; only exists on some platforms.
+# Release builds stripped (GCC and Clang; macOS's linker has dropped -s)
+if(NOT MSVC AND NOT APPLE)
+    target_link_options(prince PRIVATE $<$<CONFIG:Release>:-s>)
+endif()
+
 if(TARGET SDL3::SDL3main)
     target_link_libraries(prince SDL3::SDL3main)
 endif()
@@ -154,7 +212,22 @@ else()
     target_link_libraries(prince SDL3::SDL3 m ${CMAKE_DL_LIBS})
 endif()
 
-# A from-source SDL3 isn't installed anywhere, so put it next to the executable.
+# The built libmt32emu beside prince (Linux: by its SONAME, libmt32emu.so.2), unless a file of that name is there
+if(have_mt32)
+    if(WIN32)
+        set(_mt32_runtime_file $<TARGET_FILE:mt32emu>)
+    else()
+        set(_mt32_runtime_file $<TARGET_SONAME_FILE:mt32emu>)
+    endif()
+    # (every build, not only when prince links: a library removed from beside prince comes back)
+    add_custom_target(prince_mt32emu ALL
+        COMMAND ${CMAKE_COMMAND} -DSOURCE=${_mt32_runtime_file} -DDEST_DIR=$<TARGET_FILE_DIR:prince>
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/copy_if_missing.cmake
+        COMMENT "Putting libmt32emu next to prince (unless one is there)")
+    add_dependencies(prince_mt32emu prince mt32emu)
+endif()
+
+# A from-source SDL3 isn't installed anywhere, so put it next to the executable, unless a file of its name is there.
 if(TARGET SDL3::SDL3-shared AND SDL_SHARED)
     if(WIN32)
         set(_sdl3_runtime_file $<TARGET_FILE:SDL3::SDL3-shared>)
@@ -162,10 +235,11 @@ if(TARGET SDL3::SDL3-shared AND SDL_SHARED)
         # The loader looks up the SONAME (libSDL3.so.0), not the symlink TARGET_FILE gives.
         set(_sdl3_runtime_file $<TARGET_SONAME_FILE:SDL3::SDL3-shared>)
     endif()
-    add_custom_command(TARGET prince POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${_sdl3_runtime_file} $<TARGET_FILE_DIR:prince>
-        COMMENT "Copying SDL3 shared library next to prince")
+    add_custom_target(prince_sdl3 ALL
+        COMMAND ${CMAKE_COMMAND} -DSOURCE=${_sdl3_runtime_file} -DDEST_DIR=$<TARGET_FILE_DIR:prince>
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/copy_if_missing.cmake
+        COMMENT "Putting SDL3 next to prince (unless one is there)")
+    add_dependencies(prince_sdl3 prince)
 endif()
 
 if(PSP)
