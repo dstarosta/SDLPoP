@@ -2511,7 +2511,7 @@ static void switch_graphics_from_splash(byte setting) {
 
 void show_splash() {
     if (!enable_info_screen || start_level >= 0) return;
-    static const char press_text[] = "Press any key - continue";
+    static const char press_text[] = "Press any key - continue, Esc - quit";
     char keys_text[256] = "";
     int key_lines = 0;
     int default_line = -1;
@@ -2558,6 +2558,13 @@ void show_splash() {
     do {
         idle();
         key = key_test_quit();
+        if (key == SDL_SCANCODE_ESCAPE) {
+            quit(0);
+        }
+        int base_key = key & ~(WITH_SHIFT | WITH_CTRL | WITH_ALT);
+        if (base_key >= SDL_SCANCODE_F1 && base_key <= SDL_SCANCODE_F12) {
+            key = 0; // the function keys are not "any key"
+        }
 
         bool joy_input = 0;
         for (int i = 0; i < JOYINPUT_NUM; i++) {
@@ -2582,7 +2589,7 @@ void show_splash() {
             switch_graphics_from_splash(splash_graphics_keys[i].setting);
         }
     }
-    if ((key & WITH_CTRL) || (enable_quicksave && key == SDL_SCANCODE_F9) || (enable_replay && key == SDL_SCANCODE_TAB)) {
+    if ((key & WITH_CTRL) || (enable_replay && key == SDL_SCANCODE_TAB)) {
         extern int last_key_scancode; // defined in seg009.c
         last_key_scancode = key; // can immediately do Ctrl+L, etc from the splash screen
     }
