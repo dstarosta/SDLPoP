@@ -1188,6 +1188,16 @@ enum replay_seek_targets {
 
 #define COUNT(array) ((int) (sizeof(array)/sizeof(array[0])) )
 
+// The values of scaling_type.
+enum scaling_types {
+	SCALING_SHARP = 0,
+	SCALING_FUZZY = 1,
+	SCALING_BLURRY = 2,
+	SCALING_SCALE2X = 3,
+	SCALING_SCALE3X = 4,
+	SCALING_AUTO = 5, // Scale3x with the Macintosh graphics, sharp otherwise
+};
+
 // These are or'ed with SDL_SCANCODE_* constants in last_key_scancode.
 enum key_modifiers {
 	WITH_SHIFT = 0x8000,

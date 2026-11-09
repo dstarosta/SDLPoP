@@ -96,7 +96,9 @@ NAMES_LIST(tile_type_names, {
 	"lattice_pillar", "lattice_down", "lattice_small", "lattice_left", "lattice_right", // 25..29
 	"torch_with_debris", // 30
 });
-NAMES_LIST(scaling_type_names, {"sharp", "fuzzy", "blurry", "smooth", "auto"});
+// "smooth" is what Scale3x was called before Scale2x was added.
+KEY_VALUE_LIST(scaling_type_names, {{"sharp", SCALING_SHARP}, {"fuzzy", SCALING_FUZZY}, {"blurry", SCALING_BLURRY},
+		{"scale2x", SCALING_SCALE2X}, {"scale3x", SCALING_SCALE3X}, {"smooth", SCALING_SCALE3X}, {"auto", SCALING_AUTO}});
 NAMES_LIST(graphics_setting_names, {"auto", "dos", "mac", "snes"});
 NAMES_LIST(row_names, {"top", "middle", "bottom"});
 KEY_VALUE_LIST(direction_names, {{"left", dir_FF_left}, {"right", dir_0_right}});
@@ -521,7 +523,7 @@ void set_options_to_default() {
 	use_hardware_acceleration = 2;
 	use_correct_aspect_ratio = 0;
 	use_integer_scaling = 0;
-	scaling_type = 0;
+	scaling_type = SCALING_SHARP;
 	mt32_dac = 2;
 	mt32_quality = 2;
 	mt32_reverb = 1;

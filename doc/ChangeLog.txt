@@ -799,4 +799,5 @@ DONE: SNES-style graphics can be used with "graphics = snes" in SDLPoP.ini. They
 	in Prince of Persia Remastered by The-Alok.
 	The cutscene pictures come from SNES Remnants by KJ, with the prince recoloured to match.
 	Details: https://www.popot.org/custom_levels.php?mod=0000042
-DONE: Added the "smooth" scaling type: edges are smoothed with Scale3x. Text stays sharp.
+DONE: Added the "scale2x" and "scale3x" scaling types: edges are smoothed with Scale2x or Scale3x. Text stays sharp.
+	"smooth" in SDLPoP.ini is still read as "scale3x".

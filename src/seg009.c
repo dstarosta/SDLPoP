@@ -2960,14 +2960,21 @@ void init_overlay(void) {
 	}
 }
 
-// "auto" (4): Scale3x suits the high-resolution Mac art, but makes the low-resolution DOS and SNES art look worse.
+// "auto": Scale3x suits the high-resolution Mac art, but makes the low-resolution DOS and SNES art look worse.
 static int get_scaling_type(void) {
-	if (scaling_type == 4) return uses_mac_graphics() ? 3 : 0;
+	if (scaling_type == SCALING_AUTO) return uses_mac_graphics() ? SCALING_SCALE3X : SCALING_SHARP;
 	return scaling_type;
+}
+
+// The edge smoothing's factor: 2 for Scale2x, 3 for Scale3x, 0 for the other scaling types.
+static int get_smooth_factor(void) {
+	int type = get_scaling_type();
+	return type == SCALING_SCALE2X ? 2 : type == SCALING_SCALE3X ? 3 : 0;
 }
 
 static SDL_Surface* smooth_surface;
 static SDL_Texture* texture_smooth;
+static int smooth_factor; // the factor smooth_surface and texture_smooth were made for
 
 static Uint32 rgb24_at(const SDL_Surface* surface, int x, int y) {
 	Uint32 value = 0;
@@ -2988,7 +2995,7 @@ static bool is_smooth_dump_requested(void) {
 }
 
 static bool is_text_mask_enabled(void) {
-	return (get_scaling_type() == 3 && renderer_ != NULL) || is_smooth_dump_requested();
+	return (get_smooth_factor() != 0 && renderer_ != NULL) || is_smooth_dump_requested();
 }
 
 static void free_text_mask(void* userdata, void* value) {
@@ -3141,9 +3148,9 @@ static bool find_text_pixels(SDL_Surface* surface, byte* is_text) {
 	return found;
 }
 
-// Scale3x edge smoothing (https://www.scale2x.it/algorithm) of a 24-bit surface into one three times larger.
-// Text pixels become plain 3x3 blocks, and their neighbours do not take their colour.
-static bool scale3x_surface(SDL_Surface* source, SDL_Surface* destination) {
+// Scale2x / Scale3x edge smoothing (https://www.scale2x.it/algorithm) of a 24-bit surface into one 2 / 3 times larger.
+// Text pixels become plain blocks, and their neighbours do not take their colour.
+static bool scale_edges_surface(SDL_Surface* source, SDL_Surface* destination, int factor) {
 	static byte* is_text;
 	static int is_text_size;
 	int size = source->w * source->h;
@@ -3183,19 +3190,26 @@ static bool scale3x_surface(SDL_Surface* source, SDL_Surface* destination) {
 				if (row_below[right]) i = e;
 			}
 			if (b != h && d != f) {
-				out[0] = d == b ? d : e;
-				out[1] = ((d == b && e != c) || (b == f && e != a)) ? b : e;
-				out[2] = b == f ? f : e;
-				out[3] = ((d == b && e != g) || (d == h && e != a)) ? d : e;
-				out[5] = ((b == f && e != i) || (h == f && e != c)) ? f : e;
-				out[6] = d == h ? d : e;
-				out[7] = ((d == h && e != i) || (h == f && e != g)) ? h : e;
-				out[8] = h == f ? f : e;
+				if (factor == 2) {
+					out[0] = d == b ? d : e;
+					out[1] = b == f ? f : e;
+					out[2] = d == h ? d : e;
+					out[3] = h == f ? f : e;
+				} else {
+					out[0] = d == b ? d : e;
+					out[1] = ((d == b && e != c) || (b == f && e != a)) ? b : e;
+					out[2] = b == f ? f : e;
+					out[3] = ((d == b && e != g) || (d == h && e != a)) ? d : e;
+					out[5] = ((b == f && e != i) || (h == f && e != c)) ? f : e;
+					out[6] = d == h ? d : e;
+					out[7] = ((d == h && e != i) || (h == f && e != g)) ? h : e;
+					out[8] = h == f ? f : e;
+				}
 			}
-			for (int row = 0; row < 3; ++row) {
-				byte* dst = (byte*)destination->pixels + (y * 3 + row) * destination->pitch + x * 9;
-				for (int col = 0; col < 3; ++col) {
-					memcpy(dst + col * 3, &out[row * 3 + col], 3);
+			for (int row = 0; row < factor; ++row) {
+				byte* dst = (byte*)destination->pixels + (y * factor + row) * destination->pitch + x * factor * 3;
+				for (int col = 0; col < factor; ++col) {
+					memcpy(dst + col * 3, &out[row * factor + col], 3);
 				}
 			}
 		}
@@ -3207,12 +3221,15 @@ static bool scale3x_surface(SDL_Surface* source, SDL_Surface* destination) {
 
 void save_smoothed_screen(const char* path) {
 	if (!is_smooth_dump_requested()) return;
-	SDL_Surface* smoothed = SDL_CreateSurface(onscreen_surface_->w * 3, onscreen_surface_->h * 3, SURFACE_FORMAT_24BPP);
-	if (smoothed != NULL && scale3x_surface(onscreen_surface_, smoothed) && !SDL_SaveBMP(smoothed, path)) {
+	int factor = get_smooth_factor() != 0 ? get_smooth_factor() : 3;
+	SDL_Surface* smoothed = SDL_CreateSurface(onscreen_surface_->w * factor, onscreen_surface_->h * factor, SURFACE_FORMAT_24BPP);
+	if (smoothed != NULL && scale_edges_surface(onscreen_surface_, smoothed, factor) && !SDL_SaveBMP(smoothed, path)) {
 		sdlperror("save_smoothed_screen: SDL_SaveBMP");
 	}
 	SDL_DestroySurface(smoothed);
 }
+
+static void destroy_texture(SDL_Texture** texture);
 
 void init_scaling(void) {
 	// Don't crash in validate mode.
@@ -3225,24 +3242,31 @@ void init_scaling(void) {
 		// SDL3 defaults to LINEAR, which would make sharp mode blurry.
 		SDL_SetTextureScaleMode(texture_sharp, SDL_SCALEMODE_NEAREST);
 	}
-	if (get_scaling_type() == 1) {
+	int factor = get_smooth_factor();
+	if (factor != 0 && factor != smooth_factor) { // switched between Scale2x and Scale3x
+		SDL_DestroySurface(smooth_surface);
+		smooth_surface = NULL;
+		destroy_texture(&texture_smooth);
+		smooth_factor = factor;
+	}
+	if (get_scaling_type() == SCALING_FUZZY) {
 		if (texture_fuzzy == NULL) {
 			texture_fuzzy = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, width * 2, height * 2);
 			SDL_SetTextureScaleMode(texture_fuzzy, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_fuzzy;
-	} else if (get_scaling_type() == 2) {
+	} else if (get_scaling_type() == SCALING_BLURRY) {
 		if (texture_blurry == NULL) {
 			texture_blurry = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width, height);
 			SDL_SetTextureScaleMode(texture_blurry, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = texture_blurry;
-	} else if (get_scaling_type() == 3) {
+	} else if (factor != 0) {
 		if (smooth_surface == NULL) {
-			smooth_surface = SDL_CreateSurface(width * 3, height * 3, SURFACE_FORMAT_24BPP);
+			smooth_surface = SDL_CreateSurface(width * factor, height * factor, SURFACE_FORMAT_24BPP);
 		}
 		if (texture_smooth == NULL) {
-			texture_smooth = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width * 3, height * 3);
+			texture_smooth = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, width * factor, height * factor);
 			SDL_SetTextureScaleMode(texture_smooth, SDL_SCALEMODE_LINEAR);
 		}
 		target_texture = smooth_surface != NULL ? texture_smooth : NULL;
@@ -3479,7 +3503,7 @@ void update_screen() {
 	draw_overlay();
 	SDL_Surface* surface = get_final_surface();
 	init_scaling();
-	if (get_scaling_type() == 1) {
+	if (get_scaling_type() == SCALING_FUZZY) {
 		// Make "fuzzy pixels" like DOSBox does:
 		// First scale to double size with nearest-neighbor scaling, then scale to full screen with smooth scaling.
 		// The result is not as blurry as if we did only a smooth scaling, but not as sharp as if we did only nearest-neighbor scaling.
@@ -3488,8 +3512,8 @@ void update_screen() {
 		SDL_RenderClear(renderer_);
 		SDL_RenderTexture(renderer_, texture_sharp, NULL, NULL);
 		SDL_SetRenderTarget(renderer_, NULL);
-	} else if (get_scaling_type() == 3) {
-		if (scale3x_surface(surface, smooth_surface)) {
+	} else if (get_smooth_factor() != 0) {
+		if (scale_edges_surface(surface, smooth_surface, get_smooth_factor())) {
 			SDL_UpdateTexture(target_texture, NULL, smooth_surface->pixels, smooth_surface->pitch);
 		}
 	} else {
