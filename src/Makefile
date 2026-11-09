@@ -4,7 +4,7 @@ CC = gcc
 RM = rm -f
 
 HFILES = common.h config.h data.h proto.h types.h mt32synth.h mac_graphics.h
-OBJ = main.o data.o seg000.o seg001.o seg002.o seg003.o seg004.o seg005.o seg006.o seg007.o seg008.o seg009.o seqtbl.o replay.o options.o lighting.o mac_graphics.o screenshot.o menu.o midi.o opl3.o mt32synth.o stb_vorbis.o
+OBJ = main.o data.o seg000.o seg001.o seg002.o seg003.o seg004.o seg005.o seg006.o seg007.o seg008.o seg009.o seqtbl.o replay.o options.o lighting.o soundpos.o mac_graphics.o screenshot.o menu.o midi.o opl3.o mt32synth.o stb_vorbis.o
 BIN = ../prince
 
 OS      := $(shell uname)

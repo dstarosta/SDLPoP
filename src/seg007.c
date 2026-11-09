@@ -46,6 +46,9 @@ void mac_architecture_changed(byte room, byte tile, byte old_modifier, byte modi
 void process_trobs() {
 	word need_delete = 0;
 	if (trobs_count == 0) return;
+#ifdef USE_POSITIONAL_STEREO
+	sound_src_from = sound_src_from_trob;
+#endif
 	for (word index = 0; index < trobs_count; ++index) {
 		trob = trobs[index];
 		animate_tile();
@@ -54,6 +57,9 @@ void process_trobs() {
 			need_delete = 1;
 		}
 	}
+#ifdef USE_POSITIONAL_STEREO
+	sound_src_from = sound_src_from_char;
+#endif
 	if (need_delete) {
 		word new_index;
 		for (word index = new_index = 0; index < trobs_count; ++index) {
@@ -1022,12 +1028,18 @@ word curmob_index;
 // seg007:1063
 void do_mobs() {
 	short n_mobs = mobs_count;
+#ifdef USE_POSITIONAL_STEREO
+	sound_src_from = sound_src_from_mob;
+#endif
 	for (curmob_index = 0; n_mobs > curmob_index; ++curmob_index) {
 		curmob = mobs[curmob_index];
 		move_mob();
 		check_loose_fall_on_kid();
 		mobs[curmob_index] = curmob;
 	}
+#ifdef USE_POSITIONAL_STEREO
+	sound_src_from = sound_src_from_char;
+#endif
 	short new_index = 0;
 	for (short index = 0; index < mobs_count; ++index) {
 		if (mobs[index].speed != -1) {
@@ -1293,6 +1305,15 @@ void play_door_sound_if_visible(int sound_id) {
 	if ((current_level == 3 && gate_room == 2) || GATE_SOUND_CONDITION) {
 		has_sound = 1;
 	}
+#ifdef USE_ALL_GATE_SOUNDS
+	// A gate off the screen does not break into a gate sound that plays or is queued (as Prince of Persia 1.5)
+	if (!has_sound && fixes->enable_all_gate_sounds) {
+		bool gate_sound_playing = check_sound_playing() &&
+		                          (current_sound == sound_4_gate_closing || current_sound == sound_5_gate_opening);
+		bool gate_sound_queued = next_sound == sound_4_gate_closing || next_sound == sound_5_gate_opening;
+		has_sound = !gate_sound_playing && !gate_sound_queued;
+	}
+#endif
 	if (has_sound) {
 		play_sound(sound_id);
 	}

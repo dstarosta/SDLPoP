@@ -953,6 +953,9 @@ void draw_game_frame() {
     }
 
     play_next_sound();
+#ifdef USE_POSITIONAL_STEREO
+    update_digi_place();
+#endif
     // Note: texts are identified by their total time!
     if (text_time_remaining == 1) {
         // If the text's is about to expire:
@@ -1634,6 +1637,9 @@ void play_sound(int sound_id) {
     if (next_sound < 0 || sound_prio_table[sound_id] <= sound_prio_table[next_sound]) {
         if (NULL == sound_pointers[sound_id]) return;
         if (sound_pcspeaker_exists[sound_id] != 0 || sound_pointers[sound_id]->type != sound_speaker) {
+#ifdef USE_POSITIONAL_STEREO
+            queue_sound_src(sound_id);
+#endif
             next_sound = sound_id;
         }
     }
@@ -1646,7 +1652,13 @@ void play_next_sound() {
                 (sound_interruptible[current_sound] != 0 && sound_prio_table[next_sound] <= sound_prio_table[current_sound])
            ) {
             current_sound = next_sound;
+#ifdef USE_POSITIONAL_STEREO
+            use_queued_sound_src(true);
+#endif
             play_sound_from_buffer(sound_pointers[current_sound]);
+#ifdef USE_POSITIONAL_STEREO
+            use_queued_sound_src(false);
+#endif
         }
     }
     next_sound = -1;
@@ -2299,6 +2311,9 @@ void parse_cmdline_sound() {
         sound_flags |= sfMidi;
         sound_mode = smSblast;
     }
+#ifdef USE_POSITIONAL_STEREO
+    positional_stereo_possible = (sound_flags & sfDigi) != 0;
+#endif
 }
 
 // seg000:226D

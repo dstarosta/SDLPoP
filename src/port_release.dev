@@ -1,7 +1,7 @@
 ﻿[Project]
 FileName=port_release.dev
 Name=SDLPoP
-UnitCount=33
+UnitCount=34
 Type=0
 Ver=2
 ObjFiles=
@@ -380,3 +380,12 @@ Priority=1000
 OverrideBuildCmd=0
 BuildCmd=
 
+[Unit34]
+FileName=soundpos.c
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=

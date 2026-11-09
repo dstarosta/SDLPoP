@@ -1,7 +1,7 @@
 ﻿[Project]
 FileName=port_debug.dev
 Name=SDLPoP
-UnitCount=33
+UnitCount=34
 Type=1
 Ver=2
 ObjFiles=
@@ -372,6 +372,16 @@ BuildCmd=
 
 [Unit33]
 FileName=mac_graphics.h
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit34]
+FileName=soundpos.c
 CompileCpp=0
 Folder=
 Compile=1

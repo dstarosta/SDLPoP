@@ -331,6 +331,9 @@ The authors of this program may be contacted at https://forum.princed.org
 // Prince can grab tiles on the row above from a standing or a running jump
 #define USE_JUMP_GRAB
 
+// The closing gates can be heard in every room, not only on the screen (as in Prince of Persia 2)
+#define USE_ALL_GATE_SOUNDS
+
 // Debug features:
 
 // When the program starts, check whether the deobfuscated sequence table (seqtbl.c) is correct.
@@ -349,6 +352,9 @@ The authors of this program may be contacted at https://forum.princed.org
 
 // Darken those parts of the screen which are not near a torch.
 #define USE_LIGHTING
+
+// Hear the digitized sounds from where they happen: to the left or the right, and quieter further away.
+#define USE_POSITIONAL_STEREO
 
 // Enable screenshot features.
 #define USE_SCREENSHOT

@@ -759,6 +759,12 @@ extern byte mt32_reverb INIT(= 1);
 extern byte enable_lighting INIT(= 0);
 extern image_type* lighting_mask;
 #endif
+#ifdef USE_POSITIONAL_STEREO
+extern byte enable_positional_stereo INIT(= 1);
+extern byte positional_stereo_possible INIT(= 1); // only with the digitized sounds (not with "stdsnd")
+extern byte sound_src_from INIT(= sound_src_from_char); // whose place play_sound gives a sound
+extern sound_src_type sound_start_src; // the source of the sound being started
+#endif
 extern fixes_options_type fixes_saved;
 extern fixes_options_type fixes_disabled_state;
 extern fixes_options_type* fixes INIT(= &fixes_disabled_state);

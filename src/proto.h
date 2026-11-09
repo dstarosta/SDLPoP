@@ -722,6 +722,17 @@ void redraw_lighting(void);
 void update_lighting(const rect_type* source_rect_ptr);
 #endif
 
+// soundpos.c
+#ifdef USE_POSITIONAL_STEREO
+sound_src_type sound_src_now(void);
+void sound_src_place(const sound_src_type* src, float* pan, float* gain);
+void queue_sound_src(int sound_id);
+void use_queued_sound_src(bool use);
+void start_digi_place(void);
+void update_digi_place(void);
+void place_digi_samples(short* out, const short* in, int frames);
+#endif
+
 // screenshot.c
 #ifdef USE_SCREENSHOT
 void save_screenshot(void);

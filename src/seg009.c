@@ -2427,6 +2427,12 @@ void digi_callback(void* userdata, Uint8* stream, int len) {
 		// Don't go over the end of either the input or the output buffer.
 		size_t copy_len = MIN(len - bytes_written, digi_remaining_length);
 		if (is_sound_on) {
+#ifdef USE_POSITIONAL_STEREO
+			if (digi_audiospec->channels == 2) {
+				int frames = (int)(copy_len / (2 * sizeof(short)));
+				place_digi_samples((short*)(stream + bytes_written), (const short*)digi_remaining_pos, frames);
+			} else
+#endif
 			memcpy(stream + bytes_written, digi_remaining_pos, copy_len);
 		} else {
 			// If sound is off: Mute the sound but keep track of where we are.
@@ -2850,6 +2856,9 @@ void play_digi_sound(sound_buffer_type* buffer) {
 	digi_playing = 1;
 	digi_remaining_length = buffer->converted.length;
 	digi_remaining_pos = digi_buffer;
+#ifdef USE_POSITIONAL_STEREO
+	start_digi_place();
+#endif
 	SDL_UnlockAudioStream(digi_audio_stream);
 	SDL_ResumeAudioStreamDevice(digi_audio_stream);
 }

@@ -401,6 +401,24 @@ typedef struct mob_type {
 	byte row;
 } mob_type;
 
+// Positional stereo: where a sound comes from (soundpos.c).
+enum sound_src_kind {
+	src_none = 0, // centred, at full volume
+	src_room = 1, // a room and the pixels in it
+	src_screen = 2, // a place on the screen (a cutscene)
+};
+enum sound_src_from_type {
+	sound_src_from_char = 0,
+	sound_src_from_trob = 1,
+	sound_src_from_mob = 2,
+};
+typedef struct sound_src_type {
+	byte kind;
+	byte room;
+	byte self; // the kid's own sound
+	short x, y;
+} sound_src_type;
+
 enum directions {
 	dir_0_right = 0x00,
 	dir_56_none = 0x56,
@@ -1257,6 +1275,7 @@ typedef struct fixes_options_type {
 	byte fix_feather_fall_affects_guards;
 	byte fix_one_hp_stops_blinking;
 	byte fix_dead_floating_in_air;
+	byte enable_all_gate_sounds;
 } fixes_options_type;
 
 #define NUM_GUARD_SKILLS 12

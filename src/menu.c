@@ -148,6 +148,7 @@ enum setting_ids {
 	SETTING_ENABLE_INFO_SCREEN,
 	SETTING_ENABLE_SOUND,
 	SETTING_ENABLE_MUSIC,
+	SETTING_POSITIONAL_STEREO,
 	SETTING_ENABLE_CONTROLLER_RUMBLE,
 	SETTING_JOYSTICK_THRESHOLD,
 	SETTING_JOYSTICK_ONLY_HORIZONTAL,
@@ -213,6 +214,7 @@ enum setting_ids {
 	SETTING_FIX_DEAD_FLOATING_IN_AIR,
 	SETTING_ENABLE_SUPER_HIGH_JUMP,
 	SETTING_ENABLE_JUMP_GRAB,
+	SETTING_ENABLE_ALL_GATE_SOUNDS,
 	SETTING_USE_CUSTOM_OPTIONS,
 	SETTING_START_MINUTES_LEFT,
 	SETTING_START_TICKS_LEFT,
@@ -341,6 +343,13 @@ setting_type general_settings[] = {
 		{.id = SETTING_ENABLE_MUSIC, .style = SETTING_STYLE_TOGGLE, .linked = &enable_music,
 				.text = "Enable music",
 				.explanation = "Turn music on or off."},
+#ifdef USE_POSITIONAL_STEREO
+		{.id = SETTING_POSITIONAL_STEREO, .style = SETTING_STYLE_TOGGLE, .linked = &enable_positional_stereo,
+				.required = &positional_stereo_possible,
+				.text = "Positional stereo",
+				.explanation = "Play the sound effects from where they happen: to the left or the right, and quieter further away.\n"
+						"Only with the digitized sounds (not with the \"stdsnd\" command line option)."},
+#endif
 		{.id = SETTING_ENABLE_CONTROLLER_RUMBLE, .style = SETTING_STYLE_TOGGLE, .linked = &enable_controller_rumble,
 				.text = "Enable controller rumble",
 				.explanation = "If using a controller with a rumble motor, provide haptic feedback when the kid is hurt."},
@@ -466,6 +475,13 @@ setting_type gameplay_settings[] = {
 				.text = "Enable jump grab",
 				.explanation = "Prince can grab tiles on the floor above while jumping. "
                                "Hold Shift and up arrow, but not the forward arrow key."},
+#ifdef USE_ALL_GATE_SOUNDS
+		{.id = SETTING_ENABLE_ALL_GATE_SOUNDS, .style = SETTING_STYLE_TOGGLE,
+				.linked = &fixes_saved.enable_all_gate_sounds, .required = &use_fixes_and_enhancements,
+				.text = "Hear all gates",
+				.explanation = "The closing gates can be heard in every room, not only on the screen (as in Prince of Persia 2).\n"
+						"With positional stereo, a gate further away sounds further away."},
+#endif
 		{.id = SETTING_FIX_GATE_SOUNDS, .style = SETTING_STYLE_TOGGLE,
 				.linked = &fixes_saved.fix_gate_sounds, .required = &use_fixes_and_enhancements,
 				.text = "Fix gate sounds bug",
@@ -2311,6 +2327,9 @@ void process_ingame_settings_user_managed(SDL_IOStream* rw, rw_process_func_type
 	process(enable_info_screen);
 	process(is_sound_on);
 	process(enable_music);
+#ifdef USE_POSITIONAL_STEREO
+	process(enable_positional_stereo);
+#endif
 	process(enable_controller_rumble);
 	process(joystick_threshold);
 	process(joystick_only_horizontal);

@@ -52,7 +52,7 @@ set BuildTypeCompilerFlags= /MT /O2
 set PreprocessorDefinitions=
 
 :compile
-set SourceFiles= main.c data.c seg000.c seg001.c seg002.c seg003.c seg004.c seg005.c seg006.c seg007.c seg008.c seg009.c seqtbl.c replay.c options.c lighting.c mac_graphics.c screenshot.c menu.c midi.c opl3.c mt32synth.c stb_vorbis.c
+set SourceFiles= main.c data.c seg000.c seg001.c seg002.c seg003.c seg004.c seg005.c seg006.c seg007.c seg008.c seg009.c seqtbl.c replay.c options.c lighting.c soundpos.c mac_graphics.c screenshot.c menu.c midi.c opl3.c mt32synth.c stb_vorbis.c
 set CommonCompilerFlags= /nologo /MP /fp:fast /GR- /wd4048 %PreprocessorDefinitions% /I"%SDL3%\include"
 set CommonLinkerFlags= /subsystem:windows,5.01 /libpath:"%SDL3%\lib\%VSCMD_ARG_TGT_ARCH%" SDL3.lib Shell32.lib icon.res /out:..\prince.exe
 

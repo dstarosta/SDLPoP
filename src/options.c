@@ -186,6 +186,9 @@ static int global_ini_callback(const char *section, const char *name, const char
 		}
 		process_boolean("enable_copyprot", &enable_copyprot);
 		process_boolean("enable_music", &enable_music);
+#ifdef USE_POSITIONAL_STEREO
+		process_boolean("positional_stereo", &enable_positional_stereo);
+#endif
 		process_boolean("enable_fade", &enable_fade);
 		process_boolean("enable_flash", &enable_flash);
 		process_boolean("enable_text", &enable_text);
@@ -322,6 +325,7 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_boolean("fix_drop_2_rooms_climbing_loose_tile", &fixes_saved.fix_drop_2_rooms_climbing_loose_tile);
 		process_boolean("fix_falling_through_floor_during_sword_strike", &fixes_saved.fix_falling_through_floor_during_sword_strike);
 		process_boolean("enable_jump_grab", &fixes_saved.enable_jump_grab);
+		process_boolean("enable_all_gate_sounds", &fixes_saved.enable_all_gate_sounds);
 		process_boolean("fix_register_quick_input", &fixes_saved.fix_register_quick_input);
 		process_boolean("fix_turn_running_near_wall", &fixes_saved.fix_turn_running_near_wall);
 		process_boolean("fix_feather_fall_affects_guards", &fixes_saved.fix_feather_fall_affects_guards);
@@ -505,6 +509,9 @@ void set_options_to_default() {
 #endif
 	enable_copyprot = 0;
 	enable_music = 1;
+#ifdef USE_POSITIONAL_STEREO
+	enable_positional_stereo = 1;
+#endif
 	enable_fade = 1;
 	enable_flash = 1;
 	enable_text = 1;
