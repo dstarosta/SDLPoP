@@ -275,9 +275,9 @@ void redraw_screen(int drawing_different_room) {
 	) {
 		draw_rect(&rect_top, color_0_black);
 #ifdef USE_DARK_TRANSITION
-		// Briefly show a dark screen when changing rooms, like in the original game.
+		// Briefly show a dark screen when changing rooms, like in the original game: about two frames of its 70 Hz display.
 		update_screen();
-		SDL_Delay(100);
+		SDL_Delay(2 * 1000 / 70);
 #endif
 	}
 
