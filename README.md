@@ -482,6 +482,23 @@ an error rather than downloading it.
 
 The other build systems below don't fetch SDL3; they need it installed first.
 
+### The MT-32 library with other build systems
+
+Only CMake builds Munt's libmt32emu (2.8 or newer); the game plays OPL music without it (see
+[README-MT32.md](README-MT32.md)). On Windows the library is included. On Linux and macOS, install
+it from your package manager if a recent enough version is there, or build it from source:
+
+    git clone https://github.com/munt/munt.git
+    cd munt/mt32emu
+    mkdir build && cd build
+    cmake ..
+    make
+    sudo make install
+    sudo ldconfig
+
+(`sudo ldconfig` is for Linux only.) Instead of installing it system-wide, you can put the built
+library (`libmt32emu.so.2` on Linux, `libmt32emu.2.dylib` on macOS) next to `prince`.
+
 ### Windows
 
 #### Dev-C++

@@ -34,48 +34,26 @@ file.
 
 ### Linux
 
-The CMake build (see "COMPILING" in `README.md`) builds the library from the `extern/munt`
-submodule and puts `libmt32emu.so.2` next to `prince`, unless a file of that name is already there.
-Fetch the submodule first:
-
-```sh
-git submodule update --init
-```
-
-With another build system, install `libmt32emu` (version 2.8+). It may not be in your
-distribution's package repositories, in which case build it from source:
-
-```sh
-git clone https://github.com/munt/munt.git
-cd munt/mt32emu
-mkdir build && cd build
-cmake .. -DBUILD_SHARED_LIBS=ON -Dlibmt32emu_C_INTERFACE=TRUE
-make
-sudo make install
-sudo ldconfig
-```
-
-After installing, the game finds the library on the normal system library path.
+Keep `libmt32emu.so.2` next to `prince`, or install `libmt32emu` (version 2.8+) so the game finds it
+on the normal system library path. A game built with CMake already has the library beside it. It may
+not be in your distribution's package repositories; building it is described under "COMPILING" in
+`README.md`.
 
 ### macOS
 
-As on Linux, the CMake build builds the library from the `extern/munt` submodule (fetch it with
-`git submodule update --init`) and puts `libmt32emu.2.dylib` next to `prince`, unless a file of that
-name is already there.
-
-With another build system, install `libmt32emu` (2.8+) with Homebrew if a recent enough version is
-available:
+Keep `libmt32emu.2.dylib` next to `prince`, or install `libmt32emu` (2.8+) with Homebrew if a recent
+enough version is available:
 
 ```sh
 brew install mt32emu
 ```
 
+A game built with CMake already has the library beside it; building it is described under
+"COMPILING" in `README.md`.
+
 You may need to add `export DYLD_FALLBACK_LIBRARY_PATH="/opt/homebrew/lib:/usr/local/lib:/usr/lib"`
 to the `.zshrc` (or the corresponding file for your shell) in your home `~/` folder if the game
 falls back to the OPL MIDI (printed in the console).
-
-Otherwise build it from source using the same steps as Linux (you can drop the resulting library
-next to the game instead of installing it system-wide).
 
 ---
 
