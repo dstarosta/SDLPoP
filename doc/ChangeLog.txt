@@ -806,6 +806,10 @@ FIXED: Added a configurable fix for: After the prince drops off a ledge in a fig
 	(e.g. the skeleton on level 3) keeps walking forward. The test for "the prince is below" compared rows of different
 	rooms and was only made when there was no floor in front of the guard.
 	Details: See FIX_GUARD_FOLLOWING_KID_DOWN in config.h.
+FIXED: Added a configurable fix for: Entering Jaffar's room on level 13 played the meeting music and made Jaffar wait
+	every time, so stepping out and back in froze him again, long enough to kill him with one hit.
+	Now it happens once per level.
+	Details: See FIX_JAFFAR_MEETING_ONCE in config.h.
 CHANGED: FIX_JUMP_DISTANCE_AT_EDGE now sets the edge distance before the climb up (11 pixels, as he can hang at 11 or 12)
 	instead of moving the prince a pixel when he jumps afterwards, so the climb frames of a wider sprite (a caped prince)
 	line up too.

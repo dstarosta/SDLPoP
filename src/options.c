@@ -319,6 +319,7 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_boolean("fix_hidden_floors_during_flashing", &fixes_saved.fix_hidden_floors_during_flashing);
 		process_boolean("fix_vertical_room_exits", &fixes_saved.fix_vertical_room_exits);
 		process_boolean("fix_guard_following_kid_down", &fixes_saved.fix_guard_following_kid_down);
+		process_boolean("fix_jaffar_meeting_once", &fixes_saved.fix_jaffar_meeting_once);
 		process_boolean("fix_exit_door", &fixes_saved.fix_exit_door);
 		process_boolean("fix_quicksave_during_feather", &fixes_saved.fix_quicksave_during_feather);
 		process_boolean("fix_caped_prince_sliding_through_gate", &fixes_saved.fix_caped_prince_sliding_through_gate);

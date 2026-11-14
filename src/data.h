@@ -762,6 +762,9 @@ extern image_type* lighting_mask;
 #ifdef USE_FALLING_TILES_KILL_GUARDS
 extern byte guard_crushed INIT(= 0); // the guard was killed by a falling tile: no victory sound
 #endif
+#ifdef FIX_JAFFAR_MEETING_ONCE
+extern byte jaffar_meeting_played INIT(= 0); // the level 13 meeting music has played on this level
+#endif
 #ifdef USE_POSITIONAL_STEREO
 extern byte enable_positional_stereo INIT(= 1);
 extern byte positional_stereo_possible INIT(= 1); // only with the digitized sounds (not with "stdsnd")

@@ -1296,6 +1296,7 @@ typedef struct fixes_options_type {
 	byte fix_gate_jump_height;
 	byte fix_vertical_room_exits;
 	byte fix_guard_following_kid_down;
+	byte fix_jaffar_meeting_once;
 } fixes_options_type;
 
 #define NUM_GUARD_SKILLS 12

@@ -366,6 +366,10 @@ int quick_process(process_func_type process_func) {
 #endif
     process(is_guard_notice);
     process(can_guard_see_kid);
+#ifdef FIX_JAFFAR_MEETING_ONCE
+    // Quicksaves and replays from before this field end here: not played yet.
+    if (ok && !process_func(&jaffar_meeting_played, sizeof(jaffar_meeting_played))) jaffar_meeting_played = 0;
+#endif
 #undef process
     return ok;
 }

@@ -220,6 +220,10 @@ The authors of this program may be contacted at https://forum.princed.org
 // walking forward after the prince climbed back up. The fix checks whether he is really below, before anything else.
 #define FIX_GUARD_FOLLOWING_KID_DOWN
 
+// Entering Jaffar's room on level 13 plays the meeting music and makes him wait (28 ticks) every time, not once:
+// stepping back out and in again freezes him again, long enough to run up and kill him with one hit.
+#define FIX_JAFFAR_MEETING_ONCE
+
 // Fix priorities of sword and spike sounds. (As in PoP 1.3.)
 #define FIX_SOUND_PRIORITIES
 

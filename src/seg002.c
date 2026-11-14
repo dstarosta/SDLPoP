@@ -576,6 +576,12 @@ void sword_disappears() {
 void meet_Jaffar() {
 	// Special event: play music
 	if (current_level == 13 && leveldoor_open == 0 && Char.room == 3) {
+#ifdef FIX_JAFFAR_MEETING_ONCE
+		if (fixes->fix_jaffar_meeting_once) {
+			if (jaffar_meeting_played) return;
+			jaffar_meeting_played = 1;
+		}
+#endif
 		play_sound(sound_29_meet_Jaffar); // meet Jaffar
 		// Special event: Jaffar waits a bit (28/12=2.33 seconds)
 		guard_notice_timer = 28;

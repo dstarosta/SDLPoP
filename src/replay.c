@@ -397,6 +397,7 @@ void options_process_fixes(SDL_IOStream* rw, rw_process_func_type process_func) 
 	process(fixes_options_replay.fix_feather_fall_affects_guards);
 	process(fixes_options_replay.fix_one_hp_stops_blinking);
 	process(fixes_options_replay.fix_dead_floating_in_air);
+	process(fixes_options_replay.fix_jaffar_meeting_once);
 }
 
 void options_process_custom_general(SDL_IOStream* rw, rw_process_func_type process_func) {
@@ -667,6 +668,7 @@ void apply_replay_options(void) {
 	fixes_options_replay.fix_gate_jump_height = 0;
 	fixes_options_replay.fix_vertical_room_exits = 0;
 	fixes_options_replay.fix_guard_following_kid_down = 0;
+	fixes_options_replay.fix_jaffar_meeting_once = 0;
 	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
 		load_options_from_buffer(replay_options_sections[i].replay_data, replay_options_sections[i].data_size, replay_options_sections[i].section_func);
 	}

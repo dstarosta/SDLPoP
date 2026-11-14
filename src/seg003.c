@@ -92,6 +92,9 @@ void play_level(int level_number) {
 #ifdef USE_FALLING_TILES_KILL_GUARDS
 		guard_crushed = 0;
 #endif
+#ifdef FIX_JAFFAR_MEETING_ONCE
+		jaffar_meeting_played = 0;
+#endif
 		holding_sword = 0;
 		grab_timer = 0;
 		can_guard_see_kid = 0;
