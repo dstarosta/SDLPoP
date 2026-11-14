@@ -962,9 +962,6 @@ void redraw_needed(short tilepos) {
 					                          (draw_xh + pc->fore_x) * 8, anchor_y,
 					                          blitters_10h_transp, boundary, -1, 0);
 			}
-			if (drawn_row > 0 && tile_left == tiles_20_wall && curr_tile != tiles_20_wall) {
-				set_redraw_full(get_tilepos(drawn_col, drawn_row - 1), 1);
-			}
 		}
 		if (redraw_mac_other_overlay) mac_draw_other_overlay_exact();
 		if (redraw_mac_floor_overlay) mac_draw_floor_overlay_exact();
@@ -1654,7 +1651,6 @@ int add_backtable(short chtab_id, int id, sbyte xh, sbyte xl, int ybottom, int b
 	return 1;
 }
 
-// seg008:1017
 int add_backtable_physical(short chtab_id, int id, int physical_x, int physical_y, int blit) {
 	if (id == 0) return 0;
 	word index = backtable_count;
@@ -1681,6 +1677,7 @@ int add_backtable_physical(short chtab_id, int id, int physical_x, int physical_
 	return 1;
 }
 
+// seg008:1017
 int add_foretable(short chtab_id, int id, sbyte xh, sbyte xl, int ybottom, int blit, byte peel) {
 	if (id == 0) return 0;
 	word index = foretable_count;
@@ -2324,20 +2321,35 @@ void draw_moving() {
 	redraw_needed_tiles();
 }
 
-// seg008:1B06
+// The Mac palace wall's lit face, drawn by the tile right of the wall, reaches a pixel into the tile above (in row 0:
+// the strip of the room above), and the wall's stripe reaches into the tile on the right. A wipe of such a neighbour
+// clears those pixels, so the face's tile is drawn again; drawing that tile paints over the neighbour, so it is too.
+static void mac_redraw_wall_face_neighbours(void) {
+	if (!mac_is_palace()) return;
+	for (int col = 0; col < 10; ++col) {
+		byte left, left_modifier, tile, unused;
+		get_tile_to_draw(drawn_room, col - 1, drawn_row, &left, &left_modifier, tiles_20_wall);
+		get_tile_to_draw(drawn_room, col, drawn_row, &tile, &unused, tiles_20_wall);
+		if (left != tiles_20_wall || tile == tiles_20_wall) continue;
+		int pos = tbl_line[drawn_row] + col;
+		int up = pos - 10;
+		int right = !(left_modifier & 0x80) && col < 9 ? pos + 1 : -1;
+		if ((drawn_row > 0 ? wipe_frames[up] : redraw_frames_above[col]) || (right >= 0 && wipe_frames[right])) {
+			redraw_frames_full[pos] = MAX(redraw_frames_full[pos], 1);
+		}
+		if (wipe_frames[pos] || redraw_frames_full[pos] || redraw_frames_anim[pos]) {
+			if (drawn_row > 0) redraw_frames_full[up] = MAX(redraw_frames_full[up], 1);
+			if (right >= 0) redraw_frames_full[right] = MAX(redraw_frames_full[right], 1);
+		}
+	}
+}
+
 static void mac_expand_background_redraws(void) {
 	if (!uses_mac_graphics()) return;
 	for (int col = 0; col < 9; ++col) {
-		byte left, modifier, tile, unused;
-		get_tile_to_draw(drawn_room, col - 1, drawn_row, &left, &modifier, tiles_20_wall);
+		byte tile, unused;
 		get_tile_to_draw(drawn_room, col, drawn_row, &tile, &unused, tiles_20_wall);
 		int pos = tbl_line[drawn_row] + col;
-		if (mac_is_palace() && left == tiles_20_wall && !(modifier & 0x80) && tile != tiles_20_wall &&
-		    (wipe_frames[pos] || redraw_frames_full[pos] || redraw_frames_anim[pos] ||
-		     wipe_frames[pos + 1] || redraw_frames_full[pos + 1] || redraw_frames_anim[pos + 1])) {
-			redraw_frames_full[pos] = MAX(redraw_frames_full[pos], 1);
-			redraw_frames_full[pos + 1] = MAX(redraw_frames_full[pos + 1], 1);
-		}
 		if ((tile == tiles_22_sword || tile == tiles_21_skeleton) &&
 		    (wipe_frames[pos] || redraw_frames_full[pos] || redraw_frames_anim[pos]))
 			redraw_frames_full[pos + 1] = MAX(redraw_frames_full[pos + 1], 1);
@@ -2349,8 +2361,10 @@ static void mac_expand_background_redraws(void) {
 				redraw_frames_full[pos + 1] = MAX(redraw_frames_full[pos + 1], 1);
 		}
 	}
+	mac_redraw_wall_face_neighbours();
 }
 
+// seg008:1B06
 void redraw_needed_tiles() {
 	load_leftroom();
 	draw_objtable_items_at_tile(30);

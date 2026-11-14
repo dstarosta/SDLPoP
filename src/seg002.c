@@ -307,36 +307,29 @@ void follow_guard() {
 	saveshad();
 }
 
-// seg002:03C7
-void exit_room() {
+// One room change of the kid, with the guard staying or following. Returns the direction left, or a negative value.
+static short exit_room_once() {
 	short leave = 0;
-	if (exit_room_timer != 0) {
-		--exit_room_timer;
-#ifdef FIX_HANG_ON_TELEPORT
-		if (!(fixes->fix_hang_on_teleport && Char.y >= 211 && Char.curr_row >= 2))
-#endif
-		return;
-	}
 	loadkid();
 	load_frame_to_obj();
 	set_char_collision();
 	roomleave_result = leave_room();
 	if (roomleave_result < 0) {
-		return;
+		return roomleave_result;
 	}
 	savekid();
 	next_room = Char.room;
 #ifdef FIX_DISAPPEARING_GUARD_B
-	if (next_room == drawn_room) return;
+	if (next_room == drawn_room) return roomleave_result;
 #endif
 #ifdef USE_SUPER_HIGH_JUMP
 	// Do not change the room during super high jumps from row 1.
 	// Kid's "y" coordinate keeps him in the room below (in timers()).
 	if (fixes->enable_super_high_jump && super_jump_fall && next_room == drawn_room) {
-		return;
+		return roomleave_result;
 	}
 #endif
-	if (Guard.direction == dir_56_none) return;
+	if (Guard.direction == dir_56_none) return roomleave_result;
 	if (Guard.alive < 0 && Guard.sword == sword_2_drawn) {
 		short kid_room_m1 = Kid.room - 1;
 		// kid_room_m1 might be 65535 (-1) when the prince fell out of the level (to room 0) while a guard was active.
@@ -384,6 +377,29 @@ void exit_room() {
 #ifdef FIX_DISAPPEARING_GUARD_A
 	if (next_room == drawn_room) drawn_room = 0;
 #endif
+	return roomleave_result;
+}
+
+// seg002:03C7
+void exit_room() {
+	if (exit_room_timer != 0) {
+		--exit_room_timer;
+#ifdef FIX_VERTICAL_ROOM_EXITS
+		// The timer must not hold back a fall out of the bottom: falling on, his y byte would wrap past 255 to the top.
+		if (!(fixes->fix_vertical_room_exits && Kid.y >= 211 && Kid.curr_row >= 2))
+#endif
+		return;
+	}
+	short direction = exit_room_once();
+#ifdef FIX_VERTICAL_ROOM_EXITS
+	// Leaving up or down past a side edge (a corner) goes on sideways in the same frame,
+	// instead of showing the room above or below for the frames of exit_room_timer.
+	if (fixes->fix_vertical_room_exits && (direction == 2 || direction == 3)) {
+		exit_room_once();
+	}
+#else
+	(void) direction;
+#endif
 }
 
 // seg002:0486
@@ -425,13 +441,35 @@ short leave_room() {
 	short chary = Char.y;
 	word action = Char.action;
 	short frame = Char.frame;
-	if (action != actions_5_bumped &&
+	bool vertical_rules = false;
+	bool vertical_exit = false;
+#ifdef FIX_VERTICAL_ROOM_EXITS
+	if (fixes->fix_vertical_room_exits) {
+		// y 240..255 is both just above the top (-16..-1) and below the bottom (>= 211): the row says which.
+		// The action never changes the direction. As in the original it only holds back an exit up;
+		// a kid below the room always leaves down, or falling on, his y would wrap past 255 to the top.
+		vertical_rules = true;
+		bool up = (sbyte)chary < 10 && (sbyte)chary > -16 && Char.curr_row <= 0;
+		bool down = chary >= 211 && Char.curr_row >= 2;
+		if (up || down) {
+			if (up && (action == actions_5_bumped || action == actions_4_in_freefall || action == actions_3_in_midair)) {
+				return -1;
+			}
+			leave_dir = up ? 2 : 3;
+			vertical_exit = true;
+		}
+	}
+#endif
+	if (vertical_exit) {
+		// leave_dir is set
+	} else if (!vertical_rules &&
+		action != actions_5_bumped &&
 		action != actions_4_in_freefall &&
 		action != actions_3_in_midair &&
 		(sbyte)chary < 10 && (sbyte)chary > -16
 	) {
 		leave_dir = 2; // up
-	} else if (chary >= 211) {
+	} else if (!vertical_rules && chary >= 211) {
 		leave_dir = 3; // down
 	} else if (
 		// frames 135..149: climb up
@@ -801,6 +839,14 @@ void autocontrol_guard_kid_far() {
 	}
 }
 
+#ifdef FIX_GUARD_FOLLOWING_KID_DOWN
+// Kid (Opp) is on the row below the guard (Char): in the guard's room, or in the room below when the guard is on its bottom row.
+static bool kid_is_below_guard(void) {
+	if (Opp.room == Char.room) return Opp.curr_row == Char.curr_row + 1;
+	return Char.room != 0 && Char.curr_row == 2 && Opp.curr_row == 0 && Opp.room == level.roomlinks[Char.room - 1].down;
+}
+#endif
+
 // seg002:09F8
 void guard_follows_kid_down() {
 	// This is called from autocontrol_guard_active, so char=Guard, Opp=Kid
@@ -808,8 +854,19 @@ void guard_follows_kid_down() {
 	if (opp_action == actions_2_hang_climb || opp_action == actions_6_hang_straight) {
 		return;
 	}
+	bool kid_not_below = Char.curr_row + 1 != Opp.curr_row;
+	bool check_kid_first = false;
+#ifdef FIX_GUARD_FOLLOWING_KID_DOWN
+	// The test above compares rows of different rooms, and the original checks it only when there is no floor in front:
+	// with floor in front the guard kept walking forward after Kid climbed back up, and droppedout was never cleared.
+	if (fixes->fix_guard_following_kid_down) {
+		kid_not_below = !kid_is_below_guard();
+		check_kid_first = true;
+	}
+#endif
 	if (// there is wall in front of Guard
 		wall_type(get_tile_infrontof_char()) != 0 ||
+		(check_kid_first && kid_not_below) ||
 		(! tile_is_floor(curr_tile2) && (
 			(get_tile(curr_room, tile_col, ++tile_row) == tiles_2_spike ||
 			// Guard would fall on loose floor
@@ -819,7 +876,7 @@ void guard_follows_kid_down() {
 			// ... or into a chasm
 			! tile_is_floor(curr_tile2)) ||
 			// ... or Kid is not below
-			Char.curr_row + 1 != Opp.curr_row
+			(!check_kid_first && kid_not_below)
 		))
 	) {
 		// don't follow

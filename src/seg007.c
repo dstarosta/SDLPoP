@@ -1052,7 +1052,7 @@ void do_mobs() {
 
 // seg007:110F
 void move_mob() {
-	if (curmob.type == 0) {
+	if ((curmob.type & ~MOB_HIT_KID) == 0) {
 		move_loose();
 	}
 	if (curmob.speed <= 0) {
@@ -1260,11 +1260,29 @@ void check_loose_fall_on_kid() {
 void fell_on_your_head() {
 	short frame = Char.frame;
 	short action = Char.action;
+	bool bumped_hit = false;
+	bool long_fall = false;
+#ifdef FIX_LOOSE_FLOOR_HITTING_KID
+	// Bumping into a wall and standing up from a crouch are "bumped" actions, which the floor never hurt.
+	bumped_hit = fixes->fix_loose_floor_hitting_kid && action == actions_5_bumped &&
+	             ((frame >= frame_45_turn && frame <= frame_65_runturn) ||
+	              (frame >= frame_110_stand_up_from_crouch_1 && frame <= frame_119_stand_up_from_crouch_10));
+	// A floor that has fallen 2 or more stories hurts even a running or crouching prince.
+	long_fall = fixes->fix_loose_floor_hitting_kid && curmob.speed >= 22;
+#endif
 	// loose floors hurt you in frames 5..14 (running) only on level 13
 	if (
-		(current_level == /*13*/ custom->loose_tiles_level || (frame < frame_5_start_run || frame >= 15)) &&
-		(action < actions_2_hang_climb || action == actions_7_turn)
+		(current_level == /*13*/ custom->loose_tiles_level || (frame < frame_5_start_run || frame >= 15) || long_fall) &&
+		(action < actions_2_hang_climb || action == actions_7_turn || bumped_hit)
 	) {
+#ifdef FIX_LOOSE_FLOOR_HITTING_KID
+		if (fixes->fix_loose_floor_hitting_kid) {
+			if (curmob.type & MOB_HIT_KID) return; // a falling floor hurts once
+			// Crouching, he is under it (as in PoP 2); standing up while it is still falling on him hurts.
+			if (frame == frame_109_crouch && !long_fall) return;
+			curmob.type |= MOB_HIT_KID;
+		}
+#endif
 		Char.y = y_land[Char.curr_row + 1];
 		if (take_hp(1)) {
 			seqtbl_offset_char(seq_22_crushed); // dead (because of loose floor)

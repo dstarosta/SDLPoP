@@ -534,6 +534,7 @@ Uint32 temp_shift_release_callback(void* param, SDL_TimerID id, Uint32 interval)
 }
 
 void redefine_keys();
+extern const word seqtbl_offsets[]; // seqtbl.c
 
 // seg000:04CD
 int process_key() {
@@ -614,6 +615,13 @@ int process_key() {
             is_show_time = 1;
             break;
         case SDL_SCANCODE_A | WITH_CTRL: // Ctrl+A
+#ifdef FIX_RESTART_IN_EXIT_DOOR
+            // The whole climb, including the unseen frames after it until the level ends; Vstand follows climbstairs in seqtbl.
+            if (fixes->fix_restart_in_exit_door && Kid.curr_seq >= seqtbl_offsets[seq_70_go_up_on_level_door] &&
+                    Kid.curr_seq < seqtbl_offsets[seq_95_Jaffar_stand_PV1]) {
+                break;
+            }
+#endif
             if (current_level != 15) {
                 stop_sounds();
                 is_restart_level = 1;
@@ -1401,7 +1409,6 @@ void read_joyst_control() {
 
 }
 
-// seg000:10EA
 // The Mac flasks are 8 logical pixels wide, so they are spaced wider and sit 2 pixels higher.
 static short hp_step(void) {
     return uses_mac_graphics() ? 8 : 7;
@@ -1411,6 +1418,7 @@ static short hp_ypos(void) {
     return uses_mac_graphics() ? 192 : 194;
 }
 
+// seg000:10EA
 void draw_kid_hp(short curr_hp, short max_hp) {
     for (short drawn_hp_index = curr_hp; drawn_hp_index < max_hp; ++drawn_hp_index) {
         // empty HP
@@ -2156,7 +2164,6 @@ static bool draw_full_image_mac(enum full_image_id id, image_type* image, int xp
     return false;
 }
 
-// seg000:1C3A
 static void draw_full_image_pixels(enum full_image_id id) {
     image_type* decoded_image;
     image_type* mask = NULL;
@@ -2193,6 +2200,7 @@ static void draw_full_image_pixels(enum full_image_id id) {
     }
 }
 
+// seg000:1C3A
 // All but the palace picture and the story frame are pictures of text, which the smooth filter leaves alone.
 void draw_full_image(enum full_image_id id) {
     begin_text_draw(NULL);

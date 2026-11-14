@@ -26,6 +26,11 @@ extern const word seqtbl_offsets[];
 // seg005:000A
 void seqtbl_offset_char(short seq_index) {
 	Char.curr_seq = seqtbl_offsets[seq_index];
+#ifdef FIX_BUMP_FALL_LANDING
+	if (Char.charid == charid_0_kid) {
+		kid_bump_fall = (seq_index == seq_45_bumpfall);
+	}
+#endif
 }
 
 // seg005:001D
@@ -118,6 +123,12 @@ void land() {
 	#ifdef USE_SUPER_HIGH_JUMP
 	if (fixes->enable_super_high_jump) {
 		super_jump_fall = 0;
+	}
+	#endif
+
+	#ifdef FIX_BUMP_FALL_LANDING
+	if (fixes->fix_bump_fall_landing && Char.charid == charid_0_kid && kid_bump_fall && Char.fall_y < 25) {
+		Char.fall_y = 21; // a wall bump one row down lands at 21 or 24 by the jump's height: soft
 	}
 	#endif
 
@@ -738,13 +749,6 @@ void jump_up() {
 	if (distance < 4 && edge_type == EDGE_TYPE_WALL) {
 		Char.x = char_dx_forward(distance - 3);
 	}
-	#ifdef FIX_JUMP_DISTANCE_AT_EDGE
-	// When climbing up two floors, turning around and jumping upward, the kid falls down.
-	// This fix makes the workaround of Trick 25 unnecessary.
-	if (fixes->fix_jump_distance_at_edge && distance == 3 && edge_type == EDGE_TYPE_CLOSER) {
-		Char.x = char_dx_forward(-1);
-	}
-	#endif
 	#ifdef USE_SUPER_HIGH_JUMP
 	// kid should be able to grab 2 tiles above from an edge of a floor tile
 	if (is_feather_fall && !tile_is_floor(get_tile_above_char()) && curr_tile2 != tiles_20_wall) {
@@ -791,6 +795,13 @@ void jump_up() {
 void control_hanging() {
 	if (Char.alive < 0) {
 		if (grab_timer == 0 && control_y == CONTROL_HELD) {
+#ifdef FIX_VERTICAL_ROOM_EXITS
+			// The ledge is gone (a loose floor fell): he drops, as he does with Shift, instead of climbing onto nothing.
+			if (fixes->fix_vertical_room_exits && !tile_is_floor(get_tile_above_char())) {
+				hang_fall();
+				return;
+			}
+#endif
 			can_climb_up();
 #ifdef USE_SUPER_HIGH_JUMP
 		} else if (control_shift == CONTROL_HELD || (fixes->enable_super_high_jump && super_jump_fall && control_y == CONTROL_HELD)) {
@@ -826,6 +837,13 @@ void control_hanging() {
 void can_climb_up() {
 	short seq_id = seq_10_climb_up; // climb up
 	control_up = control_shift2 = release_arrows();
+#ifdef FIX_JUMP_DISTANCE_AT_EDGE
+	// He can hang 11 or 12 pixels from the edge: climb from 11, so the climb frames line up (a wider sprite shows the
+	// difference) and he ends up at the same distance as always.
+	if (fixes->fix_jump_distance_at_edge && distance_to_edge(Char.x) == 12) {
+		Char.x = char_dx_forward(1);
+	}
+#endif
 #ifdef USE_SUPER_HIGH_JUMP
 	if (fixes->enable_super_high_jump) {
 		super_jump_fall = 0;

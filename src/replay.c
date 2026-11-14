@@ -303,7 +303,7 @@ void start_with_replay_file(const char *filename) {
 			replay_file_open = 0;
 
 			if (is_validate_mode) // Validating replays is cmd-line only, so, no sense continuing from here.
-				exit(0);
+				exit(1);
 
 			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SDLPoP", error_message, NULL);
 			return;
@@ -313,6 +313,9 @@ void start_with_replay_file(const char *filename) {
 		}
 		rewind(replay_fp); // replay file is still open and will be read in load_replay() later
 		need_start_replay = 1; // will later call start_replay(), from init_record_replay()
+	} else if (is_validate_mode) {
+		fprintf(stderr, "Error opening replay file: %s cannot be opened!\n", filename);
+		exit(1);
 	}
 }
 
@@ -382,6 +385,18 @@ void options_process_fixes(SDL_IOStream* rw, rw_process_func_type process_func) 
 	process(fixes_options_replay.fix_jumping_over_guard);
 	process(fixes_options_replay.fix_drop_2_rooms_climbing_loose_tile);
 	process(fixes_options_replay.fix_falling_through_floor_during_sword_strike);
+	process(fixes_options_replay.fix_restart_in_exit_door);
+	process(fixes_options_replay.fix_loose_floor_hitting_kid);
+	process(fixes_options_replay.fix_bump_fall_landing);
+	process(fixes_options_replay.fix_gate_jump_height);
+	process(fixes_options_replay.fix_vertical_room_exits);
+	process(fixes_options_replay.fix_guard_following_kid_down);
+	// These were not stored before: older replays keep the viewer's settings for them, as they always did.
+	process(fixes_options_replay.fix_register_quick_input);
+	process(fixes_options_replay.fix_turn_running_near_wall);
+	process(fixes_options_replay.fix_feather_fall_affects_guards);
+	process(fixes_options_replay.fix_one_hp_stops_blinking);
+	process(fixes_options_replay.fix_dead_floating_in_air);
 }
 
 void options_process_custom_general(SDL_IOStream* rw, rw_process_func_type process_func) {
@@ -636,6 +651,8 @@ void stop_recording() {
 
 void apply_replay_options(void) {
 	// store the current options, so they can be restored later
+	// (the sections read fixes_options_replay, which still holds the last replay's fixes)
+	fixes_options_replay = fixes_saved;
 	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
 		save_options_to_buffer(replay_options_sections[i].stored_data, POP_MAX_OPTIONS_SIZE, replay_options_sections[i].section_func);
 	}
@@ -644,6 +661,12 @@ void apply_replay_options(void) {
 	// (replays from before these options: their sections end before them)
 	fixes_options_replay.enable_all_gate_sounds = 0;
 	fixes_options_replay.enable_falling_tiles_kill_guards = 0;
+	fixes_options_replay.fix_restart_in_exit_door = 0;
+	fixes_options_replay.fix_loose_floor_hitting_kid = 0;
+	fixes_options_replay.fix_bump_fall_landing = 0;
+	fixes_options_replay.fix_gate_jump_height = 0;
+	fixes_options_replay.fix_vertical_room_exits = 0;
+	fixes_options_replay.fix_guard_following_kid_down = 0;
 	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
 		load_options_from_buffer(replay_options_sections[i].replay_data, replay_options_sections[i].data_size, replay_options_sections[i].section_func);
 	}
@@ -665,6 +688,9 @@ void restore_normal_options(void) {
 	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
 		load_options_from_buffer(replay_options_sections[i].stored_data, POP_MAX_OPTIONS_SIZE, replay_options_sections[i].section_func);
 	}
+	// The sections restore into fixes_options_replay: without this the game kept playing with the replay's fixes.
+	fixes_saved = fixes_options_replay;
+	turn_fixes_and_enhancements_on_off(use_fixes_and_enhancements);
 
 	start_level = -1; // may have been set to a different value by the replay
 
@@ -692,7 +718,11 @@ void start_replay() {
 		// If the replay was started from a file given in the command line, we don't care if there are no replay files in the replay folder.
 		//if (num_replay_files == 0) return;
 	}
-	if (!load_replay()) return;
+	if (!load_replay()) {
+		// Validating is command-line only: carrying on would start the game and wait at the title screen forever.
+		if (is_validate_mode) exit(1);
+		return;
+	}
 	// Set replaying before applying options, so the latter can display an appropriate error message if the referenced mod is missing.
 	replaying = 1;
 	apply_replay_options();
@@ -750,6 +780,14 @@ static void dump_validate_frame(void) {
 	save_smoothed_screen(path);
 }
 
+// Test aid: "validate <replay> trace" prints the kid's state at the start of every tick (tests/vertical_exits.py reads it).
+static void trace_validate_tick(void) {
+	if (!is_validate_mode || !check_param("trace")) return;
+	printf("T %d room=%d x=%d y=%d row=%d col=%d action=%d frame=%d fall_y=%d hp=%d alive=%d\n",
+	       curr_tick, Kid.room, Kid.x, Kid.y, Kid.curr_row, Kid.curr_col, Kid.action, Kid.frame, Kid.fall_y, hitp_curr, Kid.alive);
+	fflush(stdout); // so a run that hangs still shows how far it got
+}
+
 void do_replay_move() {
 	if (curr_tick == 0) {
 		random_seed = saved_random_seed;
@@ -764,6 +802,7 @@ void do_replay_move() {
 		}
 	}
 	dump_validate_frame();
+	trace_validate_tick();
 	if (curr_tick == num_replay_ticks) { // replay is finished
 		end_replay();
 		return;
@@ -926,6 +965,40 @@ void replay_cycle() {
 	show_level();
 }
 
+// Reads what follows the replay header. Every size comes from the file, so each is checked against its buffer.
+static int load_replay_body(char* error_message) {
+	// load the savestate
+	fread_check(&savestate_size, sizeof(savestate_size), 1, replay_fp);
+	if (savestate_size > MAX_SAVESTATE_SIZE) {
+		snprintf_check(error_message, REPLAY_HEADER_ERROR_MESSAGE_MAX, "the savestate is too large (%u bytes)!", savestate_size);
+		return 0;
+	}
+	fread_check(savestate_buffer, savestate_size, 1, replay_fp);
+
+	// load the replay options, organized per section
+	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
+		dword section_size = 0;
+		fread_check(&section_size, sizeof(section_size), 1, replay_fp);
+		if (section_size > POP_MAX_OPTIONS_SIZE) {
+			snprintf_check(error_message, REPLAY_HEADER_ERROR_MESSAGE_MAX, "options section %d is too large (%u bytes)!", i, section_size);
+			return 0;
+		}
+		fread_check(replay_options_sections[i].replay_data, section_size, 1, replay_fp);
+		replay_options_sections[i].data_size = section_size;
+	}
+
+	// load the rest of the replay data
+	fread_check(&start_level, sizeof(start_level), 1, replay_fp);
+	fread_check(&saved_random_seed, sizeof(saved_random_seed), 1, replay_fp);
+	fread_check(&num_replay_ticks, sizeof(num_replay_ticks), 1, replay_fp);
+	if (num_replay_ticks > MAX_REPLAY_DURATION) {
+		snprintf_check(error_message, REPLAY_HEADER_ERROR_MESSAGE_MAX, "the replay is too long (%u ticks)!", num_replay_ticks);
+		return 0;
+	}
+	fread_check(moves, num_replay_ticks, 1, replay_fp);
+	return 1;
+}
+
 int load_replay() {
 	if (!replay_file_open) {
 		next_replay_number = 0;
@@ -940,7 +1013,7 @@ int load_replay() {
 		char error_message[REPLAY_HEADER_ERROR_MESSAGE_MAX];
 		int ok = read_replay_header(&header, replay_fp, error_message);
 		if (!ok) {
-			printf("Error loading replay: %s!\n", error_message);
+			printf("Error loading replay: %s\n", error_message);
 			fclose(replay_fp);
 			replay_fp = NULL;
 			replay_file_open = 0;
@@ -949,27 +1022,14 @@ int load_replay() {
 
 		memcpy(replay_levelset_name, header.levelset_name, sizeof(header.levelset_name));
 
-		// load the savestate
-		fread_check(&savestate_size, sizeof(savestate_size), 1, replay_fp);
-		fread_check(savestate_buffer, savestate_size, 1, replay_fp);
-
-		// load the replay options, organized per section
-		for (int i = 0; i < COUNT(replay_options_sections); ++i) {
-			dword section_size = 0;
-			fread_check(&section_size, sizeof(section_size), 1, replay_fp);
-			fread_check(replay_options_sections[i].replay_data, section_size, 1, replay_fp);
-			replay_options_sections[i].data_size = section_size;
+		ok = load_replay_body(error_message);
+		if (!ok) {
+			printf("Error loading replay: %s\n", error_message);
 		}
-
-		// load the rest of the replay data
-		fread_check(&start_level, sizeof(start_level), 1, replay_fp);
-		fread_check(&saved_random_seed, sizeof(saved_random_seed), 1, replay_fp);
-		fread_check(&num_replay_ticks, sizeof(num_replay_ticks), 1, replay_fp);
-		fread_check(moves, num_replay_ticks, 1, replay_fp);
 		fclose(replay_fp);
 		replay_fp = NULL;
 		replay_file_open = 0;
-		return 1; // success
+		return ok;
 	}
 	return 0;
 }
