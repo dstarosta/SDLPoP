@@ -317,7 +317,7 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_boolean("fix_offscreen_guards_disappearing", &fixes_saved.fix_offscreen_guards_disappearing);
 		process_boolean("fix_move_after_sheathe", &fixes_saved.fix_move_after_sheathe);
 		process_boolean("fix_hidden_floors_during_flashing", &fixes_saved.fix_hidden_floors_during_flashing);
-		process_boolean("fix_hang_on_teleport", &fixes_saved.fix_hang_on_teleport);
+		process_boolean("fix_vertical_room_exits", &fixes_saved.fix_vertical_room_exits);
 		process_boolean("fix_exit_door", &fixes_saved.fix_exit_door);
 		process_boolean("fix_quicksave_during_feather", &fixes_saved.fix_quicksave_during_feather);
 		process_boolean("fix_caped_prince_sliding_through_gate", &fixes_saved.fix_caped_prince_sliding_through_gate);
@@ -334,6 +334,10 @@ static int global_ini_callback(const char *section, const char *name, const char
 		process_boolean("fix_feather_fall_affects_guards", &fixes_saved.fix_feather_fall_affects_guards);
 		process_boolean("fix_one_hp_stops_blinking", &fixes_saved.fix_one_hp_stops_blinking);
 		process_boolean("fix_dead_floating_in_air", &fixes_saved.fix_dead_floating_in_air);
+		process_boolean("fix_restart_in_exit_door", &fixes_saved.fix_restart_in_exit_door);
+		process_boolean("fix_loose_floor_hitting_kid", &fixes_saved.fix_loose_floor_hitting_kid);
+		process_boolean("fix_bump_fall_landing", &fixes_saved.fix_bump_fall_landing);
+		process_boolean("fix_gate_jump_height", &fixes_saved.fix_gate_jump_height);
 	}
 
 	if (check_ini_section("CustomGameplay")) {

@@ -127,6 +127,7 @@ The authors of this program may be contacted at https://forum.princed.org
 
 // When climbing up two floors, turning around and jumping upward, the kid falls down.
 // This fix makes the workaround of Trick 25 unnecessary.
+// He can hang 11 or 12 pixels from the edge; the fix climbs from 11, so the frames of a wider sprite (a caped prince) line up too.
 #define FIX_JUMP_DISTANCE_AT_EDGE
 
 // When climbing to a higher floor, the game unnecessarily checks how far away the edge below is;
@@ -205,8 +206,14 @@ The authors of this program may be contacted at https://forum.princed.org
 // After uniting with the shadow in level 12, the hidden floors will not appear until after the flashing stops.
 #define FIX_HIDDEN_FLOORS_DURING_FLASHING
 
-// By jumping towards one of the bottom corners of the room and grabbing a ledge, you can teleport to the room above.
-#define FIX_HANG_ON_TELEPORT
+// Leaving a room up or down goes wrong in three ways, all fixed by this:
+// * By jumping towards one of the bottom corners of the room and grabbing a ledge, you can teleport to the room above.
+//   (His y byte, 244 below the room, also reads as just above the top; the row now says which.)
+// * Hanging on a loose floor that falls and pressing up climbs onto nothing and drops into the room below your own,
+//   even one that does not exist. He now falls, as he already does with Shift.
+// * Right after a room change, falling out of the bottom could wrap his y past 255 to the top of the room.
+// This replaces the old FIX_HANG_ON_TELEPORT.
+#define FIX_VERTICAL_ROOM_EXITS
 
 // Fix priorities of sword and spike sounds. (As in PoP 1.3.)
 #define FIX_SOUND_PRIORITIES
@@ -322,6 +329,22 @@ The authors of this program may be contacted at https://forum.princed.org
 // If the prince or a guard falls to his death onto a loose floor, the floor drops, but the body stays there in the air.
 // See also: https://github.com/NagyD/SDLPoP/issues/343
 #define FIX_DEAD_FLOATING_IN_AIR
+
+// Ctrl+A restarts the level even while the prince is climbing the stairs into the exit door.
+#define FIX_RESTART_IN_EXIT_DOOR
+
+// A loose floor that falls on the crouching prince hits him twice, taking 2 hit points, but none while he bumps into a wall or stands up.
+// With the fix a falling floor hurts at most once, also while he bumps or stands up, and not at all while he stays crouched (as in Prince of Persia 2).
+// A floor that has fallen 2 or more stories hurts him even while he crouches or runs.
+#define FIX_LOOSE_FLOOR_HITTING_KID
+
+// Jumping into a wall and falling to the floor one row below sometimes costs a hit point, depending on how high the jump was when it hit the wall.
+// With the fix that landing is always soft (as in Prince of Persia 2).
+#define FIX_BUMP_FALL_LANDING
+
+// A gate checks the prince's height as if his feet were on the floor, so in a jump he can pass under a gate low enough to hit his head.
+// With the fix his height off the floor counts too (as in Prince of Persia 2).
+#define FIX_GATE_JUMP_HEIGHT
 
 #endif // ifndef DISABLE_ALL_FIXES
 

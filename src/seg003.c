@@ -665,8 +665,14 @@ void bump_into_opponent() {
 
 			#ifdef FIX_PAINLESS_FALL_ON_GUARD
 			if (fixes->fix_painless_fall_on_guard) {
-				if (Char.fall_y >= 33) return; // don't bump; dead
-				else if (Char.fall_y >= 22) { // medium land
+				short fall_y = Char.fall_y;
+				#ifdef FIX_BUMP_FALL_LANDING
+				if (fixes->fix_bump_fall_landing && Char.charid == charid_0_kid && kid_bump_fall && fall_y < 25) {
+					fall_y = 21; // as in land()
+				}
+				#endif
+				if (fall_y >= 33) return; // don't bump; dead
+				else if (fall_y >= 22) { // medium land
 					take_hp(1);
 					play_sound(sound_16_medium_land);
 				}

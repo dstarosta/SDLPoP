@@ -2352,6 +2352,12 @@ static void mac_expand_background_redraws(void) {
 }
 
 void redraw_needed_tiles() {
+	if (uses_mac_graphics()) {
+		// The room-above strip's wipe (3 rows) also clears the top of the Mac tile below it: redraw that tile too.
+		for (int col = 0; col < 10; ++col) {
+			if (redraw_frames_above[col]) redraw_frames_full[col] = MAX(redraw_frames_full[col], 1);
+		}
+	}
 	load_leftroom();
 	draw_objtable_items_at_tile(30);
 	for (drawn_row = 3; drawn_row--; ) {

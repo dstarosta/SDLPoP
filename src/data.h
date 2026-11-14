@@ -997,6 +997,11 @@ extern int key_esc        INIT(= SDL_SCANCODE_ESCAPE);
 extern bool global_blink_state INIT(= false);
 #endif
 
+#ifdef FIX_BUMP_FALL_LANDING
+// The kid's current fall began with a wall bump (seq_45_bumpfall goes on in the shared freefall loop).
+extern bool kid_bump_fall INIT(= false);
+#endif
+
 #undef INIT
 #undef extern
 

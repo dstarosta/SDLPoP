@@ -308,35 +308,29 @@ void follow_guard() {
 }
 
 // seg002:03C7
-void exit_room() {
+// One room change of the kid, with the guard staying or following. Returns the direction left, or a negative value.
+static short exit_room_once() {
 	short leave = 0;
-	if (exit_room_timer != 0) {
-		--exit_room_timer;
-#ifdef FIX_HANG_ON_TELEPORT
-		if (!(fixes->fix_hang_on_teleport && Char.y >= 211 && Char.curr_row >= 2))
-#endif
-		return;
-	}
 	loadkid();
 	load_frame_to_obj();
 	set_char_collision();
 	roomleave_result = leave_room();
 	if (roomleave_result < 0) {
-		return;
+		return roomleave_result;
 	}
 	savekid();
 	next_room = Char.room;
 #ifdef FIX_DISAPPEARING_GUARD_B
-	if (next_room == drawn_room) return;
+	if (next_room == drawn_room) return roomleave_result;
 #endif
 #ifdef USE_SUPER_HIGH_JUMP
 	// Do not change the room during super high jumps from row 1.
 	// Kid's "y" coordinate keeps him in the room below (in timers()).
 	if (fixes->enable_super_high_jump && super_jump_fall && next_room == drawn_room) {
-		return;
+		return roomleave_result;
 	}
 #endif
-	if (Guard.direction == dir_56_none) return;
+	if (Guard.direction == dir_56_none) return roomleave_result;
 	if (Guard.alive < 0 && Guard.sword == sword_2_drawn) {
 		short kid_room_m1 = Kid.room - 1;
 		// kid_room_m1 might be 65535 (-1) when the prince fell out of the level (to room 0) while a guard was active.
@@ -384,6 +378,28 @@ void exit_room() {
 #ifdef FIX_DISAPPEARING_GUARD_A
 	if (next_room == drawn_room) drawn_room = 0;
 #endif
+	return roomleave_result;
+}
+
+void exit_room() {
+	if (exit_room_timer != 0) {
+		--exit_room_timer;
+#ifdef FIX_VERTICAL_ROOM_EXITS
+		// The timer must not hold back a fall out of the bottom: falling on, his y byte would wrap past 255 to the top.
+		if (!(fixes->fix_vertical_room_exits && Kid.y >= 211 && Kid.curr_row >= 2 && Kid.action != actions_3_in_midair))
+#endif
+		return;
+	}
+	short direction = exit_room_once();
+#ifdef FIX_VERTICAL_ROOM_EXITS
+	// Leaving up or down past a side edge (a corner) goes on sideways in the same frame,
+	// instead of showing the room above or below for the frames of exit_room_timer.
+	if (fixes->fix_vertical_room_exits && (direction == 2 || direction == 3)) {
+		exit_room_once();
+	}
+#else
+	(void) direction;
+#endif
 }
 
 // seg002:0486
@@ -425,13 +441,33 @@ short leave_room() {
 	short chary = Char.y;
 	word action = Char.action;
 	short frame = Char.frame;
-	if (action != actions_5_bumped &&
+	bool vertical_rules = false;
+	bool vertical_exit = false;
+#ifdef FIX_VERTICAL_ROOM_EXITS
+	if (fixes->fix_vertical_room_exits) {
+		// y 240..255 is both just above the top (-16..-1) and below the bottom (>= 211): the row says which.
+		// The action never changes the direction; it only makes him wait.
+		vertical_rules = true;
+		bool up = (sbyte)chary < 10 && (sbyte)chary > -16 && Char.curr_row <= 0;
+		bool down = chary >= 211 && Char.curr_row >= 2;
+		if (up || down) {
+			if (action == actions_3_in_midair) return -1; // only for a frame
+			if (up && (action == actions_5_bumped || action == actions_4_in_freefall)) return -1;
+			leave_dir = up ? 2 : 3;
+			vertical_exit = true;
+		}
+	}
+#endif
+	if (vertical_exit) {
+		// leave_dir is set
+	} else if (!vertical_rules &&
+		action != actions_5_bumped &&
 		action != actions_4_in_freefall &&
 		action != actions_3_in_midair &&
 		(sbyte)chary < 10 && (sbyte)chary > -16
 	) {
 		leave_dir = 2; // up
-	} else if (chary >= 211) {
+	} else if (!vertical_rules && chary >= 211) {
 		leave_dir = 3; // down
 	} else if (
 		// frames 135..149: climb up

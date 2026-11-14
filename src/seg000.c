@@ -534,6 +534,7 @@ Uint32 temp_shift_release_callback(void* param, SDL_TimerID id, Uint32 interval)
 }
 
 void redefine_keys();
+extern const word seqtbl_offsets[]; // seqtbl.c
 
 // seg000:04CD
 int process_key() {
@@ -614,6 +615,13 @@ int process_key() {
             is_show_time = 1;
             break;
         case SDL_SCANCODE_A | WITH_CTRL: // Ctrl+A
+#ifdef FIX_RESTART_IN_EXIT_DOOR
+            // The whole climb, including the unseen frames after it until the level ends; Vstand follows climbstairs in seqtbl.
+            if (fixes->fix_restart_in_exit_door && Kid.curr_seq >= seqtbl_offsets[seq_70_go_up_on_level_door] &&
+                    Kid.curr_seq < seqtbl_offsets[seq_95_Jaffar_stand_PV1]) {
+                break;
+            }
+#endif
             if (current_level != 15) {
                 stop_sounds();
                 is_restart_level = 1;

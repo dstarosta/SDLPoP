@@ -401,6 +401,9 @@ typedef struct mob_type {
 	byte row;
 } mob_type;
 
+#define MOB_HIT_KID 0x80 // in mob_type.type: this falling floor has already hurt the prince
+
+
 // Positional stereo: where a sound comes from (soundpos.c).
 enum sound_src_kind {
 	src_none = 0, // centred, at full volume
@@ -1270,7 +1273,7 @@ typedef struct fixes_options_type {
 	byte fix_offscreen_guards_disappearing;
 	byte fix_move_after_sheathe;
 	byte fix_hidden_floors_during_flashing;
-	byte fix_hang_on_teleport;
+	byte fix_hang_on_teleport; // no longer used (replaced by fix_vertical_room_exits); kept for the replay format
 	byte fix_exit_door;
 	byte fix_quicksave_during_feather;
 	byte fix_caped_prince_sliding_through_gate;
@@ -1287,6 +1290,11 @@ typedef struct fixes_options_type {
 	byte fix_dead_floating_in_air;
 	byte enable_all_gate_sounds;
 	byte enable_falling_tiles_kill_guards;
+	byte fix_restart_in_exit_door;
+	byte fix_loose_floor_hitting_kid;
+	byte fix_bump_fall_landing;
+	byte fix_gate_jump_height;
+	byte fix_vertical_room_exits;
 } fixes_options_type;
 
 #define NUM_GUARD_SKILLS 12

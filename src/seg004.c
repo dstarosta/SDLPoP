@@ -371,7 +371,15 @@ void clear_coll_rooms() {
 
 // seg004:0657
 int can_bump_into_gate() {
-	return (curr_room_modif[curr_tilepos] >> 2) + 6 < char_height;
+	int height = char_height;
+#ifdef FIX_GATE_JUMP_HEIGHT
+	if (fixes->fix_gate_jump_height) {
+		// In a jump his head is higher by his height off the floor, which the sprite's height leaves out.
+		int air = y_land[Char.curr_row + 1] - Char.y;
+		if (air > 0) height += air;
+	}
+#endif
+	return (curr_room_modif[curr_tilepos] >> 2) + 6 < height;
 }
 
 // seg004:067C

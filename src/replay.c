@@ -382,6 +382,11 @@ void options_process_fixes(SDL_IOStream* rw, rw_process_func_type process_func) 
 	process(fixes_options_replay.fix_jumping_over_guard);
 	process(fixes_options_replay.fix_drop_2_rooms_climbing_loose_tile);
 	process(fixes_options_replay.fix_falling_through_floor_during_sword_strike);
+	process(fixes_options_replay.fix_restart_in_exit_door);
+	process(fixes_options_replay.fix_loose_floor_hitting_kid);
+	process(fixes_options_replay.fix_bump_fall_landing);
+	process(fixes_options_replay.fix_gate_jump_height);
+	process(fixes_options_replay.fix_vertical_room_exits);
 }
 
 void options_process_custom_general(SDL_IOStream* rw, rw_process_func_type process_func) {
@@ -644,6 +649,11 @@ void apply_replay_options(void) {
 	// (replays from before these options: their sections end before them)
 	fixes_options_replay.enable_all_gate_sounds = 0;
 	fixes_options_replay.enable_falling_tiles_kill_guards = 0;
+	fixes_options_replay.fix_restart_in_exit_door = 0;
+	fixes_options_replay.fix_loose_floor_hitting_kid = 0;
+	fixes_options_replay.fix_bump_fall_landing = 0;
+	fixes_options_replay.fix_gate_jump_height = 0;
+	fixes_options_replay.fix_vertical_room_exits = 0;
 	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
 		load_options_from_buffer(replay_options_sections[i].replay_data, replay_options_sections[i].data_size, replay_options_sections[i].section_func);
 	}

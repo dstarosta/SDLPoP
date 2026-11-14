@@ -782,6 +782,29 @@ FIXED: Added a configurable fix for: If the prince has only one hit point when h
 	Details: See FIX_ONE_HP_STOPS_BLINKING in config.h and https://github.com/NagyD/SDLPoP/issues/338
 FIXED: Added a configurable fix for: If the prince or a guard falls to his death onto a loose floor, the floor drops, but the body stays there in the air.
 	Details: See FIX_DEAD_FLOATING_IN_AIR in config.h and https://github.com/NagyD/SDLPoP/issues/343
+FIXED: Added a configurable fix for: Ctrl+A restarts the level while the prince is climbing the stairs into the exit door.
+	Details: See FIX_RESTART_IN_EXIT_DOOR in config.h.
+FIXED: Added a configurable fix for: A loose floor that falls on the crouching prince takes 2 hit points,
+	but none while he bumps into a wall or stands up. It now hurts at most once, also while he bumps or stands up,
+	and not at all while he stays crouched (as in Prince of Persia 2).
+	A floor that has fallen 2 or more stories hurts him even while he crouches or runs.
+	Details: See FIX_LOOSE_FLOOR_HITTING_KID in config.h.
+FIXED: Added a configurable fix for: Jumping into a wall and falling to the floor one row below sometimes costs a hit point,
+	depending on how high the jump was when it hit the wall. That landing is now always soft (as in Prince of Persia 2).
+	Details: See FIX_BUMP_FALL_LANDING in config.h.
+FIXED: Added a configurable fix for: In a jump the prince can pass under a gate low enough to hit his head,
+	because the gate checks his height as if his feet were on the floor. His height off the floor now counts too (as in Prince of Persia 2).
+	Details: See FIX_GATE_JUMP_HEIGHT in config.h.
+FIXED: Added a configurable fix for leaving a room up or down, replacing FIX_HANG_ON_TELEPORT:
+	* Grabbing a ledge at a bottom corner of a room (with Shift) teleported the prince to the room above.
+	  The prince's y below the room also reads as just above its top; the row now decides, and the action can only delay.
+	* Hanging on a loose floor that fell and pressing up climbed onto nothing and dropped him into the room below his own,
+	  even one that does not exist. He now falls, as he already did with Shift.
+	* Falling out of the bottom of a room within two frames of a room change could wrap his y past 255 to the top of the room.
+	Details: See FIX_VERTICAL_ROOM_EXITS in config.h.
+CHANGED: FIX_JUMP_DISTANCE_AT_EDGE now sets the edge distance before the climb up (11 pixels, as he can hang at 11 or 12)
+	instead of moving the prince a pixel when he jumps afterwards, so the climb frames of a wider sprite (a caped prince)
+	line up too.
 DONE: Switched from SDL2 to SDL3.
 DONE: MIDI music can be played in a Roland MT-32 emulator (Munt), the same way as in DOSBox Staging.
 	Details: See README-MT32.md and the MT-32 options in SDLPoP.ini.
