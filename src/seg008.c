@@ -512,7 +512,8 @@ static int mac_leveldoor_geometry(int anchor_x, int anchor_y, byte modifier,
 	opening->top = anchor_y * 2 - oy;
 	opening->right = opening->left + door->w;
 	opening->bottom = opening->top + door->h;
-	*lift = (MIN(modifier, 43) * door->h + 21) / 43;
+	// As in DOS, one logical pixel per step: fully open, the slab's bottom still hides the black top of the doorway.
+	*lift = MIN(modifier, 43) * 2;
 	return 1;
 }
 

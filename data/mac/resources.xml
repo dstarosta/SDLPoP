@@ -136,7 +136,8 @@
   <item value="1122" path="res1122.png" x="0" y="0"/>
  </folder>
  <folder file="guard.dat" path="GUARD">
-  <item value="751" path="res751.png" x="0" y="11"/>
+  <!-- The health flask: the Mac game draws it in the sash's colours (slots 8, 9); here it takes the coat's (5, 6). -->
+  <item value="751" path="res751.png" x="0" y="11" slots="8:5 9:6"/>
   <item value="752" path="res752.png" x="0" y="47"/>
   <item value="753" path="res753.png" x="-10" y="70"/>
   <item value="754" path="res754.png" x="-4" y="72"/>
@@ -169,6 +170,17 @@
   <item value="782" path="res782.png" x="0" y="45"/>
   <item value="783" path="res783.png" x="-1" y="36"/>
   <item value="784" path="res784.png" x="0" y="23"/>
+  <!-- Guard outfits: the Mac game's colour tables (clut 3000-3007), one per guard colour 0-7 of the level data.
+       The images are drawn in the placeholder colours (clut 2000, entries 105-117), which the tables replace. -->
+  <colors value="placeholder" rgb="CA8547 EEB07D 794600 7F7F00 ABCF59 007800 00DC4A 5CFF78 802A7A FF00FF 0051FF 027CF4 05A7E8"/>
+  <colors value="0" rgb="CA8547 EEB07D CF3366 CC6699 FF7FE6 19AB7F 19CA99 19E8CC 979700 E6E600 99389C B368B8 C78CBA"/>
+  <colors value="1" rgb="CA8547 EEB07D 263DAB 4A8FFF E9E9E9 C78CBA FFC2FF FFE6FF 1C23FF 0A99CC B33338 FF6670 FF99A8"/>
+  <colors value="2" rgb="CA8547 EEB07D 66007F 990099 E37FE8 BDA300 CFCF00 E6E600 680282 FF00FF 265E73 42A3AB 8FF0F8"/>
+  <colors value="3" rgb="CA8547 EEB07D 191CB3 3F57E3 B3CCFF B34C66 CC667F FF7FA6 FFBFB0 009199 FF3D35 FF7F7F FFC2B3"/>
+  <colors value="4" rgb="CA8547 EEB07D 003F3F 007FAB 26BFCF CC667F E67F99 FF99BF EBAE7A 009199 FFFF3F FFFF8C FFFFCC"/>
+  <colors value="5" rgb="CA8547 EEB07D 9C0033 CC0066 FF7FE6 005E00 007D19 009933 979700 E6E600 006B68 00A6AB 26BFCF"/>
+  <colors value="6" rgb="CA8547 EEB07D 660066 990099 E87FE6 002B7F 194ACC 007FFF 979700 E6E600 006833 00A633 6DFF55"/>
+  <colors value="7" rgb="CA8547 EEB07D 66007F 990099 E37FE8 C78CBA FFC2FF FFE6FF 680282 FF00FF 265E73 42A3AB 5CBDC5"/>
  </folder>
  <folder file="kid.dat" path="KID">
   <item value="401" path="res401.png" x="-1" y="83"/>

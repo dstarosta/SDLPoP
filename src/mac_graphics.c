@@ -40,13 +40,30 @@ The authors of this program may be contacted at https://forum.princed.org
 typedef struct mac_origin_type {
 	char* path;
 	short x, y;
+	char* slots; // slots="from:to ...": draw a colour slot with another slot's colour, or NULL
 } mac_origin_type;
+
+#define MAC_MAX_COLOR_SLOTS 32
+#define MAC_MAX_COLOR_SETS 16
+#define PROP_MAC_FOLDER "sdlpop.mac.folder"
+#define PROP_MAC_COLOR_SLOTS "sdlpop.mac.color_slots"
+#define PROP_MAC_COLOR_SET "sdlpop.mac.color_set"
+
+// One <colors> of resources.xml.
+typedef struct mac_color_set_type {
+	bool present;
+	int count;
+	SDL_Color colors[MAC_MAX_COLOR_SLOTS];
+} mac_color_set_type;
 
 // The Mac images of one DAT file: index 0 is the game's, index 1 the loaded mod's.
 typedef struct mac_folder_type {
 	char name[16];
 	bool has_mac_set; // listed in resources.xml
 	mac_origin_type origins[2][MAC_MAX_RESOURCE];
+	// The colours drawn in the images, and the sets that can replace them (the Mac guards' outfits).
+	mac_color_set_type placeholder[2];
+	mac_color_set_type color_sets[2][MAC_MAX_COLOR_SETS];
 } mac_folder_type;
 
 extern dat_type* dat_chain_ptr;
@@ -230,9 +247,46 @@ static bool get_xml_attribute(const char* tag, const char* tag_end, const char* 
 	return false;
 }
 
+// The folder of a DAT file: kid.dat -> KID.
+static mac_folder_type* find_mac_folder_of_dat(const char* dat_file) {
+	char folder_name[POP_MAX_PATH];
+	snprintf_check(folder_name, sizeof(folder_name), "%s", dat_file);
+	char* dot = strrchr(folder_name, '.');
+	if (dot != NULL) *dot = '\0';
+	return find_mac_folder(folder_name, true);
+}
+
+// <colors value="placeholder|N" rgb="RRGGBB RRGGBB ..."/>
+static void read_mac_color_set(const char* tag, const char* tag_end, mac_folder_type* folder, int source) {
+	char value[16];
+	char rgb[MAC_MAX_COLOR_SLOTS * 7 + 1];
+	if (!get_xml_attribute(tag, tag_end, "value", value, sizeof(value)) ||
+	    !get_xml_attribute(tag, tag_end, "rgb", rgb, sizeof(rgb))) return;
+	mac_color_set_type* set;
+	if (strcmp(value, "placeholder") == 0) {
+		set = &folder->placeholder[source];
+	} else {
+		int index = atoi(value);
+		if (index < 0 || index >= MAC_MAX_COLOR_SETS) return;
+		set = &folder->color_sets[source][index];
+	}
+	memset(set, 0, sizeof(*set));
+	char* next = rgb;
+	while (set->count < MAC_MAX_COLOR_SLOTS) {
+		char* end;
+		unsigned long color = strtoul(next, &end, 16);
+		if (end == next) break;
+		set->colors[set->count++] = (SDL_Color){(Uint8)(color >> 16), (Uint8)(color >> 8), (Uint8)color, SDL_ALPHA_OPAQUE};
+		next = end;
+	}
+	set->present = set->count > 0;
+}
+
 // resources.xml lists the Mac images like Princed's resources.xml lists the DOS ones:
 // <folder file="kid.dat" path="KID"> <item value="401" path="res401.png" x="12" y="-3"/> </folder>
 // Folders can nest: the file is inherited and the paths are joined. x and y are the origin in Mac pixels.
+// A folder can also list colour sets: <colors value="placeholder" .../> are the colours drawn in its images,
+// <colors value="N" .../> replace them, slot by slot (see mac_set_chtab_colors).
 static void load_mac_resources_xml(const char* xml_path, int source) {
 	size_t size = 0;
 	char* text = SDL_LoadFile(locate_file(xml_path), &size);
@@ -270,6 +324,9 @@ static void load_mac_resources_xml(const char* xml_path, int source) {
 			} else {
 				memcpy(paths[depth], value, sizeof(paths[depth]));
 			}
+		} else if (strncmp(p, "<colors", 7) == 0 && files[depth][0] != '\0') {
+			mac_folder_type* folder = find_mac_folder_of_dat(files[depth]);
+			if (folder != NULL) read_mac_color_set(p, tag_end, folder, source);
 		} else if (strncmp(p, "<item", 5) == 0 && files[depth][0] != '\0') {
 			char item_path[POP_MAX_PATH];
 			char x[16] = "0", y[16] = "0";
@@ -278,12 +335,7 @@ static void load_mac_resources_xml(const char* xml_path, int source) {
 			if (get_xml_attribute(p, tag_end, "value", value, sizeof(value)) &&
 			    get_xml_attribute(p, tag_end, "path", item_path, sizeof(item_path))) {
 				int id = atoi(value);
-				// The folder is named after the DAT file without its extension: kid.dat -> KID.
-				char folder_name[POP_MAX_PATH];
-				snprintf_check(folder_name, sizeof(folder_name), "%s", files[depth]);
-				char* dot = strrchr(folder_name, '.');
-				if (dot != NULL) *dot = '\0';
-				mac_folder_type* folder = find_mac_folder(folder_name, true);
+				mac_folder_type* folder = find_mac_folder_of_dat(files[depth]);
 				if (folder != NULL && id >= 0 && id < MAC_MAX_RESOURCE) {
 					folder->has_mac_set = true;
 					mac_origin_type* origin = &folder->origins[source][id];
@@ -297,6 +349,9 @@ static void load_mac_resources_xml(const char* xml_path, int source) {
 					origin->path = SDL_strdup(full_path);
 					origin->x = (short)atoi(x);
 					origin->y = (short)atoi(y);
+					char slots[64];
+					SDL_free(origin->slots);
+					origin->slots = get_xml_attribute(p, tag_end, "slots", slots, sizeof(slots)) ? SDL_strdup(slots) : NULL;
 				}
 			}
 		}
@@ -344,6 +399,89 @@ static void set_mac_image_properties(image_type* image, bool has_origin, short o
 	SDL_SetNumberProperty(props, PROP_MAC_ORIGIN_Y, origin_y);
 }
 
+// A colour set of the folder: the mod's, then the game's. index -1 is the placeholder set.
+static const mac_color_set_type* get_mac_color_set(const mac_folder_type* folder, int index) {
+	if (index < -1 || index >= MAC_MAX_COLOR_SETS) return NULL;
+	for (int source = 1; source >= 0; --source) {
+		const mac_color_set_type* set = index < 0 ? &folder->placeholder[source] : &folder->color_sets[source][index];
+		if (set->present) return set;
+	}
+	return NULL;
+}
+
+static void SDLCALL free_color_slots(void* userdata, void* value) {
+	(void)userdata;
+	SDL_free(value);
+}
+
+// For each palette entry holding a placeholder colour, its slot; a colour set later replaces the entries by slot.
+// slots="from:to ..." of the image's <item> draws the entries of slot from in the colour of slot to.
+static void record_mac_color_slots(image_type* image, mac_folder_type* folder, const char* remap) {
+	const mac_color_set_type* placeholder = get_mac_color_set(folder, -1);
+	SDL_Palette* palette = SDL_GetSurfacePalette(image);
+	if (placeholder == NULL || palette == NULL) return;
+	Uint8* slots = SDL_malloc(256);
+	if (slots == NULL) return;
+	memset(slots, 0xFF, 256);
+	bool found = false;
+	for (int i = 1; i < palette->ncolors && i < 256; ++i) { // entry 0 is transparent
+		SDL_Color c = palette->colors[i];
+		for (int slot = 0; slot < placeholder->count; ++slot) {
+			SDL_Color p = placeholder->colors[slot];
+			if (c.r == p.r && c.g == p.g && c.b == p.b) {
+				slots[i] = (Uint8)slot;
+				found = true;
+				break;
+			}
+		}
+	}
+	if (!found) {
+		SDL_free(slots);
+		return;
+	}
+	if (remap != NULL) {
+		Uint8 placeholder_slots[256];
+		memcpy(placeholder_slots, slots, sizeof(placeholder_slots));
+		const char* next = remap;
+		int from, to, length;
+		while (sscanf(next, " %d:%d%n", &from, &to, &length) == 2) {
+			if (from >= 0 && from < MAC_MAX_COLOR_SLOTS && to >= 0 && to < MAC_MAX_COLOR_SLOTS) {
+				for (int i = 0; i < 256; ++i) {
+					if (placeholder_slots[i] == from) slots[i] = (Uint8)to;
+				}
+			}
+			next += length;
+		}
+	}
+	SDL_PropertiesID props = SDL_GetSurfaceProperties(image);
+	SDL_SetPointerPropertyWithCleanup(props, PROP_MAC_COLOR_SLOTS, slots, free_color_slots, NULL);
+	SDL_SetPointerProperty(props, PROP_MAC_FOLDER, folder);
+	SDL_SetNumberProperty(props, PROP_MAC_COLOR_SET, -1);
+}
+
+// Recolour the images of a chtab with colour set index, as the Mac game loads guard colour table 3000 + index.
+void mac_set_chtab_colors(chtab_type* chtab, int index) {
+	if (!mac_graphics || chtab == NULL) return;
+	for (int i = 0; i < chtab->n_images; ++i) {
+		image_type* image = chtab->images[i];
+		if (image == NULL) continue;
+		SDL_PropertiesID props = SDL_GetSurfaceProperties(image);
+		const Uint8* slots = SDL_GetPointerProperty(props, PROP_MAC_COLOR_SLOTS, NULL);
+		const mac_folder_type* folder = SDL_GetPointerProperty(props, PROP_MAC_FOLDER, NULL);
+		SDL_Palette* palette = SDL_GetSurfacePalette(image);
+		if (slots == NULL || folder == NULL || palette == NULL) continue;
+		if (SDL_GetNumberProperty(props, PROP_MAC_COLOR_SET, -1) == index) continue;
+		const mac_color_set_type* set = get_mac_color_set(folder, index);
+		if (set == NULL) continue;
+		for (int entry = 0; entry < palette->ncolors && entry < 256; ++entry) {
+			if (slots[entry] < set->count) {
+				SDL_SetPaletteColors(palette, &set->colors[slots[entry]], entry, 1);
+			}
+		}
+		SDL_SetNumberProperty(props, PROP_MAC_COLOR_SET, index);
+	}
+}
+
 image_type* load_mac_image(int resource_id, image_type* (*decode_png)(const void* data, int size)) {
 	if (!mac_graphics || resource_id < 0 || resource_id >= MAC_MAX_RESOURCE) return NULL;
 	// High-res art wins: the mod's Mac image, then the game's; DOS art only when neither loads.
@@ -370,6 +508,7 @@ image_type* load_mac_image(int resource_id, image_type* (*decode_png)(const void
 			SDL_free(data);
 			if (image == NULL) continue;
 			set_mac_image_properties(image, true, origin->x, origin->y);
+			record_mac_color_slots(image, folder, origin->slots);
 			return image;
 		}
 	}

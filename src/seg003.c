@@ -289,6 +289,8 @@ void redraw_screen(int drawing_different_room) {
 			// Moved *before* drawings.
 			set_chtab_palette(chtab_addrs[id_chtab_5_guard], &guard_palettes[0x30 * curr_guard_color - 0x30], 0x10);
 		}
+		// The Mac guards have a colour table for colour 0 as well.
+		mac_set_chtab_colors(chtab_addrs[id_chtab_5_guard], curr_guard_color);
 		need_drects = 0;
 		redraw_room();
 #ifdef USE_LIGHTING
