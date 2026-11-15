@@ -344,6 +344,7 @@ void options_process_enhancements(SDL_IOStream* rw, rw_process_func_type process
 	process(fixes_options_replay.enable_jump_grab);
 	process(fixes_options_replay.enable_all_gate_sounds);
 	process(fixes_options_replay.enable_falling_tiles_kill_guards);
+	process(fixes_options_replay.enable_twinkling_stars);
 }
 
 void options_process_fixes(SDL_IOStream* rw, rw_process_func_type process_func) {
@@ -669,6 +670,7 @@ void apply_replay_options(void) {
 	fixes_options_replay.fix_vertical_room_exits = 0;
 	fixes_options_replay.fix_guard_following_kid_down = 0;
 	fixes_options_replay.fix_jaffar_meeting_once = 0;
+	fixes_options_replay.enable_twinkling_stars = 0;
 	for (int i = 0; i < COUNT(replay_options_sections); ++i) {
 		load_options_from_buffer(replay_options_sections[i].replay_data, replay_options_sections[i].data_size, replay_options_sections[i].section_func);
 	}

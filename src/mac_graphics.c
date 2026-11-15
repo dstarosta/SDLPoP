@@ -482,6 +482,56 @@ void mac_set_chtab_colors(chtab_type* chtab, int index) {
 	}
 }
 
+// A render-only random number in 0..maximum, like the Mac game's: the game's random_seed is never touched.
+static int mac_star_random(int maximum) {
+	static Uint32 seed = 1;
+	seed = seed * 1103515245u + 12345u;
+	return (int)(((seed >> 16) & 0xFFFF) * (Uint32)(maximum + 1) >> 16);
+}
+
+// The stars (colour slots 0-2: centres, 3-4: arms) get a new colour every frame, as in the Mac game (CODE 3 $0F9E):
+// a centre is grey, light grey or white (10/30/60%), or 8% of the time a star colour; an arm is black, 1% a star colour.
+// With only_new, only images not yet animated get colours (freshly loaded ones still show the placeholders).
+void mac_twinkle_stars(chtab_type* chtab, bool only_new) {
+	if (!mac_graphics || chtab == NULL) return;
+	static const SDL_Color greys[] = {{0x99, 0x99, 0x99, 255}, {0xCC, 0xCC, 0xCC, 255}, {0xFA, 0xFA, 0xFA, 255}};
+	static const SDL_Color black = {0, 0, 0, 255};
+	SDL_Color colors[5];
+	const mac_color_set_type* placeholder = NULL;
+	for (int i = 0; i < chtab->n_images; ++i) {
+		image_type* image = chtab->images[i];
+		if (image == NULL) continue;
+		SDL_PropertiesID props = SDL_GetSurfaceProperties(image);
+		const Uint8* slots = SDL_GetPointerProperty(props, PROP_MAC_COLOR_SLOTS, NULL);
+		const mac_folder_type* folder = SDL_GetPointerProperty(props, PROP_MAC_FOLDER, NULL);
+		SDL_Palette* palette = SDL_GetSurfacePalette(image);
+		if (slots == NULL || folder == NULL || palette == NULL) continue;
+		if (only_new && SDL_GetNumberProperty(props, PROP_MAC_COLOR_SET, -1) != -1) continue;
+		if (placeholder == NULL) {
+			placeholder = get_mac_color_set(folder, -1);
+			if (placeholder == NULL || placeholder->count < 5) return;
+			for (int slot = 0; slot < 5; ++slot) {
+				if (slot <= 2) {
+					if (mac_star_random(99) >= 92) {
+						colors[slot] = placeholder->colors[mac_star_random(2)];
+					} else {
+						int roll = mac_star_random(99);
+						colors[slot] = greys[roll < 10 ? 0 : roll < 40 ? 1 : 2];
+					}
+				} else {
+					colors[slot] = mac_star_random(99) < 99 ? black : placeholder->colors[3 + mac_star_random(1)];
+				}
+			}
+		}
+		for (int entry = 0; entry < palette->ncolors && entry < 256; ++entry) {
+			if (slots[entry] < 5) {
+				SDL_SetPaletteColors(palette, &colors[slots[entry]], entry, 1);
+			}
+		}
+		SDL_SetNumberProperty(props, PROP_MAC_COLOR_SET, 0);
+	}
+}
+
 image_type* load_mac_image(int resource_id, image_type* (*decode_png)(const void* data, int size)) {
 	if (!mac_graphics || resource_id < 0 || resource_id >= MAC_MAX_RESOURCE) return NULL;
 	// High-res art wins: the mod's Mac image, then the game's; DOS art only when neither loads.

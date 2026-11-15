@@ -786,6 +786,11 @@ int get_render_height(void);
 bool mac_has_image(const char* folder_name, int resource_id);
 image_type* load_mac_image(int resource_id, image_type* (*decode_png)(const void* data, int size));
 void mac_set_chtab_colors(chtab_type* chtab, int index);
+void mac_twinkle_stars(chtab_type* chtab, bool only_new);
+#ifdef USE_TWINKLING_STARS
+void twinkle_balcony_stars(void);
+#endif
+void mac_update_star_colors(bool advance);
 void set_mac_image_dos_size(image_type* image, int width, int height);
 bool is_native_resolution_image(const image_type* image);
 void mark_native_resolution_image(image_type* image);

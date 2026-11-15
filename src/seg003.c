@@ -294,6 +294,7 @@ void redraw_screen(int drawing_different_room) {
 		}
 		// The Mac guards have a colour table for colour 0 as well.
 		mac_set_chtab_colors(chtab_addrs[id_chtab_5_guard], curr_guard_color);
+		mac_update_star_colors(false);
 		need_drects = 0;
 		redraw_room();
 #ifdef USE_LIGHTING

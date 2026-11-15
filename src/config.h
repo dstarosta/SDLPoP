@@ -369,6 +369,9 @@ The authors of this program may be contacted at https://forum.princed.org
 // A falling tile kills a guard it comes down on (as in Prince of Persia 2)
 #define USE_FALLING_TILES_KILL_GUARDS
 
+// The stars above the palace balconies twinkle like those of the princess's window (DOS graphics; Mac stars always do)
+#define USE_TWINKLING_STARS
+
 // Debug features:
 
 // When the program starts, check whether the deobfuscated sequence table (seqtbl.c) is correct.

@@ -810,6 +810,8 @@ FIXED: Added a configurable fix for: Entering Jaffar's room on level 13 played t
 	every time, so stepping out and back in froze him again, long enough to kill him with one hit.
 	Now it happens once per level.
 	Details: See FIX_JAFFAR_MEETING_ONCE in config.h.
+DONE: Added an enhancement: the stars above the palace balconies twinkle like those of the princess's window.
+	Use the "enable_twinkling_stars" option in SDLPoP.ini.
 CHANGED: FIX_JUMP_DISTANCE_AT_EDGE now sets the edge distance before the climb up (11 pixels, as he can hang at 11 or 12)
 	instead of moving the prince a pixel when he jumps afterwards, so the climb frames of a wider sprite (a caped prince)
 	line up too.

@@ -222,6 +222,7 @@ enum setting_ids {
 	SETTING_ENABLE_JUMP_GRAB,
 	SETTING_ENABLE_ALL_GATE_SOUNDS,
 	SETTING_ENABLE_FALLING_TILES_KILL_GUARDS,
+	SETTING_ENABLE_TWINKLING_STARS,
 	SETTING_USE_CUSTOM_OPTIONS,
 	SETTING_START_MINUTES_LEFT,
 	SETTING_START_TICKS_LEFT,
@@ -495,6 +496,13 @@ setting_type gameplay_settings[] = {
 				.text = "Falling tiles kill guards",
 				.explanation = "A falling tile kills a guard it comes down on (as in Prince of Persia 2).\n"
 						"It hits him when it covers at least half of his body."},
+#endif
+#ifdef USE_TWINKLING_STARS
+		{.id = SETTING_ENABLE_TWINKLING_STARS, .style = SETTING_STYLE_TOGGLE,
+				.linked = &fixes_saved.enable_twinkling_stars, .required = &use_fixes_and_enhancements,
+				.text = "Twinkling balcony stars",
+				.explanation = "The stars above the palace balconies twinkle like those of the princess's window.\n"
+						"With Mac graphics they always twinkle, as in the Mac game."},
 #endif
 		{.id = SETTING_FIX_GATE_SOUNDS, .style = SETTING_STYLE_TOGGLE,
 				.linked = &fixes_saved.fix_gate_sounds, .required = &use_fixes_and_enhancements,
@@ -1655,6 +1663,12 @@ void draw_setting(setting_type* setting, rect_type* parent, int* y_offset, int i
 	if (setting->required != NULL) {
 		disabled = !(*(byte*)setting->required);
 	}
+#ifdef USE_TWINKLING_STARS
+	// The Mac game's stars always twinkle.
+	if (setting->id == SETTING_ENABLE_TWINKLING_STARS && uses_mac_graphics()) {
+		disabled = true;
+	}
+#endif
 	if (disabled) {
 		text_color = color_7_lightgray;
 	}

@@ -1121,6 +1121,25 @@ static dat_type* find_image_dat(int resource_id) {
 	return pointer;
 }
 
+// The size of a DOS image, read from its header without decoding the image: collisions use it.
+static void get_dos_image_size(int resource_id, int* width, int* height) {
+	data_location result;
+	int size;
+	byte* data = load_from_opendats_alloc(resource_id, "png", &result, &size);
+	*width = *height = 0;
+	if (result == data_DAT && size >= (int)sizeof(image_data_type)) {
+		const image_data_type* header = (const image_data_type*)data;
+		if (SDL_Swap16LE(header->height) != 0) { // decode_image() returns no image then
+			*width = SDL_Swap16LE(header->width);
+			*height = SDL_Swap16LE(header->height);
+		}
+	} else if (result == data_directory && size >= 24 && memcmp(data + 12, "IHDR", 4) == 0) {
+		*width = (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
+		*height = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
+	}
+	free(data);
+}
+
 // seg009:121A
 image_type* load_image(int resource_id, dat_pal_type* palette) {
 	image_type* image = load_mac_image(resource_id, load_png_image);
@@ -1141,17 +1160,17 @@ image_type* load_image(int resource_id, dat_pal_type* palette) {
 		if (image != NULL && uses_snes_graphics()) {
 			// SNES sprites have other sizes; collisions use the DOS size.
 			pause_snes_resources(true);
-			image_type* dos_image = load_dos_image(resource_id, palette);
+			int dos_width, dos_height;
+			get_dos_image_size(resource_id, &dos_width, &dos_height);
 			pause_snes_resources(false);
-			set_mac_image_dos_size(image, dos_image ? dos_image->w : 0, dos_image ? dos_image->h : 0);
-			SDL_DestroySurface(dos_image);
+			set_mac_image_dos_size(image, dos_width, dos_height);
 		}
 		return image;
 	}
 	// Remember the DOS size: collisions are computed from it.
-	image_type* dos_image = load_dos_image(resource_id, palette);
-	set_mac_image_dos_size(image, dos_image ? dos_image->w : 0, dos_image ? dos_image->h : 0);
-	SDL_DestroySurface(dos_image);
+	int dos_width, dos_height;
+	get_dos_image_size(resource_id, &dos_width, &dos_height);
+	set_mac_image_dos_size(image, dos_width, dos_height);
 	if (!SDL_SetSurfaceColorKey(image, true, 0)) {
 		sdlperror("load_image: SDL_SetSurfaceColorKey");
 		quit(1);

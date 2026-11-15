@@ -573,6 +573,9 @@
   <item value="973" path="res973.png" x="0" y="29"/>
   <item value="974" path="res974.png" x="0" y="29"/>
   <item value="975" path="res975.png" x="0" y="29"/>
+  <!-- Stars: clut 2000 entries 196-200, drawn in the Mac game's "star colors" (clut 3500): centres 196-198, arms 199-200.
+       Every frame the game picks each one's colour at random (mac_twinkle_stars); these are the colours to replace. -->
+  <colors value="placeholder" rgb="FFE60F 0033FF FF1E00 197FFF B333E6"/>
  </folder>
  <folder file="shadow.dat" path="SHADOW">
   <item value="751" path="res751.png" x="0" y="11"/>
@@ -954,5 +957,8 @@
   <item value="375" path="res375.png" x="0" y="4"/>
   <item value="376" path="res376.png" x="-10" y="4"/>
   <item value="377" path="res377.png" x="0" y="4"/>
+  <!-- Stars: clut 2000 entries 196-200, drawn in the Mac game's "star colors" (clut 3500): centres 196-198, arms 199-200.
+       Every frame the game picks each one's colour at random (mac_twinkle_stars); these are the colours to replace. -->
+  <colors value="placeholder" rgb="FFE60F 0033FF FF1E00 197FFF B333E6"/>
  </folder>
 </resources>

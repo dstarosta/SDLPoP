@@ -922,8 +922,34 @@ void play_frame() {
     }
 }
 
+// A balcony in the room, in the given column (-1: any).
+static bool is_balcony_in(int room, int column) {
+    if (room == 0) return false;
+    for (int pos = 0; pos < 30; ++pos) {
+        if (column >= 0 && pos % 10 != column) continue;
+        byte tile = level.fg[(room - 1) * 30 + pos] & 0x1F;
+        if (tile == tiles_23_balcony_left || tile == tiles_24_balcony_right) return true;
+    }
+    return false;
+}
+
+// The stars of the Mac palace balconies twinkle every frame, as in the Mac game; a balcony on screen is then redrawn.
+// Without advance, only images loaded since get their colours.
+void mac_update_star_colors(bool advance) {
+    if (!uses_mac_graphics() || !custom->tbl_level_type[current_level]) return;
+    mac_twinkle_stars(chtab_addrs[id_chtab_6_environment], !advance);
+    // A balcony in the left room's last column shows here too.
+    if (advance && (is_balcony_in(drawn_room, -1) || is_balcony_in(room_L, 9))) {
+        need_mac_tile_redraw = 1;
+    }
+}
+
 // seg000:09B6
 void draw_game_frame() {
+    mac_update_star_colors(true);
+#ifdef USE_TWINKLING_STARS
+    twinkle_balcony_stars();
+#endif
     // A Mac tile-change redraw must not swallow a room change; redraw_screen(1) redraws everything anyway.
     if (different_room) {
         need_mac_tile_redraw = 0;

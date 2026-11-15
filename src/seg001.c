@@ -51,8 +51,6 @@ hof_type hof[MAX_HOF_COUNT];
 
 #define N_STARS 6
 
-static void restore_princess_stars(void);
-static void reset_mac_stars(void);
 
 static int mac_native_princess_room(void) {
 	chtab_type* room = chtab_addrs[id_chtab_8_princessroom];
@@ -168,6 +166,7 @@ void draw_princess_room_bg() {
 	memset(table_counts, 0, sizeof(table_counts));
 	const int native_room = mac_native_princess_room();
 	if (native_room) {
+		mac_twinkle_stars(chtab_addrs[id_chtab_8_princessroom], false); // every frame, as in the Mac game
 		free_peels();
 		add_backtable_physical(id_chtab_8_princessroom, 1, 0, 0, blitters_0_no_transp);
 	}
@@ -194,9 +193,6 @@ void draw_princess_room_bg() {
 	draw_hourglass();
 	draw_tables();
 	if (native_room) {
-		current_target_surface = offscreen_surface;
-		restore_princess_stars();
-		current_target_surface = onscreen_surface_;
 		rect_type dirty = screen_rect;
 		add_drect(&dirty);
 	}
@@ -730,7 +726,6 @@ void load_intro(int which_imgs,cutscene_ptr_type func,int free_sounds) {
 	load_chtab_from_file(id_chtab_3_princessinstory, 800, "PV.DAT", 1<<9);
 	load_chtab_from_file(id_chtab_4_jaffarinstory_princessincutscenes,
 	                     50*which_imgs + 850, "PV.DAT", 1<<10);
-	reset_mac_stars();
 	for (short current_star = 0; current_star < N_STARS; ++current_star) {
 		draw_star(current_star, 0);
 	}
@@ -770,56 +765,12 @@ star_type stars[N_STARS] = {
 // data:0DE6
 const byte star_colors[N_STAR_COLORS] = {8, 7, 15, 15, 7};
 
-// The stars painted in the Mac room picture (640x400 centres): two in the window, nine over the balconies.
-static const short mac_star_centres[][2] = {
-	{ 17, 209}, { 31, 203},
-	{199, 226}, {239, 201}, {303, 209}, {318, 226}, {338, 203}, {416, 193}, {442, 219}, {543, 200}, {549, 221},
-};
-#define N_MAC_STARS COUNT(mac_star_centres)
-static byte mac_star_colors[N_MAC_STARS];
-static byte mac_star_turn;
-
-static void reset_mac_stars(void) {
-	for (int i = 0; i < N_MAC_STARS; ++i) {
-		mac_star_colors[i] = i % N_STAR_COLORS;
-	}
-	mac_star_turn = 0;
-}
-
-// Repaints a Mac star from the room picture, dimmed like the DOS star colours (dark grey, grey, white).
-static void draw_mac_star(int which_star) {
-	static const int brightness[N_STAR_COLORS] = {85, 170, 255, 255, 170};
-	image_type* room = get_image(id_chtab_8_princessroom, 0);
-	SDL_Palette* palette = room ? SDL_GetSurfacePalette(room) : NULL;
-	if (palette == NULL || !SDL_LockSurface(room)) return;
-	int level = brightness[mac_star_colors[which_star]];
-	for (int y = mac_star_centres[which_star][1] - 2; y <= mac_star_centres[which_star][1] + 2; ++y) {
-		for (int x = mac_star_centres[which_star][0] - 2; x <= mac_star_centres[which_star][0] + 2; ++x) {
-			SDL_Color c = palette->colors[((byte*)room->pixels)[y * room->pitch + x]];
-			if (c.r + c.g + c.b < 60) continue;
-			Uint32 rgb = ((Uint32)(c.r * level / 255) << 16) | ((Uint32)(c.g * level / 255) << 8) | (Uint32)(c.b * level / 255);
-			draw_native_rect_physical(x, y, 1, 1, rgb);
-		}
-	}
-	SDL_UnlockSurface(room);
-}
-
-// Redraws the stars at their current colours; the Mac room is recomposed every frame.
-static void restore_princess_stars(void) {
-	for (int i = 0; i < N_MAC_STARS; ++i) {
-		draw_mac_star(i);
-	}
-}
-
 // seg001:0E1C
 void draw_star(int which_star,int mark_dirty) {
 	// The stars in the window of the princess's room.
 	if (mac_native_princess_room()) {
-		// The Mac picture has its own stars; spread the DOS twinkles over them without extra random numbers.
+		// The Mac picture's own stars twinkle every frame instead (draw_princess_room_bg).
 		stars[which_star].color = (stars[which_star].color + 1) % N_STAR_COLORS;
-		int mac_star = (which_star * 2 + mac_star_turn++) % N_MAC_STARS;
-		mac_star_colors[mac_star] = (mac_star_colors[mac_star] + 1) % N_STAR_COLORS;
-		draw_mac_star(mac_star);
 		return;
 	}
 	rect_type rect;

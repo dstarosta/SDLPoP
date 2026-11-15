@@ -3190,3 +3190,141 @@ void draw_right_mark (word decal_variant, word arg1) {
 	}
 	ptr_add_table(RSET_WALL, image_id, draw_xh + (decal_variant > 1), arg1, draw_bottom_y - RPOS[decal_variant], BLIT_TRANS, 0);
 }
+
+#ifdef USE_TWINKLING_STARS
+// The stars in the sky of the palace balconies twinkle like those of the princess's window, which the DOS game never did.
+#define STAR_ENTRY 16 // palette entries 16-18 are added to the balcony pieces: dark grey, grey, white
+
+#define PROP_BALCONY_STARS "sdlpop.balcony_stars" // the piece has been set up
+
+typedef struct balcony_star_type {
+	byte piece; // 0-3: balcony images 10-13 of the environment
+	short x, y;
+	image_type* image; // NULL if this pixel is sky (a mod's other balcony)
+	byte original_entry; // the pixel as drawn
+	byte color;
+} balcony_star_type;
+
+static balcony_star_type balcony_stars[] = {
+	{0, 23, 1}, {0, 24, 14}, // balcony left
+	{1, 21, 15}, // its top
+	{2, 7, 7}, // balcony right
+	{3, 8, 15}, // its top
+};
+#define N_BALCONY_STARS COUNT(balcony_stars)
+static byte balcony_star_frames;
+static bool balcony_stars_changed; // some star is not as drawn
+// The colours of the princess's window stars (see draw_star), as the added palette entries.
+static const byte balcony_star_entries[] = {STAR_ENTRY, STAR_ENTRY + 1, STAR_ENTRY + 2, STAR_ENTRY + 2, STAR_ENTRY + 1};
+
+// A render-only random number in 0..maximum: the game's random_seed is never touched.
+static int balcony_star_random(int maximum) {
+	static Uint32 seed = 1;
+	seed = seed * 1103515245u + 12345u;
+	return (int)(((seed >> 16) & 0xFFFF) * (Uint32)(maximum + 1) >> 16);
+}
+
+static void set_balcony_star_pixel(const balcony_star_type* star, byte entry) {
+	if (!SDL_LockSurface(star->image)) return;
+	((byte*)star->image->pixels)[star->y * star->image->pitch + star->x] = entry;
+	SDL_UnlockSurface(star->image);
+}
+
+static bool are_balcony_stars_set_up(void) {
+	for (int piece = 0; piece < 4; ++piece) {
+		image_type* image = get_image(id_chtab_6_environment, 9 + piece);
+		if (image != NULL && !SDL_GetBooleanProperty(SDL_GetSurfaceProperties(image), PROP_BALCONY_STARS, false)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void set_up_balcony_stars(void) {
+	extern rgb_type palette[256];
+	static const byte dos_star_colors[] = {8, 7, 15}; // dark grey, grey, white
+	for (int i = 0; i < N_BALCONY_STARS; ++i) {
+		balcony_stars[i].image = NULL;
+	}
+	balcony_stars_changed = false;
+	for (int piece = 0; piece < 4; ++piece) {
+		image_type* image = get_image(id_chtab_6_environment, 9 + piece);
+		if (image == NULL) continue;
+		SDL_SetBooleanProperty(SDL_GetSurfaceProperties(image), PROP_BALCONY_STARS, true);
+		SDL_Palette* image_palette = SDL_GetSurfacePalette(image);
+		if (image_palette == NULL || (image_palette->ncolors > 16 && image_palette->ncolors < STAR_ENTRY + 3)) continue;
+		if (image_palette->ncolors <= 16) {
+			// A PNG's palette has only the colours it uses: make room for the star colours.
+			SDL_Palette* larger_palette = SDL_CreatePalette(STAR_ENTRY + 3);
+			if (larger_palette == NULL) continue;
+			SDL_SetPaletteColors(larger_palette, image_palette->colors, 0, image_palette->ncolors);
+			SDL_SetSurfacePalette(image, larger_palette);
+			SDL_DestroyPalette(larger_palette); // the surface keeps it
+			image_palette = SDL_GetSurfacePalette(image);
+		}
+		for (int i = 0; i < 3; ++i) {
+			rgb_type c = palette[dos_star_colors[i]];
+			SDL_Color color = {(Uint8)(c.r << 2), (Uint8)(c.g << 2), (Uint8)(c.b << 2), SDL_ALPHA_OPAQUE};
+			SDL_SetPaletteColors(image_palette, &color, STAR_ENTRY + i, 1);
+		}
+		if (!SDL_LockSurface(image)) continue;
+		for (int i = 0; i < N_BALCONY_STARS; ++i) {
+			balcony_star_type* star = &balcony_stars[i];
+			byte entry = (star->x < image->w && star->y < image->h) ? ((const byte*)image->pixels)[star->y * image->pitch + star->x] : 0;
+			if (star->piece == piece && entry != 0) {
+				star->image = image;
+				star->original_entry = entry;
+				star->color = 2; // white, as drawn
+			}
+		}
+		SDL_UnlockSurface(image);
+	}
+}
+
+static bool is_balcony_tile(int room, int tilepos) {
+	if (room == 0) return false;
+	byte tile = level.fg[(room - 1) * 30 + tilepos] & 0x1F;
+	return tile == tiles_23_balcony_left || tile == tiles_24_balcony_right;
+}
+
+// The pieces are drawn by the tile right of each balcony tile and by the one above that.
+static void redraw_balcony_stars(void) {
+	for (int pos = 0; pos < 30; ++pos) {
+		if (is_balcony_tile(drawn_room, pos)) {
+			set_redraw_full(get_tilepos(pos % 10 + 1, pos / 10), 1);
+			set_redraw_full(get_tilepos(pos % 10 + 1, pos / 10 - 1), 1);
+		}
+	}
+	for (int row = 0; row < 3; ++row) {
+		if (is_balcony_tile(room_L, row * 10 + 9)) {
+			set_redraw_full(get_tilepos(0, row), 1);
+			set_redraw_full(get_tilepos(0, row - 1), 1);
+		}
+	}
+}
+
+// Called every frame: every other frame a star changes its colour, as in the princess's window.
+void twinkle_balcony_stars(void) {
+	if (uses_mac_graphics() || !custom->tbl_level_type[current_level]) return;
+	bool set_up = are_balcony_stars_set_up(); // a level load replaces the pieces
+	if (!fixes->enable_twinkling_stars) {
+		// Turned off: the stars go back to how they are drawn.
+		if (set_up && balcony_stars_changed) {
+			for (int i = 0; i < N_BALCONY_STARS; ++i) {
+				if (balcony_stars[i].image != NULL) set_balcony_star_pixel(&balcony_stars[i], balcony_stars[i].original_entry);
+			}
+			balcony_stars_changed = false;
+			redraw_balcony_stars();
+		}
+		return;
+	}
+	if (!set_up) set_up_balcony_stars();
+	if (++balcony_star_frames & 1) return;
+	balcony_star_type* star = &balcony_stars[balcony_star_random(N_BALCONY_STARS - 1)];
+	if (star->image == NULL) return;
+	star->color = (star->color + 1) % COUNT(balcony_star_entries);
+	set_balcony_star_pixel(star, balcony_star_entries[star->color]);
+	balcony_stars_changed = true;
+	redraw_balcony_stars();
+}
+#endif
