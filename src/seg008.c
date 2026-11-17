@@ -751,9 +751,12 @@ static void mac_draw_tile_exact(void) {
 }
 
 static void mac_draw_overlay_components(int mid) {
-	mac_back_to_mid = mid;
+	// CODE 4:$39C6: of the left tile's pieces only a floor's right piece joins the overlay; the rest (a pillar's side...) stays behind the kid.
+	mac_back_to_mid = mid && tile_left == tiles_1_floor;
 	mac_draw_left_other_overhang();
+	mac_back_to_mid = 0;
 	mac_draw_left_animated();
+	mac_back_to_mid = mid;
 	mac_draw_current_floor_front(0);
 	mac_draw_current_floor_top();
 	mac_draw_current_animated();
